@@ -1,0 +1,9 @@
+industry_code,industry_name,year,gross_output,materials_cost,intermediate_inputs,value_added,source
+22,Utilities,2021,595000,201000,,394000,BEA (demo)
+311,Food Manufacturing,2021,904100,552700,,351400,ASM (demo)
+325,Chemical Manufacturing,2021,832300,365300,,467000,ASM (demo)
+336,Transportation Equipment,2021,878700,577500,,301200,ASM (demo)
+324,Petroleum and Coal Products,2021,610400,473400,,137000,ASM (demo)
+315,Apparel Manufacturing,2021,9400,4200,,5200,ASM (demo)
+23,Construction,2021,1986000,,974000,1012000,BEA (demo)
+44-45,Retail Trade,2021,1800000,1600000,,200000,Inferred (demo)

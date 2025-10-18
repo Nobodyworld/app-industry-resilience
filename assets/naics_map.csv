@@ -1,0 +1,21 @@
+industry_code,industry_name,bea_group
+11,"Agriculture,Forestry,Fishing and Hunting",AG
+21,"Mining,Quarrying,and Oil and Gas Extraction",MIN
+22,"Utilities",UTIL
+23,"Construction",CONST
+31-33,"Manufacturing",MANUF
+42,"Wholesale Trade",WHOLE
+44-45,"Retail Trade",RETAIL
+48-49,"Transportation and Warehousing",TRANS
+51,"Information",INFO
+52,"Finance and Insurance",FIN
+53,"Real Estate and Rental and Leasing",RE
+54,"Professional,Scientific,and Technical Services",PROF
+55,"Management of Companies and Enterprises",MGMT
+56,"Administrative and Support and Waste Management",ADMIN
+61,"Educational Services",ED
+62,"Health Care and Social Assistance",HEALTH
+71,"Arts,Entertainment,and Recreation",ARTS
+72,"Accommodation and Food Services",FOOD
+81,"Other Services (except Public Administration)",OTHER
+92,"Public Administration",PUBLIC
