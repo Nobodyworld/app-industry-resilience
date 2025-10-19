@@ -65,24 +65,34 @@ docker run -p 8501:8501 idiot-index-app
 
 ## Development
 
-Install development dependencies:
+Install development and tooling dependencies plus git hooks with a single command:
 
 ```bash
-pip install -r requirements-dev.txt
+make setup
 ```
 
-Run code quality checks:
+`make setup` installs Python runtime + dev dependencies and registers the `pre-commit` hooks (including the `commit-msg` hook that enforces Conventional Commits). Set `SKIP_PIP=1 make setup` if you are working in an offline environment where pip cannot reach PyPI.
+
+Every change should pass the repository quality gate before you push:
 
 ```bash
-# Unit tests
-pytest
-
-# Linting
-flake8 src/
-
-# Type checking
-mypy src/
+make check
 ```
+
+`make check` runs all configured pre-commit hooks (Black, Ruff, codespell, detect-secrets, mypy, commitlint) across the repository, executes the security gate (`pip-audit` + `detect-secrets` baseline diff), and then runs `pytest` with coverage reporting. If the `pre-commit` binary is unavailable, the Makefile falls back to the same checks via `scripts/run_quality_checks.py` so the workflow still works offline.
+
+Targeted commands are also available:
+
+```bash
+make format        # Auto-format using Black
+make lint          # Ruff linting without auto-fix
+make typecheck     # mypy static analysis
+make test          # pytest without coverage
+make security      # pip-audit + detect-secrets baseline validation
+make sbom          # Generate CycloneDX SBOM at build/sbom/cyclonedx.json
+```
+
+Commit messages must follow the Conventional Commits spec; the provided hooks will prevent non-conforming messages.
 
 ## Architecture
 

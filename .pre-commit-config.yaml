@@ -1,0 +1,54 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-trailing-whitespace
+        name: Check trailing whitespace
+        entry: python scripts/check_trailing_whitespace.py
+        language: system
+        files: "\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$"
+      - id: ensure-eof-newline
+        name: Ensure EOF newline
+        entry: python scripts/check_trailing_whitespace.py --check-eof
+        language: system
+        pass_filenames: true
+        files: "\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$"
+      - id: black
+        name: Black
+        entry: python -m black
+        language: system
+        types: [python]
+      - id: ruff
+        name: Ruff
+        entry: python -m ruff
+        args: ["check", "--fix"]
+        language: system
+        types: [python]
+      - id: codespell
+        name: Codespell (offline)
+        entry: python scripts/codespell.py
+        language: system
+        files: "\.(py|md|markdown|txt|rst)$"
+      - id: mypy
+        name: mypy
+        entry: python -m mypy
+        language: system
+        pass_filenames: false
+        types: [python]
+        require_serial: true
+      - id: commitlint
+        name: Conventional Commit lint
+        entry: python scripts/commitlint.py
+        language: system
+        stages: [commit-msg]
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args:
+          - --baseline
+          - .secrets.baseline
