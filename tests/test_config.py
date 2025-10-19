@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from src.config import ConfigError, Environment, get_config_summary, load_config, validate_config
+from src.core import (
+    ConfigError,
+    Environment,
+    get_config_summary,
+    load_config,
+    validate_config,
+)
 
 
 def test_load_config_from_mapping(tmp_path) -> None:

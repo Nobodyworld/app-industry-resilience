@@ -84,6 +84,14 @@ flake8 src/
 mypy src/
 ```
 
+## Architecture
+
+The project is organised into dedicated layers (`core`, `adapters`, `infrastructure`, `interfaces`, and `agents`) to keep domain logic decoupled from interfaces. Refer to [ARCHITECTURE.md](ARCHITECTURE.md) for a full breakdown of the new layout and compatibility shims.
+
+## Agent integrations
+
+Automated clients can call the Idiot Index pipeline through the agent toolkit under `agents/`. The primary tool, `compute_idiot_index_summary`, exposes validated dataclass payloads and JSON schemas for integration. See [docs/AI_INTERFACE.md](docs/AI_INTERFACE.md) for invocation details and schema definitions.
+
 ## API Keys
 
 To access live government data, create a `.env` file:

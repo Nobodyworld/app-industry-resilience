@@ -8,11 +8,18 @@ import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 from urllib.parse import urlencode
 
-from src.config import get_config_summary, load_config, validate_config
-from src.metrics import compute_metrics, format_for_display
-from src.normalize import normalize_columns
-from src.security import FilePolicy, SecurityUtils
-from src.ui.components import (
+from src.adapters import fetch_asm_manufacturing, fetch_go_ii_by_industry
+from src.core import (
+    FilePolicy,
+    SecurityUtils,
+    compute_metrics,
+    format_for_display,
+    get_config_summary,
+    load_config,
+    normalize_columns,
+    validate_config,
+)
+from src.interfaces.streamlit.components import (
     build_data_story,
     load_custom_styles,
     render_deep_dive,
@@ -23,7 +30,7 @@ from src.ui.components import (
     render_signal_bar,
     render_state_banner,
 )
-from src.ui.helpers import (
+from src.interfaces.streamlit.helpers import (
     build_comparison_table,
     calculate_benchmark,
     decode_query_params,
@@ -42,14 +49,10 @@ def load_sample() -> pd.DataFrame:
 
 
 def try_fetch_census(year: int, api_key: str) -> pd.DataFrame:
-    from src.sources.census_asm import fetch_asm_manufacturing
-
     return fetch_asm_manufacturing(api_key=api_key, year=year)
 
 
 def try_fetch_bea(year: int, api_key: str) -> pd.DataFrame:
-    from src.sources.bea import fetch_go_ii_by_industry
-
     return fetch_go_ii_by_industry(api_key=api_key, year=year)
 
 

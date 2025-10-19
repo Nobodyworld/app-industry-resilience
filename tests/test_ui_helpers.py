@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from src.ui.helpers import (
+from src.interfaces.streamlit.helpers import (
     build_comparison_table,
     calculate_benchmark,
     decode_query_params,
