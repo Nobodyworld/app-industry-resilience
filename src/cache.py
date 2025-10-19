@@ -1,111 +1,142 @@
+"""File-system backed caching utilities used across the application."""
+
+from __future__ import annotations
+
 import json
-import hashlib
+import threading
 import time
-from typing import Any, Optional, Dict
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+from .config import CacheConfig, load_config
+
+
+@dataclass(frozen=True)
+class CacheStats:
+    """Summary information for cache inspection and tests."""
+
+    files: int
+    total_size_bytes: int
+
 
 class Cache:
-    """Simple file-based cache for API responses and computations."""
+    """Simple JSON-file cache with time-based expiration.
 
-    def __init__(self, cache_dir: str = ".cache", ttl_seconds: int = 3600):
-        self.cache_dir = Path(cache_dir)
+    The cache stores JSON-serialisable values on disk so data is preserved across
+    restarts. Each entry is written atomically to avoid corrupted files and is
+    automatically expired based on its configured TTL.
+    """
+
+    def __init__(self, cache_dir: Path, ttl_seconds: int) -> None:
+        self.cache_dir = cache_dir
         self.ttl_seconds = ttl_seconds
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
 
-    # TODO - Implement cache size limits and automatic cleanup policies
-    # TODO - Add cache encryption for sensitive data storage
-    # TODO - Implement distributed cache support (Redis, Memcached)
+    def _path_for_key(self, key: str) -> Path:
+        hashed = _stable_hash(key)
+        return self.cache_dir / f"{hashed}.json"
 
-    def _get_cache_key(self, key: str) -> str:
-        """Generate a safe cache key from the input key."""
-        return hashlib.md5(key.encode()).hexdigest()
-
-    def _get_cache_path(self, cache_key: str) -> Path:
-        """Get the file path for a cache key."""
-        return self.cache_dir / f"{cache_key}.json"
-
-    def get(self, key: str) -> Optional[Any]:
-        """Retrieve value from cache if it exists and hasn't expired."""
-        cache_key = self._get_cache_key(key)
-        cache_path = self._get_cache_path(cache_key)
-
-        if not cache_path.exists():
+    def get(self, key: str) -> Any | None:
+        path = self._path_for_key(key)
+        if not path.exists():
             return None
-
-        try:
-            with open(cache_path, 'r') as f:
-                data = json.load(f)
-
-            # Check if cache has expired
-            if time.time() - data['timestamp'] > self.ttl_seconds:
-                cache_path.unlink()  # Remove expired cache
+        with self._lock:
+            try:
+                with path.open("r", encoding="utf-8") as handle:
+                    payload = json.load(handle)
+            except (json.JSONDecodeError, OSError):
+                _safe_unlink(path)
                 return None
 
-            return data['value']
+            if _is_expired(payload.get("timestamp"), self.ttl_seconds):
+                _safe_unlink(path)
+                return None
 
-        except (json.JSONDecodeError, KeyError, OSError):
-            # Invalid cache file, remove it
-            if cache_path.exists():
-                cache_path.unlink()
-            return None
-
-    # TODO - Implement cache hit/miss statistics and performance monitoring
-    # TODO - Add cache compression for large data structures
-    # TODO - Implement cache invalidation strategies and cache tags
+            return payload.get("value")
 
     def set(self, key: str, value: Any) -> None:
-        """Store value in cache."""
-        cache_key = self._get_cache_key(key)
-        cache_path = self._get_cache_path(cache_key)
-
-        data = {
-            'timestamp': time.time(),
-            'value': value
-        }
-
-        try:
-            with open(cache_path, 'w') as f:
-                json.dump(data, f, indent=2)
-        except OSError:
-            # If we can't write to cache, just continue
-            pass
+        path = self._path_for_key(key)
+        payload = {"timestamp": time.time(), "value": value}
+        tmp_path = path.with_suffix(".tmp")
+        with self._lock:
+            try:
+                with tmp_path.open("w", encoding="utf-8") as handle:
+                    json.dump(payload, handle, ensure_ascii=False)
+                tmp_path.replace(path)
+            except OSError:
+                _safe_unlink(tmp_path)
 
     def clear(self) -> None:
-        """Clear all cached data."""
-        for cache_file in self.cache_dir.glob("*.json"):
-            try:
-                cache_file.unlink()
-            except OSError:
-                pass
+        with self._lock:
+            for file in self.cache_dir.glob("*.json"):
+                _safe_unlink(file)
 
-    def get_stats(self) -> Dict[str, int]:
-        """Get cache statistics."""
-        cache_files = list(self.cache_dir.glob("*.json"))
-        total_size = sum(f.stat().st_size for f in cache_files if f.exists()) 
+    def stats(self) -> CacheStats:
+        files = [file for file in self.cache_dir.glob("*.json") if file.exists()]
+        total_size = sum(file.stat().st_size for file in files)
+        return CacheStats(files=len(files), total_size_bytes=total_size)
 
-        return {
-            'files': len(cache_files),
-            'total_size_bytes': total_size
-        }
 
-# TODO - Implement cache persistence across application restarts
-# TODO - Add cache backup and restore functionality
-# TODO - Implement cache warming and preloading strategies# Global cache instances - lazy initialization
-_api_cache = None
-_computation_cache = None
+_api_cache: Cache | None = None
+_computation_cache: Cache | None = None
+_api_lock = threading.Lock()
+_computation_lock = threading.Lock()
 
-def get_api_cache():
+
+def get_api_cache(cache_config: CacheConfig | None = None) -> Cache | None:
+    """Return a cache instance for API responses."""
+
     global _api_cache
-    if _api_cache is None:
-        _api_cache = Cache(cache_dir=".cache/api", ttl_seconds=3600)  # 1 hour for API responses
-    return _api_cache
+    config = cache_config or load_config().cache
+    if not config.enabled:
+        return None
+    with _api_lock:
+        if _api_cache is None or _api_cache.ttl_seconds != config.api_ttl_seconds:
+            _api_cache = Cache(config.api_cache_dir(), config.api_ttl_seconds)
+        return _api_cache
 
-def get_computation_cache():
+
+def get_computation_cache(cache_config: CacheConfig | None = None) -> Cache | None:
+    """Return a cache instance for expensive metric calculations."""
+
     global _computation_cache
-    if _computation_cache is None:
-        _computation_cache = Cache(cache_dir=".cache/computation", ttl_seconds=1800)  # 30 minutes for computations
-    return _computation_cache
+    config = cache_config or load_config().cache
+    if not config.enabled:
+        return None
+    with _computation_lock:
+        if (
+            _computation_cache is None
+            or _computation_cache.ttl_seconds != config.computation_ttl_seconds
+        ):
+            _computation_cache = Cache(
+                config.computation_cache_dir(), config.computation_ttl_seconds
+            )
+        return _computation_cache
 
-# For backward compatibility
-api_cache = None  # Will be set when first accessed
-computation_cache = None  # Will be set when first accessed
+
+def _stable_hash(value: str) -> str:
+    # Use a deterministic hash that is stable between interpreter sessions.
+    import hashlib
+
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _safe_unlink(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+
+
+def _is_expired(timestamp: float | None, ttl_seconds: int) -> bool:
+    if timestamp is None:
+        return True
+    return (time.time() - float(timestamp)) > ttl_seconds
+
+
+__all__ = ["Cache", "CacheStats", "get_api_cache", "get_computation_cache"]
+

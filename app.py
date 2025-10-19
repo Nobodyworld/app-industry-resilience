@@ -6,10 +6,10 @@ import plotly.express as px
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from src.config import BEA_API_KEY, CENSUS_API_KEY, DEFAULT_YEAR
+from src.config import get_config_summary, load_config, validate_config
 from src.metrics import compute_metrics, format_for_display
 from src.normalize import normalize_columns
-from src.security import SecurityUtils
+from src.security import FilePolicy, SecurityUtils
 from src.ui.components import (
     build_data_story,
     load_custom_styles,
@@ -22,9 +22,8 @@ from src.ui.components import (
     render_state_banner,
 )
 
-# TODO - Add comprehensive error handling for Streamlit app initialization failures
-# TODO - Implement user session management for better state handling across page refreshes
-# TODO - Add loading states and progress indicators for long-running operations
+APP_CONFIG = load_config()
+CONFIG_VALIDATION = validate_config(APP_CONFIG)
 
 
 @st.cache_data(show_spinner=False)
@@ -44,21 +43,25 @@ def try_fetch_bea(year: int, api_key: str) -> pd.DataFrame:
     return fetch_go_ii_by_industry(api_key=api_key, year=year)
 
 
-def process_uploaded_file(uploaded_file: UploadedFile) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+def process_uploaded_file(
+    uploaded_file: UploadedFile, *, policy: FilePolicy
+) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
     """Validate and materialize a CSV upload into a dataframe."""
 
     try:
-        file_valid, file_msg = SecurityUtils.validate_file_upload(
-            uploaded_file.name, SecurityUtils.MAX_FILE_SIZE_MB
+        meta_result = SecurityUtils.validate_file_upload(
+            uploaded_file.name,
+            policy,
+            file_size_bytes=getattr(uploaded_file, "size", None),
         )
-        if not file_valid:
-            return None, f"File security check failed: {file_msg}"
+        if not meta_result.ok:
+            return None, f"File security check failed: {meta_result.message}"
 
         temp_df = pd.read_csv(uploaded_file)
 
-        content_valid, content_msg = SecurityUtils.validate_csv_content(temp_df)
-        if not content_valid:
-            return None, f"CSV content security check failed: {content_msg}"
+        content_result = SecurityUtils.validate_csv_content(temp_df)
+        if not content_result.ok:
+            return None, f"CSV content security check failed: {content_result.message}"
 
         required_cols = ["industry_code", "industry_name", "year"]
         optional_cols = [
@@ -83,7 +86,7 @@ def process_uploaded_file(uploaded_file: UploadedFile) -> Tuple[Optional[pd.Data
             )
 
         return temp_df, None
-    except Exception as exc:  # pylint: disable=broad-except
+    except Exception as exc:  # pragma: no cover - Streamlit runtime safeguard
         return None, f"Error reading CSV: {exc}"
 
 
@@ -96,6 +99,17 @@ def to_csv_bytes(df: pd.DataFrame) -> bytes:
 st.set_page_config(page_title="Idiot Index – Industry Dashboard", layout="wide")
 load_custom_styles()
 
+if CONFIG_VALIDATION.errors:
+    for err in CONFIG_VALIDATION.errors:
+        st.sidebar.error(err)
+    st.stop()
+
+for warning in CONFIG_VALIDATION.warnings:
+    st.sidebar.warning(warning)
+
+with st.sidebar.expander("Configuration summary", expanded=False):
+    st.json(get_config_summary(APP_CONFIG))
+
 if "focus_mode" not in st.session_state:
     st.session_state["focus_mode"] = False
 if "search_query" not in st.session_state:
@@ -104,10 +118,10 @@ if "industry_selection" not in st.session_state:
     st.session_state["industry_selection"] = None
 
 sidebar_state = render_sidebar(
-    default_year=DEFAULT_YEAR,
+    default_year=APP_CONFIG.default_year,
     year_bounds=(1997, 2100),
-    bea_key=BEA_API_KEY,
-    census_key=CENSUS_API_KEY,
+    bea_key=APP_CONFIG.bea_api_key or "",
+    census_key=APP_CONFIG.census_api_key or "",
     security_utils=SecurityUtils,
 )
 
@@ -128,7 +142,9 @@ if data_mode == "Sample (offline)":
 elif data_mode == "Upload CSV":
     if uploaded_file is None:
         st.stop()
-    df_raw, error = process_uploaded_file(uploaded_file)
+    df_raw, error = process_uploaded_file(
+        uploaded_file, policy=FilePolicy(max_size_mb=APP_CONFIG.max_csv_size_mb)
+    )
     if error:
         st.sidebar.error(error)
         st.stop()

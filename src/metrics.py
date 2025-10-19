@@ -1,59 +1,118 @@
+"""Metric computation helpers for the Idiot Index application."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+
 import pandas as pd
-from .cache import get_computation_cache
-import hashlib
 
-def compute_metrics(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
+from .cache import Cache, get_computation_cache
+from .config import load_config
 
-    # Create cache key from DataFrame content
-    df_str = df.to_json()
-    cache_key = hashlib.md5(df_str.encode()).hexdigest()
 
-    # Check cache first
-    cached_result = get_computation_cache().get(cache_key)
-    if cached_result is not None:
-        return pd.DataFrame(cached_result)
+@dataclass(frozen=True)
+class MetricConfig:
+    """Configuration options for metric computation."""
 
-    # TODO - Add input data validation before computation
-    # TODO - Implement parallel processing for large datasets
-    # TODO - Add computation progress tracking and cancellation support
+    use_cache: bool = True
 
-    if 'gross_output' not in df.columns or df['gross_output'].isna().all():
-        raise ValueError("gross_output column is required but missing or empty")
 
-    # Prefer materials_cost; if missing, use intermediate_inputs
-    denom = df['materials_cost'].fillna(df['intermediate_inputs'])
-    df['idiot_index'] = df['gross_output'] / denom
-    # Value added can be provided or computed if intermediate inputs are present
-    if 'value_added' not in df.columns:
-        df['value_added'] = df['gross_output'] - df['intermediate_inputs']
+def compute_metrics(
+    df: pd.DataFrame,
+    *,
+    cache: Cache | None = None,
+    config: MetricConfig | None = None,
+) -> pd.DataFrame:
+    """Compute Idiot Index derived metrics for the provided dataframe."""
+
+    if df.empty:
+        raise ValueError("Cannot compute metrics for an empty dataframe.")
+
+    if "gross_output" not in df.columns:
+        raise ValueError("gross_output column is required but missing from data.")
+
+    metric_config = config or MetricConfig()
+    app_config = load_config()
+    cache_instance = cache
+    if cache_instance is None and app_config.cache.enabled:
+        cache_instance = get_computation_cache(app_config.cache)
+    use_cache = metric_config.use_cache and cache_instance is not None
+
+    cache_key = None
+    if use_cache:
+        cache_key = _hash_dataframe(df)
+        cached = cache_instance.get(cache_key)
+        if cached is not None:
+            return pd.DataFrame(cached)
+
+    work = df.copy()
+
+    materials = work.get("materials_cost")
+    intermediates = work.get("intermediate_inputs")
+    if materials is None:
+        materials = pd.Series([pd.NA] * len(work), dtype="float64")
+    if intermediates is None:
+        intermediates = pd.Series([pd.NA] * len(work), dtype="float64")
+
+    denominator = materials.where(materials.notna(), intermediates)
+    denominator = denominator.astype("float64")
+    denominator.replace({0.0: pd.NA}, inplace=True)
+
+    work["idiot_index"] = (
+        work["gross_output"].astype("float64") / denominator
+    ).replace([float("inf"), float("-inf")], pd.NA)
+
+    fallback_inputs = denominator.fillna(0.0)
+    if "value_added" not in work.columns:
+        work["value_added"] = work["gross_output"].astype("float64") - fallback_inputs
     else:
-        df['value_added'] = df['value_added'].where(df['value_added'].notna(), df['gross_output'] - df['intermediate_inputs'])
-    # Value-Added %
-    df['value_added_pct'] = (df['value_added'] / df['gross_output']) * 100.0
-    # Materials share % (proxy for 1 / idiot_index)
-    df['materials_share_pct'] = (denom / df['gross_output']) * 100.0
-    # Defensive: handle divide-by-zero / inf
-    df.replace([float('inf'), -float('inf')], pd.NA, inplace=True)
+        work["value_added"] = work["value_added"].astype("float64").where(
+            work["value_added"].notna(),
+            work["gross_output"].astype("float64") - fallback_inputs,
+        )
 
-    # TODO - Add statistical outlier detection and handling
-    # TODO - Implement industry-specific normalization factors
-    # TODO - Add confidence intervals for computed metrics
+    work["value_added_pct"] = (
+        work["value_added"].astype("float64") / work["gross_output"].astype("float64")
+    ) * 100.0
+    work["materials_share_pct"] = (
+        fallback_inputs / work["gross_output"].astype("float64")
+    ) * 100.0
 
-    # Cache the result
-    get_computation_cache().set(cache_key, df.to_dict('records'))
+    work = work.replace([float("inf"), float("-inf")], pd.NA)
 
-    return df
+    if use_cache and cache_key is not None:
+        cache_instance.set(cache_key, work.to_dict(orient="records"))
+
+    return work
+
 
 def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    num_cols = ['gross_output','materials_cost','intermediate_inputs','value_added',
-                'idiot_index','value_added_pct','materials_share_pct']
-    for c in num_cols:
-        if c in out.columns:
-            out[c] = out[c].astype(float)
-    return out
+    """Ensure numeric columns are cast to floats for UI presentation."""
 
-# TODO - Implement locale-aware number formatting for international users
-# TODO - Add data rounding and precision control based on data source
-# TODO - Implement conditional formatting rules for display optimization
+    formatted = df.copy()
+    numeric_columns = {
+        "gross_output",
+        "materials_cost",
+        "intermediate_inputs",
+        "value_added",
+        "idiot_index",
+        "value_added_pct",
+        "materials_share_pct",
+    }
+    for column in numeric_columns.intersection(formatted.columns):
+        formatted[column] = pd.to_numeric(formatted[column], errors="coerce").astype(
+            "float64"
+        )
+    return formatted
+
+
+def _hash_dataframe(df: pd.DataFrame) -> str:
+    import hashlib
+
+    payload = json.dumps(df.to_dict(orient="records"), sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+__all__ = ["MetricConfig", "compute_metrics", "format_for_display"]
+

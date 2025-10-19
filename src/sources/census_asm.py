@@ -1,82 +1,68 @@
-import pandas as pd
-from ..utils import safe_get_json
-from ..cache import get_api_cache
-from ..rate_limiter import api_limiter
+from __future__ import annotations
 
-# ASM time series endpoints evolve; consult https://api.census.gov/data.html
-# Classic variables:
-# - RCPTOT: Value of shipments
-# - CSTMTOT: Cost of materials
-# - VALADD:  Value added
-#
-# Example endpoint (subject to change):
-# https://api.census.gov/data/2021/asm?get=NAICS2017,RCPTOT,CSTMTOT,VALADD&for=us:*
+import pandas as pd
+
+from ..cache import get_api_cache
+from ..config import load_config
+from ..normalize import DEFAULT_COLUMN_ALIASES, normalize_columns
+from ..rate_limiter import api_limiter
+from ..security import SecurityUtils
+from ..utils import safe_get_json
 
 ASM_BASE = "https://api.census.gov/data/2021/asm"
 
+
 def fetch_asm_manufacturing(api_key: str, year: int) -> pd.DataFrame:
-    if not api_key:
-        raise RuntimeError("Missing Census API key")
+    config = load_config()
+    key_result = SecurityUtils.validate_api_key(api_key, "Census")
+    if not key_result.ok:
+        raise RuntimeError(key_result.message)
 
-    # Validate year range for Census ASM data
-    if year < 1997 or year > 2023:  # Census ASM data availability
-        raise RuntimeError(f"Year {year} is outside Census ASM data range (1997-2023)")
+    year_result = SecurityUtils.validate_year(year)
+    if not year_result.ok:
+        raise RuntimeError(year_result.message)
 
-    # Check cache first
-    cache_key = f"census_asm_{year}"
-    cached_result = get_api_cache().get(cache_key)
-    if cached_result is not None:
-        return pd.DataFrame(cached_result)
+    if year_result.value not in config.supported_years_census:
+        raise RuntimeError(
+            f"Year {year_result.value} is outside supported Census ASM range "
+            f"{config.supported_years_census.start}-"
+            f"{config.supported_years_census.stop - 1}."
+        )
+
+    cache = get_api_cache(config.cache)
+    cache_key = f"census_asm_{year_result.value}"
+    if cache:
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return pd.DataFrame(cached_result)
 
     params = {
         "get": "NAICS2017,NAICS2017_LABEL,RCPTOT,CSTMTOT,VALADD",
         "for": "us:*",
-        "key": api_key
+        "key": key_result.value,
     }
 
-    # Apply rate limiting
-    api_limiter.wait_for_api('census')
+    api_limiter.wait_for_api("census")
 
-    try:
-        data = safe_get_json(ASM_BASE, params=params)
-    except RuntimeError as e:
-        if "GET failed" in str(e):
-            raise RuntimeError(f"Census ASM API request failed. This may indicate: 1) Invalid API key, 2) Network connectivity issues, 3) API endpoint changes. Original error: {e}")
-        raise
+    data = safe_get_json(ASM_BASE, params=params)
 
     if not isinstance(data, list) or len(data) < 2:
-        raise RuntimeError("Census ASM API returned unexpected data format. The API response structure may have changed.")
+        raise RuntimeError("Census ASM API returned unexpected data format.")
 
     header, *rows = data
     if not rows:
-        raise RuntimeError(f"No data available for year {year}. This industry may not have data for the selected year.")
+        raise RuntimeError(
+            f"No Census ASM data available for {year_result.value}."
+        )
 
     df = pd.DataFrame(rows, columns=header)
+    normalized = normalize_columns(
+        df.assign(year=year_result.value, source="Census ASM"),
+        column_aliases=DEFAULT_COLUMN_ALIASES,
+    )
+    normalized["intermediate_inputs"] = pd.NA
 
-    # Validate expected columns exist
-    expected_cols = ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"]
-    missing_cols = [col for col in expected_cols if col not in df.columns]
-    if missing_cols:
-        raise RuntimeError(f"Census ASM API response missing expected columns: {missing_cols}. The API schema may have changed.")
+    if cache:
+        cache.set(cache_key, normalized.to_dict("records"))
 
-    # Coerce numerics (ASM values often are in thousands of dollars)
-    for col in ["RCPTOT","CSTMTOT","VALADD"]:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-    df = df.rename(columns={
-        "NAICS2017": "industry_code",
-        "NAICS2017_LABEL": "industry_name",
-        "RCPTOT": "gross_output",
-        "CSTMTOT": "materials_cost",
-        "VALADD": "value_added"
-    })
-    df["year"] = year
-    df["intermediate_inputs"] = None  # not directly provided
-    df["source"] = "Census ASM"
-    # Keep plausible columns
-    keep = ["industry_code","industry_name","year","gross_output","materials_cost","intermediate_inputs","value_added","source"]
-    result_df = df[keep]
-
-    # Cache the result
-    get_api_cache().set(cache_key, result_df.to_dict('records'))
-
-    return result_df
+    return normalized

@@ -72,14 +72,14 @@ pip install -r requirements-dev.txt
 Run code quality checks:
 
 ```bash
+# Unit tests
+pytest
+
 # Linting
 flake8 src/
 
 # Type checking
 mypy src/
-
-# Testing with coverage
-pytest tests/ --cov=src
 ```
 
 ## API Keys
@@ -94,6 +94,18 @@ CENSUS_API_KEY=your_census_api_key_here
 Get API keys from:
 - [BEA API](https://apps.bea.gov/API/signup/)
 - [Census API](https://www.census.gov/data/developers/data-sets.html)
+
+### Configuration reference
+
+The app validates configuration at startup before rendering the UI. Key environment variables:
+
+- `ENVIRONMENT`: `development` (default), `testing`, or `production`.
+- `DEFAULT_YEAR`: Initial year selection when the sidebar loads.
+- `CACHE_ENABLED`: Enable/disable filesystem caches (`true`/`false`).
+- `CACHE_DIR`: Base directory for cache files (defaults to `.cache`).
+- `BEA_API_KEY`, `CENSUS_API_KEY`: Required when `ENVIRONMENT=production`.
+
+Launch the app and open the “Configuration summary” expander in the sidebar to review resolved values and warnings.
 
 ---
 
@@ -148,11 +160,12 @@ This application has been significantly enhanced with production-ready features:
 - **Improved deep-dive views** with safe handling of missing data
 - **Better sidebar feedback** for data loading and error states
 
-### **Code Quality**
-- **Type hints and validation** throughout the codebase
-- **Configuration management** with environment-aware settings
-- **Clean architecture** with isolated API clients and reusable utilities
-- **Comprehensive error messages** for debugging and user guidance
+### **Code Quality & Security**
+- **Typed configuration loader** with validation and sidebar warnings
+- **Deterministic caching** with TTL management and per-test isolation
+- **Hardened security utilities** covering uploads, strings, and API keys
+- **Retriable HTTP client** with typed errors and exponential backoff
+- **Expanded automated tests** spanning config, metrics, normalization, and API clients
 
 ### **API Integration**
 - **Complete BEA API implementation** (previously stubbed)
@@ -183,13 +196,22 @@ This application has been significantly enhanced with production-ready features:
 ├── data/
 │   └── sample_industries.csv
 ├── src/
+│   ├── __init__.py
+│   ├── cache.py
 │   ├── config.py
 │   ├── metrics.py
 │   ├── normalize.py
+│   ├── rate_limiter.py
+│   ├── security.py
+│   ├── types.py
 │   ├── utils.py
 │   └── sources/
 │       ├── bea.py
 │       └── census_asm.py
+└── tests/
+    ├── test_config.py
+    ├── test_core.py
+    └── test_security.py
 ```
 
 ---
@@ -206,41 +228,23 @@ This application implements production-grade features for reliability, performan
 
 ### 🚀 Performance & Caching
 
-- **Intelligent Caching**: API responses cached for 1 hour, computations for 30 minutes
-- **File-Based Cache**: Persistent caching with automatic cleanup and TTL management
-- **Performance Monitoring**: Built-in timing and metrics for all operations
-- **Cache Statistics**: Real-time cache hit/miss ratios and storage metrics
+- **File-based caches** for API responses and metric computations with configurable TTLs
+- **Atomic writes** to prevent partial cache files and reduce corruption risk
+- **Cache statistics helper** for inspecting cache size and entry counts during diagnostics
 
 ### 🔒 Security & Rate Limiting
 
-- **API Rate Limiting**: Token bucket algorithm prevents government API abuse
-- **Environment-Aware Limits**: Stricter limits in production (BEA: 10/min, Census: 20/min)
-- **Input Validation**: Comprehensive validation for all user inputs and file uploads
-- **Secure Configuration**: Sensitive data masking and environment-specific settings
-- **File Upload Security**:
-  - Extension validation (CSV only)
-  - File size limits (50MB max)
-  - Content scanning for malicious patterns
-  - Path traversal protection
-- **API Key Security**:
-  - Format validation and length checks
-  - Secure storage and transmission
-  - No logging of sensitive keys
-- **Input Sanitization**:
-  - XSS prevention in user inputs
-  - SQL injection protection
-  - Dangerous pattern filtering
-- **Data Validation**:
-  - CSV content security scanning
-  - Schema validation with required fields
-  - Type coercion with bounds checking
+- **API rate limiting** via configurable token buckets per provider
+- **Environment-aware defaults** for stricter production limits
+- **Upload hygiene** with filename sanitization, file-size enforcement, and CSV content scans
+- **API key validation** with length checks and character whitelists
+- **String sanitization** to strip dangerous HTML/script patterns
+- **Year and numeric validation** before expensive computations
 
-### 📊 Monitoring & Observability
+### 📊 Observability
 
-- **Structured Logging**: JSON-formatted logs with performance metrics and error tracking
-- **Multi-Level Logging**: Console (INFO+) and rotating file logs (DEBUG+)
-- **API Call Auditing**: Complete audit trail of all external API interactions
-- **Health Checks**: Application health monitoring and status endpoints
+- **Rotating file and console logs** via `src/logging_config.py`
+- **API call logging hooks** to trace outbound requests and timings
 
 ### ⚙️ Configuration Management
 
@@ -251,17 +255,15 @@ This application implements production-grade features for reliability, performan
 
 ### 🏗️ Infrastructure & DevOps
 
-- **Docker Containerization**: Complete containerization with health checks and security best practices
-- **CI/CD Pipeline**: GitHub Actions with multi-version Python testing, linting, and coverage reporting
-- **Development Tooling**: Comprehensive dev dependencies (black, flake8, mypy, pytest-cov)
-- **Professional Standards**: Type hints, comprehensive testing, and code quality automation
+- **Dockerfile** for reproducible local or cloud deployments
+- **Development tooling** pinned in `requirements-dev.txt` (black, flake8, mypy, pytest-cov)
+- **Type hints** and linting integrated into the codebase
 
 ### 🧪 Quality Assurance
 
-- **Comprehensive Testing**: 31 test cases covering all major functionality including security validation
-- **Type Safety**: Full type hints throughout the codebase
-- **Code Quality**: Automated linting, formatting, and security scanning
-- **Integration Testing**: End-to-end testing with mocked external dependencies
+- **Pytest suite** covering configuration, normalization, metrics, security, and API clients
+- **Mock-based integration tests** for BEA and Census API adapters
+- **Type hints** throughout core modules for editor and static analysis support
 
 ---
 

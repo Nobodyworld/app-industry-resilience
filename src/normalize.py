@@ -1,48 +1,127 @@
+"""Utilities for normalising user or API provided industry data."""
+
+from __future__ import annotations
+
+import re
+from decimal import Decimal, InvalidOperation
+from typing import Mapping
+
 import pandas as pd
-from typing import Any, Optional
 
-REQUIRED_COLS = ['industry_code','industry_name','year','gross_output']
-OPTIONAL_COLS = ['materials_cost','intermediate_inputs','value_added','source']
+REQUIRED_COLS: tuple[str, ...] = (
+    "industry_code",
+    "industry_name",
+    "year",
+    "gross_output",
+)
 
-# TODO - Add support for custom column mapping configurations
-# TODO - Implement data type inference for better column handling
-# TODO - Add column validation rules and business logic constraints
+OPTIONAL_COLS: tuple[str, ...] = (
+    "materials_cost",
+    "intermediate_inputs",
+    "value_added",
+    "source",
+)
 
-def coerce_numeric(x: Any) -> Optional[float]:
+DEFAULT_COLUMN_ALIASES: Mapping[str, str] = {
+    "naics": "industry_code",
+    "naics_code": "industry_code",
+    "naics2017": "industry_code",
+    "naics2017_code": "industry_code",
+    "naics2017_label": "industry_name",
+    "description": "industry_name",
+    "industrydescription": "industry_name",
+    "industrYdescription": "industry_name",
+    "valueadded": "value_added",
+    "valadd": "value_added",
+    "rcptot": "gross_output",
+    "cstmtot": "materials_cost",
+    "go": "gross_output",
+    "intermediateinputs": "intermediate_inputs",
+}
+
+_NUMERIC_CLEANER = re.compile(r"[\s,_]")
+
+
+def normalize_columns(
+    df: pd.DataFrame, column_aliases: Mapping[str, str] | None = None
+) -> pd.DataFrame:
+    """Return a canonical view of the provided DataFrame.
+
+    The function validates required columns, coerces numeric fields into floats,
+    trims string columns, and ensures optional columns exist.
+    """
+
+    if df.empty:
+        raise ValueError("Input dataframe is empty; cannot normalise columns.")
+
+    alias_map = {
+        key.lower(): value
+        for key, value in {**DEFAULT_COLUMN_ALIASES, **(column_aliases or {})}.items()
+    }
+
+    normalized = df.copy()
+    normalized.columns = [col.strip().lower() for col in normalized.columns]
+    normalized.rename(columns=lambda c: alias_map.get(c, c), inplace=True)
+
+    missing_required = [col for col in REQUIRED_COLS if col not in normalized.columns]
+    if missing_required:
+        raise ValueError(
+            "Missing required columns: " + ", ".join(sorted(missing_required))
+        )
+
+    for optional in OPTIONAL_COLS:
+        if optional not in normalized.columns:
+            normalized[optional] = pd.NA
+
+    normalized["industry_code"] = (
+        normalized["industry_code"].astype(str).str.strip().str.upper()
+    )
+    normalized["industry_name"] = (
+        normalized["industry_name"].astype(str).str.strip()
+    )
+    normalized["source"] = normalized["source"].fillna("Unknown").astype(str).str.strip()
+
+    normalized["year"] = normalized["year"].apply(_coerce_year)
+    for column in ("gross_output", "materials_cost", "intermediate_inputs", "value_added"):
+        normalized[column] = normalized[column].apply(_coerce_numeric)
+
+    return normalized
+
+
+def _coerce_year(value: object) -> int:
+    if pd.isna(value):
+        raise ValueError("Year column contains null values after normalisation.")
     try:
-        return float(x)
-    except Exception:
+        return int(float(value))
+    except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+        raise ValueError(f"Unable to parse year value '{value}'.") from exc
+
+
+def _coerce_numeric(value: object) -> float | None:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    if isinstance(value, (int, float)) and not pd.isna(value):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        cleaned = _NUMERIC_CLEANER.sub("", cleaned.replace("−", "-"))
+        try:
+            return float(Decimal(cleaned))
+        except (InvalidOperation, ValueError):
+            return None
+
+    try:
+        return float(Decimal(str(value)))
+    except (InvalidOperation, TypeError, ValueError):
         return None
 
-# TODO - Implement more sophisticated type coercion with unit conversion
-# TODO - Add validation for reasonable numeric ranges and data quality checks
-# TODO - Implement currency and unit normalization for international data
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    # Check for required columns
-    df_columns = [col.lower().strip() for col in df.columns]
-    missing_required = [col for col in REQUIRED_COLS if col not in df_columns]
+__all__ = [
+    "DEFAULT_COLUMN_ALIASES",
+    "OPTIONAL_COLS",
+    "REQUIRED_COLS",
+    "normalize_columns",
+]
 
-    if missing_required:
-        raise ValueError(f"Missing required columns: {', '.join(missing_required)}. Required: {', '.join(REQUIRED_COLS)}")
-
-    # Lowercase headers
-    df = df.copy()
-    df.columns = [c.strip().lower() for c in df.columns]
-    # Ensure required + optional exist
-    for c in OPTIONAL_COLS:
-        if c not in df.columns:
-            df[c] = None
-    # Types
-    df['year'] = df['year'].apply(lambda v: int(float(v)) if pd.notna(v) else None)
-    for c in ['gross_output','materials_cost','intermediate_inputs','value_added']:
-        df[c] = df[c].apply(coerce_numeric)
-    # Trim strings
-    df['industry_code'] = df['industry_code'].astype(str).str.strip()
-    df['industry_name'] = df['industry_name'].astype(str).str.strip()
-    df['source'] = df['source'].astype(str).str.strip()
-    return df
-
-# TODO - Add data quality scoring and anomaly detection during normalization
-# TODO - Implement automatic column name fuzzy matching for user-uploaded data
-# TODO - Add support for custom data transformation pipelines
