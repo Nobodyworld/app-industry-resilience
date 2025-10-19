@@ -1,112 +1,108 @@
 # Repo Intelligence Report
 
-_Last updated: 2025-02-15_
+_Last updated: 2025-10-20_
 
-## 1. System Overview
+## 1. Product & Architecture Snapshot
 
-### Domain & User Value
-- **Product:** Streamlit dashboard that visualises the “Idiot Index” (gross output ÷ materials cost) for U.S. industries.
-- **Primary users:** Analysts exploring industry efficiency, and automation agents that need a programmatic Idiot Index summary.
-- **Data sources:**
-  - **Bundled sample CSV** under `data/sample_industries.csv` for offline exploration.【F:data/sample_industries.csv†L1-L5】
-  - **BEA GDP-by-Industry API** and **Census ASM API** via adapter modules in `src/adapters/` and legacy shims in `src/sources/` for backwards compatibility.【F:src/adapters/bea.py†L1-L40】【F:src/sources/__init__.py†L1-L15】
+### Domain & Value Proposition
+- **Purpose:** Idiot Index quantifies the materials efficiency of U.S. industries by comparing gross output to materials and intermediate input spend. Analysts and automation agents explore historical trends, benchmark peers, and export curated datasets.【F:app.py†L1-L136】【F:agents/idiot_index.py†L1-L160】
+- **Core behaviours:**
+  1. Collect source data from BEA and Census ASM APIs or user uploads.【F:app.py†L41-L110】【F:src/adapters/__init__.py†L1-L40】
+  2. Normalise datasets, compute Idiot Index metrics, and prepare trend/comparison tables.【F:src/core/normalize.py†L1-L200】【F:src/core/metrics.py†L1-L200】
+  3. Present insights via Streamlit (charts, benchmarks, downloads) and agent-friendly toolkits.【F:src/interfaces/streamlit/components.py†L1-L200】【F:src/interfaces/streamlit/helpers.py†L1-L200】【F:agents/toolkit.py†L1-L160】
 
-### Runtime Entrypoints & Interfaces
-- **Streamlit UI (`app.py`)** orchestrates configuration loading, sidebar input validation, data fetching, metric computation, and interactive visualisations with download/export helpers.【F:app.py†L1-L120】
-- **Agent Toolkit (`agents/`)** exposes `compute_idiot_index_summary` with dataclass schemas for conversational clients; it reuses the same normalization and metrics pipeline.【F:agents/idiot_index.py†L1-L160】
-- **No standalone CLI or background jobs.** All long-running operations (API fetch, caching, metrics) run inside Streamlit or agent requests.
+### Execution Surfaces
+| Surface | Entry Point | Notes |
+| --- | --- | --- |
+| Interactive UI | `app.py` | Streamlit app orchestrating config validation, data acquisition, stateful UI, downloads, and caching.【F:app.py†L12-L220】 |
+| Automation toolkit | `agents/idiot_index.py` | Dataclasses + helper functions for LangChain/OpenAI agents to compute Idiot Index scenarios headlessly.【F:agents/idiot_index.py†L1-L160】 |
+| Developer CLI | `Makefile` targets | `make setup`, `make check`, `make security`, and `make sbom` provide one-command automation for contributors and CI.【F:Makefile†L1-L120】 |
 
-### Layered Architecture
-- **Core domain (`src/core/`)**: typed configuration, caching, normalization, metrics, security, HTTP utilities, and type definitions.【F:src/core/config.py†L1-L120】【F:src/core/metrics.py†L1-L80】
-- **Adapters (`src/adapters/`)**: BEA and Census API clients with retrying HTTP access, caching, and data shaping; exceptions like `BEAClientError` model remote failures.【F:src/adapters/bea.py†L1-L160】【F:src/adapters/census_asm.py†L1-L120】
-- **Infrastructure (`src/infrastructure/`)**: logging configuration and rate limiter utilities for cross-cutting concerns.【F:src/infrastructure/logging_config.py†L1-L160】【F:src/infrastructure/rate_limiter.py†L1-L120】
-- **Interfaces (`src/interfaces/streamlit/`)**: UI components and helpers used by `app.py`; legacy aliases remain under `src/ui/` for downstream import stability.【F:src/interfaces/streamlit/components.py†L1-L120】【F:src/ui/__init__.py†L1-L3】
-- **Agents (`agents/`)**: dataclasses, tool registry, and integration helper functions for automation clients.【F:agents/toolkit.py†L1-L120】
-- **Tests (`tests/`)**: pytest suite covering configuration, adapters, logging, security, UI helpers, and agent behaviours.【F:tests/test_core.py†L1-L160】【F:tests/test_logging.py†L1-L120】
+### Deployable Footprint & Ops Hooks
+- **Container:** Single-stage Dockerfile on `python:3.11-slim`; installs runtime deps, copies repo, runs as non-root, and defines a `curl` health check (fails today because `curl` is not installed).【F:Dockerfile†L1-L30】
+- **CI/CD:** GitHub Actions `ci.yml` fan-out for Python 3.9–3.11 running `make check` (format, lint, types, tests) plus a security job executing gitleaks, `make security`, and SBOM generation.【F:.github/workflows/ci.yml†L1-L80】
+- **Local automation:** `scripts/run_quality_checks.py` and `scripts/generate_sbom.py` mirror CI behaviour for offline/air-gapped workflows.【F:scripts/run_quality_checks.py†L1-L200】【F:scripts/generate_sbom.py†L1-L160】
 
-### Data Flow
+### Data & Control Flow
 ```
-User selects data source → `app.py` validates sidebar inputs → adapters fetch data (with caching + rate limiting) → `normalize_columns` cleans schema → `compute_metrics` derives Idiot Index and value-added metrics → UI helpers format tables/charts → exports/logging handled by infrastructure modules.
+User/Agent request
+  ↓
+app.py initialises configuration and sidebar state【F:app.py†L16-L140】
+  ↓
+Data source chosen (sample CSV, upload, BEA, Census)【F:app.py†L41-L115】
+  ↓                                ↘
+Adapters fetch API payloads with retries/rate limits【F:src/adapters/bea.py†L1-L200】【F:src/adapters/census_asm.py†L1-L200】
+  ↓                                ↙
+Core layer normalises columns, computes Idiot Index metrics, enforces security policies【F:src/core/normalize.py†L1-L200】【F:src/core/metrics.py†L1-L200】【F:src/core/security.py†L1-L200】
+  ↓
+Interfaces format tables, charts, and downloads for Streamlit components【F:src/interfaces/streamlit/helpers.py†L1-L200】【F:src/interfaces/streamlit/components.py†L1-L200】
+  ↓
+Outputs rendered in UI or returned to agent callers
 ```
-- Caching: `Cache` in `src/core/cache.py` provides TTL-based filesystem caching used by adapters and metrics.【F:src/core/cache.py†L1-L120】
-- Security: `SecurityUtils` validates file uploads, sanitizes strings, and enforces CSV hygiene for both UI and agents.【F:src/core/security.py†L1-L160】
+- **Caching:** `src/core/cache.py` provides disk-backed TTL caches for API responses and computed tables; adapters opt-in to reuse results.【F:src/core/cache.py†L1-L140】【F:src/adapters/bea.py†L210-L320】
+- **Rate limiting:** Shared `RateLimiter` throttles outbound HTTP calls to respect vendor policies.【F:src/infrastructure/rate_limiter.py†L1-L200】
 
-### Observability & Config
-- Logging configured via `src/infrastructure/logging_config.py`, supporting JSON/console handlers, redaction, and dynamic levels.【F:src/infrastructure/logging_config.py†L1-L160】
-- Configuration loaded by `load_config` with validation and environment detection; validation surfaces warnings/errors into the Streamlit sidebar.【F:src/core/config.py†L120-L240】【F:app.py†L26-L60】
+### Configuration & Secrets
+- `src/core/config.py` lazily parses environment variables (dotenv support) into a strongly typed `AppConfig`. `app.py` currently loads configuration at import time, which couples runtime state to process start-up and complicates tests that need custom env overrides.【F:src/core/config.py†L1-L200】【F:app.py†L30-L40】
+- Key knobs: environment (`ENVIRONMENT`), logging level, default analysis year, API keys, API base URLs, cache toggle/TTLs, CSV upload policy (size/year ranges).【F:src/core/config.py†L70-L190】
+- Security policies (max CSV size, allowed columns) flow through `SecurityUtils` for both uploads and API usage.【F:src/core/security.py†L1-L200】
 
-## 2. Tech Stack & Dependency Map
+## 2. Module & Dependency Map
 
-### Languages & Frameworks
-- **Python 3.11** (typed, dataclasses, `pandas`, `requests`, `streamlit`, `plotly`).
-- Tests with **pytest** + **pytest-cov**; lint/type tools include `flake8`, `black`, and `mypy` (not yet enforced via tooling config files).【F:requirements.txt†L1-L7】【F:requirements-dev.txt†L1-L8】
-- Packaging via requirements files; no Poetry/Pipenv.
+### Layered Modules
+| Layer | Directory | Responsibilities | Notable Dependencies |
+| --- | --- | --- | --- |
+| Interfaces | `src/interfaces/streamlit/` | UI orchestration, sidebar, charts, downloads, query param encoding, style injection. | Streamlit, Plotly.【F:src/interfaces/streamlit/components.py†L1-L240】【F:src/interfaces/streamlit/helpers.py†L1-L220】 |
+| Application Core | `src/core/` | Config, caching, normalization, Idiot Index metrics, security validation, domain types/utilities. | pandas, dataclasses, dotenv.【F:src/core/__init__.py†L1-L40】【F:src/core/metrics.py†L1-L200】 |
+| Adapters | `src/adapters/` | BEA and Census API clients, response parsing, caching integration, request payload builders. | requests, `RateLimiter`, `Cache`.【F:src/adapters/bea.py†L1-L320】【F:src/adapters/census_asm.py†L1-L320】 |
+| Infrastructure | `src/infrastructure/` & `src/logging_config.py` | Structured logging defaults, CLI to configure logging handlers. | logging, JSON, os.【F:src/infrastructure/logging_config.py†L1-L180】【F:src/logging_config.py†L1-L200】 |
+| Legacy Shims | `src/{cache,config,metrics,normalize,security}.py`, `src/ui/`, `src/sources/` | Re-export layered modules for backwards compatibility with older import paths. | Internal modules only.【F:src/cache.py†L1-L20】【F:src/ui/__init__.py†L1-L20】 |
+| Agents | `agents/` | Agent toolkit for conversational automation (tools, schemas, prompts). | Core + adapters.【F:agents/toolkit.py†L1-L200】 |
 
-### Internal Module Graph (simplified)
-```
-app.py
-├─ src.adapters (BEA/Census)
-│   ├─ src.core.cache / src.core.normalize / src.core.utils
-│   └─ src.infrastructure.rate_limiter
-├─ src.core (config, metrics, normalize, security, cache, utils)
-├─ src.interfaces.streamlit (components/helpers)
-└─ src.infrastructure.logging_config
+### External Dependencies & Hotspots
+- **Runtime dependencies:** Streamlit, pandas, Plotly, requests, python-dotenv, pytest (bundled for Streamlit scripting needs).【F:requirements.txt†L1-L7】
+- **Dev tooling:** Black, Ruff, mypy, pytest-cov, pre-commit, Codespell, Commitizen, detect-secrets, pip-audit, types-requests.【F:requirements-dev.txt†L1-L13】
+- **High-churn files:** `app.py` (480 LOC), `src/interfaces/streamlit/components.py` (477), `src/core/config.py` (360), `src/adapters/bea.py` (332). These monolithic modules increase regression risk when editing UI or configuration flows.【F:app.py†L1-L200】【F:src/interfaces/streamlit/components.py†L1-L200】【F:src/core/config.py†L1-L200】【F:src/adapters/bea.py†L1-L200】
+- **Duplicated tooling:** `scripts/run_quality_checks.py` replicates Makefile logic to support environments without `pre-commit`, leading to dual maintenance burden.【F:scripts/run_quality_checks.py†L1-L200】
 
-agents/
-└─ src.adapters + src.core + src.infrastructure
-```
-- Backwards-compatibility shims under `src/` (`config.py`, `cache.py`, `normalize.py`, etc.) re-export the new layered modules; these increase surface area without adding functionality.【F:src/config.py†L1-L2】【F:src/cache.py†L1-L2】
+## 3. Quality, Observability, and Security Posture
 
-### Third-Party Services
-- **BEA API** (GDP-by-Industry / Input-Output tables) using API key with optional version + host overrides.【F:src/adapters/bea.py†L40-L120】
-- **Census ASM API** (manufacturing data) with API key requirement.【F:src/adapters/census_asm.py†L1-L100】
-- No databases; persistent state limited to filesystem caches and user downloads.
+### Testing & Coverage
+- Pytest suite covers configuration parsing, cache behaviour, adapter request factories, logging redaction, security validators, and Streamlit helper utilities.【F:tests/test_config.py†L1-L220】【F:tests/test_security.py†L1-L200】【F:tests/test_ui_helpers.py†L1-L200】
+- Coverage is generated via `pytest --cov` in `make check`, but no minimum threshold or badge enforcement exists; UI rendering lacks integration or snapshot validation.【F:Makefile†L33-L80】
 
-### Tooling & Operations
-- Docker image based on `python:3.11-slim`, installs only runtime requirements; health check hits Streamlit endpoint but lacks curl dependency by default (curl is missing).【F:Dockerfile†L1-L28】
-- GitHub Actions workflow runs lint (flake8), mypy (with `--ignore-missing-imports`), pytest with coverage, and uploads to Codecov.【F:.github/workflows/ci.yml†L1-L44】
-- `.env.example` documents required environment variables; config loader uses `python-dotenv` to load `.env` automatically.【F:.env.example†L1-L8】【F:src/core/config.py†L12-L30】
+### Static Analysis & Typing
+- Formatting (Black), linting (Ruff), typing (mypy) unified through the Makefile and CI. Mypy currently runs in non-strict mode with `ignore_missing_imports`, so incorrect assumptions around pandas/Streamlit remain unchecked.【F:pyproject.toml†L1-L80】【F:Makefile†L1-L80】
+- `pre-commit` orchestrates Black, Ruff, Codespell, detect-secrets, pip-audit, and commit message linting; fallback Python script ensures parity without the `pre-commit` binary.【F:.pre-commit-config.yaml†L1-L200】【F:scripts/run_quality_checks.py†L1-L200】
 
-## 3. Code Health Findings
+### Observability & Operations
+- Logging is centralised in `src/infrastructure/logging_config.py`, enabling JSON/plain outputs, redaction, rotation, and integration with the config subsystem.【F:src/infrastructure/logging_config.py†L1-L180】
+- No metrics or tracing are emitted; Streamlit UI relies on log statements only. There is no readiness endpoint beyond the Docker health check, and health currently fails because `curl` is absent in the runtime image.【F:Dockerfile†L1-L30】
 
-### Hotspots (by size/complexity)
-1. `src/interfaces/streamlit/components.py` (477 LOC) – dense mix of UI rendering + CSS string literals.【F:src/interfaces/streamlit/components.py†L1-L120】
-2. `src/core/config.py` (360 LOC) – complex parsing/validation logic tightly coupled to environment variables.【F:src/core/config.py†L1-L160】
-3. `src/adapters/bea.py` (332 LOC) – intricate pagination, caching, and metadata handling; high branching risk.【F:src/adapters/bea.py†L1-L160】
-4. `app.py` (≈300 LOC) – monolithic orchestrator mixing state management, data fetching, and visualization orchestration.【F:app.py†L1-L200】
+### Security & Supply Chain
+- Upload validation enforces file size, allowed extensions, and column schema; CSV contents are sanity-checked before use.【F:src/core/security.py†L1-L200】
+- `make security` runs pip-audit and detect-secrets (with fallback scanning when hooks are unavailable). CI adds gitleaks and SBOM generation via `make sbom`.【F:Makefile†L81-L130】【F:.github/workflows/ci.yml†L40-L80】
+- Missing pieces: Renovate/Dependabot automation, SLSA provenance/signing, container hardening (multi-stage build, minimal packages), and documented vulnerability disclosure response timeline in `SECURITY.md`.
 
-### Potential Dead/Legacy Code
-- Compatibility wrappers in `src/` (`config.py`, `cache.py`, `normalize.py`, `utils.py`, `logging_config.py`, `ui/`, `sources/`) merely re-export the layered modules. They may be retired once downstream imports migrate, but removing them risks breaking unknown consumers.【F:src/normalize.py†L1-L2】【F:src/ui/__init__.py†L1-L3】
-- `REPORTS/` contains historical documents; confirm whether still needed or can be archived externally.【F:REPORTS/000_CONTEXT.md†L1-L20】
+## 4. Risks & Constraints
+1. **Configuration coupling:** `app.py` loads and validates configuration at import time, making environment overrides in tests brittle and preventing lazy secrets loading.【F:app.py†L30-L50】
+2. **UI monolith:** Streamlit module mixes state management, data orchestration, and rendering, inflating surface area per change and impeding reuse.【F:app.py†L1-L220】【F:src/interfaces/streamlit/components.py†L1-L200】
+3. **Adapter resilience:** External API integrations depend on runtime environment variables with limited circuit breaking; retries/backoff are inline without observability hooks.【F:src/adapters/bea.py†L1-L320】
+4. **Container health:** Health check relies on `curl` which is not installed, causing false negatives in container orchestration systems.【F:Dockerfile†L1-L30】
+5. **Governance drift:** Governance docs exist but do not yet reflect the modernization roadmap, release automation strategy, or dependency update policy (tracked in PLAN Milestone 1).
 
-### Risk Areas
-- **Configuration**: `load_config` executes at import time (via `APP_CONFIG = load_config()` in `app.py`), pulling environment variables early; this complicates testing and dynamic configuration.【F:app.py†L26-L34】
-- **Caching**: Filesystem cache lacks eviction strategy beyond TTL; concurrency safety relies on file locks but limited coverage for multi-process scenarios.【F:src/core/cache.py†L60-L140】
-- **API keys**: Validation ensures presence and format but there is no runtime secrets scanning; `.env` handling may load values automatically in production unexpectedly.【F:src/core/security.py†L1-L160】
-- **Docker healthcheck** uses `curl` but base image does not install it; health command will fail out of the box.【F:Dockerfile†L18-L28】
-- **CI**: mypy runs with `--ignore-missing-imports`, reducing type-safety; there is no commitlint/format enforcement.
+## 5. High-ROI Opportunities (90-Day Horizon)
+| # | Opportunity | Impact | Effort | Tags | Notes |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Fix Docker health check by installing `curl` or switching to a Python probe script packaged with the app. | High | Small | reliability, DX | Prevents immediate health probe failures and unblocks container adoption.【F:Dockerfile†L1-L30】 |
+| 2 | Enable `mypy --strict` with targeted suppressions/stubs for Streamlit and pandas. | High | Medium | testing, DX | Tighten regressions detection ahead of architectural refactors.【F:pyproject.toml†L1-L80】 |
+| 3 | Decompose `app.py` into controller/service modules with feature-flagged rollout. | High | Large | DX, reliability | Unlocks unit testing for orchestration logic and reduces Streamlit monolith risk.【F:app.py†L1-L220】 |
+| 4 | Record adapter interactions (pytest-recording/VCR) and validate cache/rate limit paths offline. | Medium | Medium | testing, reliability | Current tests exercise only the sample dataset, leaving BEA/Census flows unverified offline.【F:tests/test_agents.py†L14-L30】 |
+| 5 | Introduce Renovate with dependency grouping and CODEOWNERS routing. | Medium | Small | security, reliability | Keeps runtime + tooling fresh with manageable review flow. |
+| 6 | Add OpenTelemetry instrumentation for adapter latency and cache hits behind an env-flag. | Medium | Medium | observability, performance | Enables dashboards and regression detection. |
+| 7 | Replace legacy shim modules with warnings + migration guide, reducing duplicate imports. | Medium | Medium | DX, reliability | Shrinks surface area once dependent integrations are audited.【F:src/cache.py†L1-L20】【F:src/ui/__init__.py†L1-L20】 |
+| 8 | Harden configuration via Pydantic `BaseSettings`, central schema, and explicit override hooks for tests. | High | Medium | security, DX | Eliminates manual parsing and ensures safe defaults.【F:src/core/config.py†L1-L200】 |
+| 9 | Enforce coverage thresholds and publish reports (Codecov/pytest-html) in CI. | Medium | Small | testing, reliability | Raises feedback quality on PRs.【F:.github/workflows/ci.yml†L1-L80】 |
+| 10 | Expand onboarding docs (First Hour Guide, troubleshooting) aligned with new tooling defaults. | Medium | Small | docs, DX | Ensures engineers can ship within the “5-minute” directive. |
 
-## 4. Testing & Quality
-- Pytest suite includes config, core logic, adapters (with mocks), logging, security, UI helpers, and agent flows.【F:tests/test_config.py†L1-L160】【F:tests/test_agents.py†L1-L160】
-- Coverage XML generated but no badge/report tracked; no tests for Streamlit layout or front-end snapshotting.
-- No pre-commit hooks; developers rely on manual commands described in README.【F:README.md†L60-L104】
-
-## 5. Security & Compliance Posture
-- Security utilities sanitize uploads and strings, but there is no automated secret scanning or dependency audit.
-- Dependencies pinned by exact version; lacks lockfile or SBOM.
-- No CODEOWNERS, SECURITY policy, or contribution guidelines beyond README; governance docs missing.
-
-## 6. Quick Wins & Top Opportunities (ROI Ranked)
-1. **Fix Docker healthcheck dependency** – add `curl`/`wget` or switch to Python-based health script. Low effort, prevents false negatives. *(Reliability, DevOps)*
-2. **Introduce pre-commit with black, ruff, mypy, commitlint** – standardises DX, reduces drift. *(DX, Testing)*
-3. **Tighten mypy (no `--ignore-missing-imports`) and enable `strict` package config** – catches integration issues early. *(Testing, Reliability)*
-4. **Modularise `app.py` state management into dedicated controller module** – increases maintainability. *(DX, Reliability)*
-5. **Document architecture & onboarding in updated README/CONTRIBUTING** – reduces ramp-up time. *(Docs)*
-6. **Add SBOM + dependency audit in CI (Syft/Trivy)** – improves supply-chain visibility. *(Security)*
-7. **Adopt Renovate/Dependabot with policies** – ensures dependency freshness. *(Security, Reliability)*
-8. **Add structured logging & metrics emission to adapters** – enhances observability. *(Reliability, Observability)*
-9. **Implement integration tests for BEA/Census adapters using recorded fixtures** – protects against API schema drift. *(Testing)*
-10. **Retire legacy re-export modules behind feature flag** – simplifies namespace once downstream confirmed. *(DX)*
-
----
-This report should be updated as modernization work progresses to track new risks, architecture shifts, and test coverage.
+The opportunities map directly to Milestone tasks in `PLAN.md` and will gain dedicated ExecPlans as work initiates.
