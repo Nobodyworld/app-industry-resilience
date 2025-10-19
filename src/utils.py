@@ -1,57 +1,90 @@
-import requests
+"""Utility helpers shared between API modules and the Streamlit app."""
+
+from __future__ import annotations
+
+import random
 import time
-from typing import Optional, Dict, Any
+from dataclasses import dataclass
+from typing import Any, Mapping
 
-# TODO - Add request/response logging and monitoring
-# TODO - Implement connection pooling for better performance
-# TODO - Add support for different authentication methods (OAuth, API keys)
+import requests
 
-def safe_get_json(url: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, str]] = None, timeout: int = 30, max_retries: int = 3):
-    last_exception = None
 
-    for attempt in range(max_retries):
-        try:
-            r = requests.get(url, params=params, headers=headers, timeout=timeout)
-            r.raise_for_status()
+class HTTPRequestError(RuntimeError):
+    """Raised when an HTTP request cannot be completed successfully."""
 
-            try:
-                return r.json()
-            except ValueError as e:
-                raise RuntimeError(f"Invalid JSON response from {url}: {e}")
 
-        except requests.exceptions.Timeout as e:
-            last_exception = RuntimeError(f"Request timeout after {timeout}s for {url}: {e}")
-        except requests.exceptions.ConnectionError as e:
-            last_exception = RuntimeError(f"Network connection error for {url}: {e}")
-        except requests.exceptions.HTTPError as e:
-            # Don't retry on HTTP errors (4xx, 5xx) as they indicate API issues
-            if r.status_code >= 400:
-                raise RuntimeError(f"HTTP {r.status_code} error from {url}: {r.text[:200]}...")
-            last_exception = RuntimeError(f"HTTP error for {url}: {e}")
-        except requests.exceptions.RequestException as e:
-            last_exception = RuntimeError(f"Request error for {url}: {e}")
-        except Exception as e:
-            last_exception = RuntimeError(f"Unexpected error requesting {url}: {e}")
+class InvalidJSONError(HTTPRequestError):
+    """Raised when a response body cannot be parsed as JSON."""
 
-        # Wait before retry (exponential backoff)
-        if attempt < max_retries - 1:
-            wait_time = 2 ** attempt  # 1s, 2s, 4s
-            time.sleep(wait_time)
 
-    # If we get here, all retries failed
-    raise last_exception or RuntimeError(f"Failed to fetch {url} after {max_retries} attempts")
+@dataclass(frozen=True)
+class RetryPolicy:
+    max_attempts: int = 3
+    base_delay: float = 1.0
+    backoff_factor: float = 2.0
+    jitter: bool = True
 
-# TODO - Add circuit breaker pattern for failing endpoints
-# TODO - Implement response caching at HTTP level
-# TODO - Add request deduplication to prevent duplicate API calls
 
-def thousands_to_units(val):
-    # ASM often returns thousands; convert to plain dollars if needed
+def safe_get_json(
+    url: str,
+    *,
+    params: Mapping[str, Any] | None = None,
+    headers: Mapping[str, str] | None = None,
+    timeout: float = 30.0,
+    retry_policy: RetryPolicy | None = None,
+) -> Any:
+    """Fetch JSON from an HTTP endpoint with retry support."""
+
+    policy = retry_policy or RetryPolicy()
+    session = requests.Session()
+    last_error: Exception | None = None
+
     try:
-        return float(val) * 1.0
-    except Exception:
-        return None
+        for attempt in range(1, policy.max_attempts + 1):
+            try:
+                response = session.get(
+                    url,
+                    params=dict(params or {}),
+                    headers=dict(headers or {}),
+                    timeout=timeout,
+                )
+                response.raise_for_status()
+            except requests.exceptions.Timeout as exc:
+                last_error = HTTPRequestError(f"Request to {url} timed out: {exc}")
+            except requests.exceptions.ConnectionError as exc:
+                last_error = HTTPRequestError(
+                    f"Connection error while requesting {url}: {exc}"
+                )
+            except requests.exceptions.HTTPError as exc:
+                raise HTTPRequestError(
+                    f"HTTP {response.status_code} error for {url}: {response.text[:200]}"
+                ) from exc
+            except requests.exceptions.RequestException as exc:
+                last_error = HTTPRequestError(
+                    f"Request error while contacting {url}: {exc}"
+                )
+            else:
+                try:
+                    return response.json()
+                except ValueError as exc:
+                    raise InvalidJSONError(
+                        f"Invalid JSON response from {url}: {exc}"
+                    ) from exc
 
-# TODO - Add unit conversion utilities for different data sources
-# TODO - Implement currency conversion and inflation adjustment
-# TODO - Add data scaling validation and automatic detection
+            if attempt >= policy.max_attempts:
+                break
+
+            delay = policy.base_delay * (policy.backoff_factor ** (attempt - 1))
+            if policy.jitter:
+                delay *= random.uniform(0.8, 1.2)
+            time.sleep(delay)
+
+    finally:
+        session.close()
+
+    raise last_error or HTTPRequestError(f"Failed to fetch JSON from {url}")
+
+
+__all__ = ["HTTPRequestError", "InvalidJSONError", "RetryPolicy", "safe_get_json"]
+

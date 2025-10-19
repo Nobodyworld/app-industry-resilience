@@ -219,10 +219,13 @@ def render_sidebar(
     )
 
     errors: List[str] = []
-    year_valid, year_clean, year_msg = security_utils.validate_year(year_input)
-    if not year_valid:
-        st.sidebar.error(year_msg)
-        errors.append(year_msg)
+    year_result = security_utils.validate_year(year_input)
+    if not year_result.ok or year_result.value is None:
+        st.sidebar.error(year_result.message)
+        errors.append(year_result.message)
+        year_clean = None
+    else:
+        year_clean = year_result.value
 
     bea_val = st.sidebar.text_input("BEA API Key", value=bea_key, type="password")
     census_val = st.sidebar.text_input("Census API Key", value=census_key, type="password")
@@ -233,15 +236,15 @@ def render_sidebar(
         if uploaded_file is None:
             st.sidebar.info("Drop a CSV to activate the canvas.")
     elif data_mode == "Census ASM (Manufacturing)":
-        valid, msg = security_utils.validate_api_key(census_val, "Census")
-        if not valid:
-            st.sidebar.error(msg)
-            errors.append(msg)
+        key_result = security_utils.validate_api_key(census_val, "Census")
+        if not key_result.ok:
+            st.sidebar.error(key_result.message)
+            errors.append(key_result.message)
     elif data_mode == "BEA (Economy-wide)":
-        valid, msg = security_utils.validate_api_key(bea_val, "BEA")
-        if not valid:
-            st.sidebar.error(msg)
-            errors.append(msg)
+        key_result = security_utils.validate_api_key(bea_val, "BEA")
+        if not key_result.ok:
+            st.sidebar.error(key_result.message)
+            errors.append(key_result.message)
 
     guidance = {
         "Sample (offline)": "Explore the experience instantly with curated demo data.",
@@ -261,7 +264,7 @@ def render_sidebar(
     return SidebarState(
         data_mode=data_mode,
         year_input=year_input,
-        year_clean=year_clean if year_valid else None,
+        year_clean=year_clean,
         bea_key=bea_val,
         census_key=census_val,
         uploaded_file=uploaded_file,

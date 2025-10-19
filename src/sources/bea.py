@@ -1,9 +1,22 @@
-import pandas as pd
+from __future__ import annotations
+
 import time
-from ..utils import safe_get_json
+
+import pandas as pd
+
 from ..cache import get_api_cache
-from ..logging_config import logger, log_api_call, log_cache_hit, log_cache_miss, log_performance
+from ..config import load_config
+from ..logging_config import (
+    log_api_call,
+    log_cache_hit,
+    log_cache_miss,
+    log_performance,
+    logger,
+)
+from ..normalize import normalize_columns
 from ..rate_limiter import api_limiter
+from ..security import SecurityUtils
+from ..utils import safe_get_json
 
 # BEA API endpoints and parameters
 # GDPbyIndustry dataset provides Gross Output (GO) and Intermediate Inputs (II)
@@ -18,24 +31,36 @@ BEA_BASE = "https://apps.bea.gov/api/data"
 
 def fetch_go_ii_by_industry(api_key: str, year: int) -> pd.DataFrame:
     start_time = time.time()
-    logger.info(f"Fetching BEA data for year {year}")
+    config = load_config()
 
-    if not api_key:
-        logger.error("Missing BEA API key")
-        raise RuntimeError("Missing BEA API key")
+    key_result = SecurityUtils.validate_api_key(api_key, "BEA")
+    if not key_result.ok:
+        logger.error(key_result.message)
+        raise RuntimeError(key_result.message)
 
-    # Check cache first
-    cache_key = f"bea_go_ii_{year}"
-    cached_result = get_api_cache().get(cache_key)
-    if cached_result is not None:
-        log_cache_hit(cache_key, "api")
-        log_performance("BEA API fetch (cached)", time.time() - start_time)
-        return pd.DataFrame(cached_result)
+    year_result = SecurityUtils.validate_year(year)
+    if not year_result.ok:
+        raise RuntimeError(year_result.message)
+
+    if year_result.value not in config.supported_years_bea:
+        raise RuntimeError(
+            f"Year {year_result.value} is outside supported BEA range "
+            f"{config.supported_years_bea.start}-"
+            f"{config.supported_years_bea.stop - 1}."
+        )
+
+    cache = get_api_cache(config.cache)
+    cache_key = f"bea_go_ii_{year_result.value}"
+    if cache:
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            log_cache_hit(cache_key, "api")
+            log_performance("BEA API fetch (cached)", time.time() - start_time)
+            return pd.DataFrame(cached_result)
 
     log_cache_miss(cache_key, "api")
 
-    # Apply rate limiting
-    api_limiter.wait_for_api('bea')
+    api_limiter.wait_for_api("bea")
 
     # TODO - Implement parallel API calls for multiple years
     # TODO - Add API response compression and optimization
@@ -48,7 +73,7 @@ def fetch_go_ii_by_industry(api_key: str, year: int) -> pd.DataFrame:
         "datasetname": "GDPbyIndustry",
         "TableID": "1",  # Gross Output
         "Frequency": "A",
-        "Year": str(year),
+        "Year": str(year_result.value),
         "Industry": "ALL",
         "ResultFormat": "json"
     }
@@ -63,7 +88,7 @@ def fetch_go_ii_by_industry(api_key: str, year: int) -> pd.DataFrame:
         "datasetname": "GDPbyIndustry",
         "TableID": "2",  # Intermediate Inputs
         "Frequency": "A",
-        "Year": str(year),
+        "Year": str(year_result.value),
         "Industry": "ALL",
         "ResultFormat": "json"
     }
@@ -78,27 +103,28 @@ def fetch_go_ii_by_industry(api_key: str, year: int) -> pd.DataFrame:
     ii_df = _process_bea_table(ii_data, "intermediate_inputs")
 
     # Merge the datasets
-    df = pd.merge(go_df, ii_df, on=['industry_code', 'industry_name', 'year'], how='outer')
+    df = pd.merge(
+        go_df,
+        ii_df,
+        on=["industry_code", "industry_name", "year"],
+        how="outer",
+    )
+    df["source"] = "BEA (Economy-wide)"
+    normalized = normalize_columns(df)
+    normalized["materials_cost"] = pd.NA
+    normalized["value_added"] = pd.NA
 
-    # Add source and fill missing columns
-    df['source'] = 'BEA (Economy-wide)'
-    df['materials_cost'] = None  # BEA doesn't provide direct materials cost
-    df['value_added'] = None     # BEA doesn't provide direct value added
-
-    # Ensure all required columns exist
-    required_cols = ['industry_code', 'industry_name', 'year', 'gross_output',
-                     'materials_cost', 'intermediate_inputs', 'value_added', 'source']
-    for col in required_cols:
-        if col not in df.columns:
-            df[col] = None
-
-    # Cache the result
-    get_api_cache().set(cache_key, df.to_dict('records'))
+    if cache:
+        cache.set(cache_key, normalized.to_dict("records"))
 
     log_performance("BEA API fetch", time.time() - start_time)
-    logger.info(f"Successfully processed {len(df)} BEA industry records for year {year}")
+    logger.info(
+        "Successfully processed %s BEA industry records for year %s",
+        len(normalized),
+        year_result.value,
+    )
 
-    return df
+    return normalized
 
 def _process_bea_table(data: dict, value_column: str) -> pd.DataFrame:
     """Process BEA API response into standardized DataFrame format."""
@@ -116,11 +142,20 @@ def _process_bea_table(data: dict, value_column: str) -> pd.DataFrame:
 
     rows = []
     for item in results['Data']:
+        try:
+            value = float(str(item.get('DataValue', '0')).replace(',', '')) * 1_000_000
+        except ValueError:
+            value = None
+        year = item.get('Year')
+        try:
+            year_int = int(year)
+        except (TypeError, ValueError):
+            year_int = 0
         row = {
             'industry_code': item.get('Industry', ''),
             'industry_name': item.get('IndustrYDescription', item.get('Industry', '')),
-            'year': int(item.get('Year', 0)),
-            value_column: float(item.get('DataValue', 0)) * 1000000  # Convert millions to actual dollars
+            'year': year_int,
+            value_column: value,
         }
         rows.append(row)
 
