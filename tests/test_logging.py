@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import logging
 
-from src import logging_config
+from src.infrastructure import logging_config
 
 
 def test_log_api_call_redacts_sensitive_fields() -> None:

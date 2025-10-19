@@ -6,12 +6,17 @@ import pandas as pd
 import pytest
 import requests
 
-from src.cache import Cache
-from src.metrics import MetricConfig, compute_metrics, format_for_display
-from src.normalize import normalize_columns
-from src.sources.bea import BEAClientError, fetch_go_ii_by_industry
-from src.sources.census_asm import fetch_asm_manufacturing
-from src.utils import HTTPRequestError, RetryPolicy, safe_get_json
+from src.adapters import BEAClientError, fetch_go_ii_by_industry, fetch_asm_manufacturing
+from src.core import (
+    Cache,
+    HTTPRequestError,
+    MetricConfig,
+    RetryPolicy,
+    compute_metrics,
+    format_for_display,
+    normalize_columns,
+    safe_get_json,
+)
 
 
 def test_normalize_columns_handles_aliases() -> None:
@@ -83,8 +88,8 @@ def test_safe_get_json_retries_and_raises(monkeypatch) -> None:
     assert call_count["count"] == 2
 
 
-@patch("src.sources.census_asm.get_api_cache", return_value=None)
-@patch("src.sources.census_asm.safe_get_json")
+@patch("src.adapters.census_asm.get_api_cache", return_value=None)
+@patch("src.adapters.census_asm.safe_get_json")
 def test_fetch_census_manufacturing(mock_get_json, _cache):
     mock_get_json.return_value = [
         ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"],
@@ -96,8 +101,8 @@ def test_fetch_census_manufacturing(mock_get_json, _cache):
     assert frame.loc[0, "gross_output"] == 100.0
 
 
-@patch("src.sources.bea.get_api_cache", return_value=None)
-@patch("src.sources.bea.safe_get_json")
+@patch("src.adapters.bea.get_api_cache", return_value=None)
+@patch("src.adapters.bea.safe_get_json")
 def test_fetch_bea(mock_get_json, _cache):
     health_response = {"BEAAPI": {"Results": {"Data": []}}}
     go_response = {
@@ -120,7 +125,7 @@ def test_fetch_bea(mock_get_json, _cache):
     assert metadata.get("endpoint")
 
 
-@patch("src.sources.bea.safe_get_json")
+@patch("src.adapters.bea.safe_get_json")
 def test_fetch_bea_multi_year_caches(mock_get_json, tmp_path):
     cache = Cache(tmp_path, ttl_seconds=60)
 
@@ -153,7 +158,7 @@ def test_fetch_bea_multi_year_caches(mock_get_json, tmp_path):
         build_response(2020, "55"),
     ]
 
-    with patch("src.sources.bea.get_api_cache", side_effect=fake_cache):
+    with patch("src.adapters.bea.get_api_cache", side_effect=fake_cache):
         frame = fetch_go_ii_by_industry("valid_api_key_12345", [2021, 2020])
         assert sorted(frame["year"].unique().tolist()) == [2020, 2021]
         metadata = frame.attrs["bea_metadata"]
@@ -166,8 +171,8 @@ def test_fetch_bea_multi_year_caches(mock_get_json, tmp_path):
         assert mock_get_json.call_count == call_count  # cache hit, no new calls
 
 
-@patch("src.sources.bea.get_api_cache", return_value=None)
-@patch("src.sources.bea.safe_get_json", side_effect=Exception("down"))
+@patch("src.adapters.bea.get_api_cache", return_value=None)
+@patch("src.adapters.bea.safe_get_json", side_effect=Exception("down"))
 def test_select_bea_endpoint_failure(mock_get_json, _cache):
     with pytest.raises(BEAClientError):
         fetch_go_ii_by_industry("valid_api_key_12345", 2021)

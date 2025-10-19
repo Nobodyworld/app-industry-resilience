@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+import pandas as pd
+
+from ..core import (
+    DEFAULT_COLUMN_ALIASES,
+    SecurityUtils,
+    get_api_cache,
+    load_config,
+    normalize_columns,
+    safe_get_json,
+)
+from ..infrastructure import api_limiter
+
+ASM_BASE = "https://api.census.gov/data/2021/asm"
+
+
+def fetch_asm_manufacturing(api_key: str, year: int) -> pd.DataFrame:
+    config = load_config()
+    key_result = SecurityUtils.validate_api_key(api_key, "Census")
+    if not key_result.ok:
+        raise RuntimeError(key_result.message)
+
+    year_result = SecurityUtils.validate_year(year)
+    if not year_result.ok:
+        raise RuntimeError(year_result.message)
+
+    if year_result.value not in config.supported_years_census:
+        raise RuntimeError(
+            f"Year {year_result.value} is outside supported Census ASM range "
+            f"{config.supported_years_census.start}-"
+            f"{config.supported_years_census.stop - 1}."
+        )
+
+    cache = get_api_cache(config.cache)
+    cache_key = f"census_asm_{year_result.value}"
+    if cache:
+        cached_result = cache.get(cache_key)
+        if cached_result is not None:
+            return pd.DataFrame(cached_result)
+
+    params = {
+        "get": "NAICS2017,NAICS2017_LABEL,RCPTOT,CSTMTOT,VALADD",
+        "for": "us:*",
+        "key": key_result.value,
+    }
+
+    api_limiter.wait_for_api("census")
+
+    data = safe_get_json(ASM_BASE, params=params)
+
+    if not isinstance(data, list) or len(data) < 2:
+        raise RuntimeError("Census ASM API returned unexpected data format.")
+
+    header, *rows = data
+    if not rows:
+        raise RuntimeError(
+            f"No Census ASM data available for {year_result.value}."
+        )
+
+    df = pd.DataFrame(rows, columns=header)
+    normalized = normalize_columns(
+        df.assign(year=year_result.value, source="Census ASM"),
+        column_aliases=DEFAULT_COLUMN_ALIASES,
+    )
+    normalized["intermediate_inputs"] = pd.NA
+
+    if cache:
+        cache.set(cache_key, normalized.to_dict("records"))
+
+    return normalized
