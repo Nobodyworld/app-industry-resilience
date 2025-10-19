@@ -11,3 +11,11 @@
 ## 2025-10-19T16:45Z – chore: harden security automation and supply-chain checks
 - **Summary:** Introduced `pip-audit`, `detect-secrets`, and CycloneDX SBOM generation into the Makefile, pre-commit hooks, and fallback scripts; added a dedicated `security` GitHub Actions job running gitleaks, vulnerability scans, and SBOM uploads; refreshed docs and PLAN status to reflect the new guard rails.
 - **Next:** Move into Milestone 2 by tightening mypy to strict mode, backfilling missing type hints, and inventorying adapter dead-code paths before refactors.
+
+## 2025-10-19T18:05Z – docs: refresh modernization baseline
+- **Summary:** Rebuilt `REPORT.md` with an up-to-date system overview, dependency map, risks, and ROI-ranked opportunities, and re-authored `PLAN.md` with milestone-tagged tasks, rollback notes, and prerequisites to guide the upcoming workstreams.
+- **Next:** Deliver Milestone 1 by tightening governance docs, CODEOWNERS/triage workflows, and aligning formatter/linter/type tooling with CI and pre-commit enforcement.
+
+## 2025-10-20T09:15Z – docs: elevate repo intelligence & execution plan
+- **Summary:** Rewrote `REPORT.md` with accurate module mappings, runtime/dependency insights, and a refreshed top-10 ROI list aligned to actual code hotspots; rebuilt `PLAN.md` with milestone overview tables, clarified acceptance criteria, and explicit prerequisites/rollback notes; left `STATUS.md` breadcrumbs for the governance milestone.
+- **Next:** Execute Milestone 1 tasks—governance doc refresh, CODEOWNERS/template alignment, and unified formatter/linter/type tooling with matching CI enforcement.
