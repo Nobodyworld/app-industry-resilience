@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
+
+from .helpers import DownloadArtifact
 
 
 @dataclass
@@ -399,13 +401,23 @@ def render_deep_dive(
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_download_panel(file_name: str, data: bytes) -> None:
-    """Display a styled download area."""
+def render_download_panel(artifacts: Sequence[DownloadArtifact]) -> None:
+    """Display a styled download area with multiple export options."""
+
+    if not artifacts:
+        return
 
     with st.container():
         st.markdown("<div class='download-panel'>", unsafe_allow_html=True)
         st.write("Carry the Idiot Index narrative with you.")
-        st.download_button("Download results", data=data, file_name=file_name, mime="text/csv")
+        for artifact in artifacts:
+            st.download_button(
+                artifact.label,
+                data=artifact.data,
+                file_name=artifact.file_name,
+                mime=artifact.mime,
+                use_container_width=True,
+            )
         st.markdown("</div>", unsafe_allow_html=True)
 
 

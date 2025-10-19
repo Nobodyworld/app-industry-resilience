@@ -17,9 +17,11 @@ This isn’t an academic metric; it’s a blunt heuristic popularized in enginee
   - Gross‑margin analogs
 - Lets you:
   - Compare sectors via sortable tables
+  - Build multi-industry comparison sets with historical trend charts
   - Drill down by NAICS code with robust error handling
+  - Generate shareable URLs that preserve filters and selections
   - Upload your own CSVs with automatic schema validation
-  - Export results (CSV)
+  - Export results in CSV, JSON, or Excel, including the current filtered view
   - Explore data with interactive Plotly charts
 - Works **offline** out of the box via a bundled sample dataset.
 - **Robust error handling** with graceful degradation and clear user feedback
@@ -156,8 +158,15 @@ This application has been significantly enhanced with production-ready features:
 
 ### **Enhanced User Experience**
 - **Interactive Plotly charts** replacing basic visualizations
+- **Multi-industry comparisons and benchmarking** with historical trendlines and dataset averages
+- **Shareable URLs** so teams can jump straight to the same insights
 - **CSV upload validation** with clear schema requirements and error messages
 - **Improved deep-dive views** with safe handling of missing data
+- **Multi-format exports** (CSV, JSON, Excel) for both full datasets and filtered perspectives
+
+### **Platform Resilience & Observability**
+- **BEA API failover and pagination handling** with NAICS enrichment and metadata capture
+- **Structured logging with redaction** plus remote shipping hooks and dynamic log-level controls
 - **Better sidebar feedback** for data loading and error states
 
 ### **Code Quality & Security**

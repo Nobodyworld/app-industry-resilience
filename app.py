@@ -1,10 +1,12 @@
-import io
-from typing import Optional, Tuple
+from __future__ import annotations
+
+from typing import Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
+from urllib.parse import urlencode
 
 from src.config import get_config_summary, load_config, validate_config
 from src.metrics import compute_metrics, format_for_display
@@ -20,6 +22,14 @@ from src.ui.components import (
     render_sidebar,
     render_signal_bar,
     render_state_banner,
+)
+from src.ui.helpers import (
+    build_comparison_table,
+    calculate_benchmark,
+    decode_query_params,
+    encode_query_params,
+    prepare_download_artifacts,
+    prepare_trend_data,
 )
 
 APP_CONFIG = load_config()
@@ -90,12 +100,6 @@ def process_uploaded_file(
         return None, f"Error reading CSV: {exc}"
 
 
-def to_csv_bytes(df: pd.DataFrame) -> bytes:
-    buf = io.StringIO()
-    df.to_csv(buf, index=False)
-    return buf.getvalue().encode()
-
-
 st.set_page_config(page_title="Idiot Index – Industry Dashboard", layout="wide")
 load_custom_styles()
 
@@ -110,15 +114,49 @@ for warning in CONFIG_VALIDATION.warnings:
 with st.sidebar.expander("Configuration summary", expanded=False):
     st.json(get_config_summary(APP_CONFIG))
 
+query_params_initial = decode_query_params(st.experimental_get_query_params())
+
+
+def _last_value(key: str, default: str | None = None) -> str | None:
+    values = query_params_initial.get(key)
+    if not values:
+        return default
+    return values[-1]
+
+
 if "focus_mode" not in st.session_state:
-    st.session_state["focus_mode"] = False
+    focus_raw = (_last_value("focus", "false") or "false").lower()
+    st.session_state["focus_mode"] = focus_raw in {"true", "1", "yes"}
 if "search_query" not in st.session_state:
-    st.session_state["search_query"] = ""
-if "industry_selection" not in st.session_state:
-    st.session_state["industry_selection"] = None
+    st.session_state["search_query"] = _last_value("search", "") or ""
+if "industry_selection_code" not in st.session_state:
+    st.session_state["industry_selection_code"] = _last_value("industry")
+if "comparison_codes" not in st.session_state:
+    st.session_state["comparison_codes"] = query_params_initial.get("compare", [])
+
+year_override = APP_CONFIG.default_year
+year_override_raw = _last_value("year")
+if year_override_raw:
+    try:
+        year_override = int(year_override_raw)
+    except ValueError:
+        year_override = APP_CONFIG.default_year
+
+sidebar_modes = [
+    "Sample (offline)",
+    "Upload CSV",
+    "Census ASM (Manufacturing)",
+    "BEA (Economy-wide)",
+]
+mode_raw = _last_value("mode")
+if mode_raw:
+    slug_lookup = {option.lower().replace(" ", "-"): option for option in sidebar_modes}
+    resolved_mode = slug_lookup.get(mode_raw)
+    if resolved_mode:
+        st.session_state["Source"] = resolved_mode
 
 sidebar_state = render_sidebar(
-    default_year=APP_CONFIG.default_year,
+    default_year=year_override,
     year_bounds=(1997, 2100),
     bea_key=APP_CONFIG.bea_api_key or "",
     census_key=APP_CONFIG.census_api_key or "",
@@ -129,6 +167,7 @@ if sidebar_state.halt or sidebar_state.year_clean is None:
     st.stop()
 
 data_mode = sidebar_state.data_mode
+data_mode_slug = data_mode.lower().replace(" ", "-")
 year_clean = sidebar_state.year_clean
 bea_key = sidebar_state.bea_key.strip()
 census_key = sidebar_state.census_key.strip()
@@ -167,16 +206,14 @@ elif data_mode == "BEA (Economy-wide)":
 if df_raw is None:
     st.stop()
 
-# Normalize, compute
-assert df_raw is not None  # Type hint for linter
 df_norm = normalize_columns(df_raw)
-df = compute_metrics(df_norm)
-df = format_for_display(df)
+df_metrics = compute_metrics(df_norm)
+df_display = format_for_display(df_metrics)
 
 current_query_raw = st.session_state.get("search_query", "")
 current_query = SecurityUtils.sanitize_string_input(current_query_raw.strip())
 
-df_filtered = df.copy()
+df_filtered = df_display.copy()
 if current_query:
     query_lower = current_query.lower()
     df_filtered = df_filtered[
@@ -190,7 +227,7 @@ focus_mode = render_page_header(
     meta={
         "Source": data_mode,
         "Year": str(year_clean),
-        "Visible": f"{len(df_filtered):,} / {len(df):,}",
+        "Visible": f"{len(df_filtered):,} / {len(df_display):,}",
     },
     focus_mode=st.session_state["focus_mode"],
 )
@@ -255,7 +292,7 @@ with industries_tab:
         key="search_query",
     )
     sanitized = SecurityUtils.sanitize_string_input(search_value.strip())
-    df_view = df.copy()
+    df_view = df_display.copy()
     if sanitized:
         query_lower = sanitized.lower()
         df_view = df_view[
@@ -295,33 +332,32 @@ with signals_tab:
     st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Deep dive")
-choices = df_view["industry_name"].tolist()
+code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"]))
+choices: Sequence[str] = list(dict.fromkeys(df_filtered["industry_code"]))
+selected_code: Optional[str] = None
 if not choices:
     st.warning("No industries match the current filters.")
 else:
-    if (
-        st.session_state["industry_selection"] not in choices
-        and choices
-    ):
-        st.session_state["industry_selection"] = choices[0]
-
-    selected = st.selectbox(
+    default_code = st.session_state.get("industry_selection_code")
+    if default_code not in choices:
+        default_code = choices[0]
+        st.session_state["industry_selection_code"] = default_code
+    selected_code = st.selectbox(
         "Select an industry",
         choices,
-        index=choices.index(st.session_state["industry_selection"])
-        if st.session_state["industry_selection"] in choices
-        else 0,
-        key="industry_selection",
+        index=choices.index(default_code) if default_code in choices else 0,
+        format_func=lambda code: f"{code_lookup.get(code, code)} ({code})",
     )
-    row = df_view[df_view["industry_name"] == selected].head(1)
+    st.session_state["industry_selection_code"] = selected_code
+    row = df_filtered[df_filtered["industry_code"] == selected_code].head(1)
     if row.empty:
         st.error("No data available for the selected industry.")
     else:
         current_row = row.iloc[0]
         story = build_data_story(
             row=current_row,
-            filtered_size=len(df_view),
-            total_size=len(df),
+            filtered_size=len(df_filtered),
+            total_size=len(df_display),
             filter_query=SecurityUtils.sanitize_string_input(
                 st.session_state.get("search_query", "").strip()
             ),
@@ -329,14 +365,113 @@ else:
         )
         render_deep_dive(row=current_row, story=story, focus_mode=focus_mode)
 
-render_download_panel(
-    file_name="idiot_index_results.csv",
-    data=to_csv_bytes(df),
+st.markdown("---")
+st.subheader("Comparisons & benchmarking")
+
+comparison_options = sorted(code_lookup.keys())
+valid_existing = [
+    code for code in st.session_state.get("comparison_codes", []) if code in comparison_options
+]
+comparison_selection = st.multiselect(
+    "Compare industries",
+    options=comparison_options,
+    default=valid_existing,
+    format_func=lambda code: f"{code_lookup.get(code, code)} ({code})",
+)
+st.session_state["comparison_codes"] = comparison_selection
+
+comparison_table = build_comparison_table(df_display, comparison_selection)
+if comparison_table.empty:
+    st.info("Select one or more industries to compare their Idiot Index and value-added mix.")
+else:
+    st.dataframe(comparison_table, use_container_width=True)
+
+trend_selection = comparison_selection or ([selected_code] if selected_code else [])
+trend_data = prepare_trend_data(df_display, trend_selection)
+if trend_data.empty or trend_data["year"].nunique() <= 1:
+    st.caption("Add additional years to see historical trendlines for the selected industries.")
+else:
+    trend_fig = px.line(
+        trend_data,
+        x="year",
+        y="idiot_index",
+        color="industry_name",
+        title="Historical Idiot Index trend",
+    )
+    trend_fig.update_layout(xaxis_title="Year", yaxis_title="Idiot Index")
+    st.plotly_chart(trend_fig, use_container_width=True)
+
+benchmark_stats = calculate_benchmark(df_display, selected_code)
+metric_cols = st.columns(3)
+
+idiot_avg = benchmark_stats.get("idiot_index_avg")
+idiot_delta = benchmark_stats.get("idiot_index_delta")
+with metric_cols[0]:
+    st.metric(
+        "Dataset average Idiot Index",
+        f"{idiot_avg:.2f}" if idiot_avg is not None and pd.notna(idiot_avg) else "—",
+        delta=(
+            f"{idiot_delta:+.2f}"
+            if idiot_delta is not None and pd.notna(idiot_delta)
+            else None
+        ),
+    )
+
+value_avg = benchmark_stats.get("value_added_pct_avg")
+value_delta = benchmark_stats.get("value_added_pct_delta")
+with metric_cols[1]:
+    st.metric(
+        "Dataset average Value-Added %",
+        f"{value_avg:.1f}%" if value_avg is not None and pd.notna(value_avg) else "—",
+        delta=(
+            f"{value_delta:+.1f}%"
+            if value_delta is not None and pd.notna(value_delta)
+            else None
+        ),
+    )
+
+materials_avg = benchmark_stats.get("materials_share_pct_avg")
+materials_delta = benchmark_stats.get("materials_share_pct_delta")
+with metric_cols[2]:
+    st.metric(
+        "Dataset average Materials Share %",
+        f"{materials_avg:.1f}%"
+        if materials_avg is not None and pd.notna(materials_avg)
+        else "—",
+        delta=(
+            f"{materials_delta:+.1f}%"
+            if materials_delta is not None and pd.notna(materials_delta)
+            else None
+        ),
+    )
+
+download_artifacts = prepare_download_artifacts(
+    df_full=df_display,
+    df_filtered=df_filtered,
+    base_name="idiot_index_results",
+)
+render_download_panel(download_artifacts)
+
+share_mapping = encode_query_params(
+    focus="true" if focus_mode else "false",
+    search=current_query_raw or None,
+    industry=selected_code if selected_code else None,
+    compare=comparison_selection if comparison_selection else None,
+    year=str(year_clean) if year_clean is not None else None,
+    mode=data_mode_slug,
 )
 
-# TODO - Add industry comparison functionality to compare multiple industries side-by-side
-# TODO - Implement historical trend analysis for selected industries over time
-# TODO - Add industry benchmarking against industry averages or percentiles
-# TODO - Add multiple export formats (Excel, JSON, PDF reports)
-# TODO - Implement filtered data export based on current view
-# TODO - Add data sharing functionality with unique URLs or embed codes
+def _normalise(mapping: Mapping[str, list[str]]) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    return tuple(sorted((key, tuple(values)) for key, values in mapping.items()))
+
+if _normalise(share_mapping) != _normalise(query_params_initial):
+    st.experimental_set_query_params(**share_mapping)
+
+share_url = "?" + urlencode(
+    [(key, value) for key, values in share_mapping.items() for value in values]
+)
+st.text_input(
+    "Shareable link",
+    value=share_url,
+    help="Copy this URL to revisit the dashboard with the same filters and selections.",
+)
