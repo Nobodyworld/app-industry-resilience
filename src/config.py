@@ -95,6 +95,8 @@ class AppConfig:
     default_year: int
     bea_api_key: str | None
     census_api_key: str | None
+    bea_api_version: str | None
+    bea_api_base_urls: tuple[str, ...]
     rate_limits: RateLimitConfig
     cache: CacheConfig
     max_csv_size_mb: int
@@ -155,6 +157,11 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
 
     bea_api_key = _clean_secret(values.get("BEA_API_KEY"))
     census_api_key = _clean_secret(values.get("CENSUS_API_KEY"))
+    bea_api_version = _clean_secret(values.get("BEA_API_VERSION"))
+    bea_api_base_urls = _parse_url_list(
+        values.get("BEA_API_BASE_URLS", "https://apps.bea.gov/api/data"),
+        "BEA_API_BASE_URLS",
+    )
 
     cache_dir = Path(values.get("CACHE_DIR", ".cache")).resolve()
     api_ttl = _parse_int(values.get("CACHE_TTL_API", "3600"), "CACHE_TTL_API")
@@ -194,6 +201,8 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
         default_year=default_year,
         bea_api_key=bea_api_key,
         census_api_key=census_api_key,
+        bea_api_version=bea_api_version,
+        bea_api_base_urls=bea_api_base_urls,
         rate_limits=rate_limits,
         cache=CacheConfig(
             enabled=cache_enabled,
@@ -285,6 +294,8 @@ def get_config_summary(config: AppConfig | None = None) -> dict[str, object]:
         "supported_years_census": _range_to_tuple(config.supported_years_census),
         "bea_key_set": bool(config.bea_api_key),
         "census_key_set": bool(config.census_api_key),
+        "bea_api_version": config.bea_api_version or "default",
+        "bea_api_base_urls": list(config.bea_api_base_urls),
     }
 
 
@@ -326,6 +337,13 @@ def _clean_secret(value: str | None) -> str | None:
 
 def _range_to_tuple(value: range) -> tuple[int, int]:
     return value.start, value.stop - 1
+
+
+def _parse_url_list(raw: str, name: str) -> tuple[str, ...]:
+    urls = [part.strip() for part in raw.split(",") if part.strip()]
+    if not urls:
+        raise ConfigError(f"{name} must contain at least one URL.")
+    return tuple(urls)
 
 
 __all__ = [
