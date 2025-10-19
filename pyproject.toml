@@ -1,0 +1,69 @@
+[project]
+name = "idiot-index-app"
+version = "0.1.0"
+description = "Streamlit application for Idiot Index analysis"
+requires-python = ">=3.9"
+readme = "README.md"
+license = { file = "LICENSE" }
+
+[tool.black]
+line-length = 100
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "B",
+  "I",
+  "UP",
+  "W",
+]
+ignore = [
+  "E203",
+  "E266",
+  "E501",
+]
+fixable = ["ALL"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["B011"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_return_any = true
+no_implicit_optional = true
+show_error_codes = true
+pretty = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "-ra --color=yes --strict-config --strict-markers"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+tag_format = "v$version"
+update_changelog_on_bump = true
+

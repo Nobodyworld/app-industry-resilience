@@ -1,0 +1,7 @@
+# Code owners for automatic review assignment
+*       @idiot-index/maintainers
+
+# Critical domains
+src/security.py   @idiot-index/maintainers
+src/infra/**      @idiot-index/maintainers
+.github/**        @idiot-index/maintainers

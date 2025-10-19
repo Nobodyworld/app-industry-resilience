@@ -1,0 +1,9 @@
+title = "idiot-index-app gitleaks policy"
+
+[allowlist]
+  description = "Allow generated baselines and documentation references"
+  paths = [
+    "docs/execplans/.*",
+    "REPORTS/.*",
+    ".*\\.secrets\\.baseline"
+  ]
