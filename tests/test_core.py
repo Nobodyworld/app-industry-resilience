@@ -41,6 +41,22 @@ def test_normalize_columns_handles_aliases() -> None:
     assert normalized.loc[0, "materials_cost"] == 600.0
 
 
+def test_normalize_columns_rejects_fractional_years() -> None:
+    frame = pd.DataFrame(
+        {
+            "industry_code": ["311"],
+            "industry_name": ["Food"],
+            "year": ["2021.5"],
+            "gross_output": ["1,000"],
+        }
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        normalize_columns(frame)
+
+    assert "year" in str(excinfo.value).lower()
+
+
 def test_compute_metrics_uses_cache(tmp_path) -> None:
     cache = Cache(tmp_path, ttl_seconds=60)
     data = pd.DataFrame(
@@ -63,6 +79,31 @@ def test_compute_metrics_uses_cache(tmp_path) -> None:
         result_second = compute_metrics(data, cache=cache, config=MetricConfig(use_cache=True))
         mocked_set.assert_not_called()
     pd.testing.assert_frame_equal(result_first, result_second)
+
+
+def test_cache_removes_corrupted_entries(tmp_path) -> None:
+    cache = Cache(tmp_path, ttl_seconds=60)
+    key = "corrupted"
+    path = cache._path_for_key(key)
+    path.write_text("{not: json}", encoding="utf-8")
+
+    assert cache.get(key) is None
+    assert not path.exists()
+
+
+def test_cache_respects_ttl(monkeypatch, tmp_path) -> None:
+    cache = Cache(tmp_path, ttl_seconds=1)
+    key = "expiring"
+    base_time = 1_700_000_000.0
+
+    monkeypatch.setattr("src.core.cache.time.time", lambda: base_time)
+    cache.set(key, {"value": 1})
+    path = cache._path_for_key(key)
+    assert path.exists()
+
+    monkeypatch.setattr("src.core.cache.time.time", lambda: base_time + 5)
+    assert cache.get(key) is None
+    assert not path.exists()
 
 
 def test_format_for_display_coerces_numeric() -> None:

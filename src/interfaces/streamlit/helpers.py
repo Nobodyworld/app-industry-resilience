@@ -40,7 +40,7 @@ def prepare_download_artifacts(
         except ModuleNotFoundError:
             return None
         buffer = io.BytesIO()
-        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:  # type: ignore[call-arg]
+        with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
             frame.to_excel(writer, index=False, sheet_name="Idiot Index")
         return buffer.getvalue()
 
@@ -164,7 +164,7 @@ def decode_query_params(params: Mapping[str, list[str]]) -> MutableMapping[str, 
     return decoded
 
 
-def encode_query_params(**state: str | Sequence[str]) -> Mapping[str, list[str]]:
+def encode_query_params(**state: str | Sequence[str] | None) -> Mapping[str, list[str]]:
     """Create a query param mapping suitable for Streamlit."""
 
     encoded: dict[str, list[str]] = {}

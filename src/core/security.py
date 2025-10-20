@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 import pandas as pd
@@ -165,10 +167,29 @@ class SecurityUtils:
 
     @staticmethod
     def validate_year(year: object) -> ValidationResult[int]:
-        try:
-            parsed = int(float(year))
-        except (TypeError, ValueError):
+        if year is None or isinstance(year, bool):
             return ValidationResult.failure("Year must be an integer value.")
+
+        parsed: int | None = None
+        if isinstance(year, int):
+            parsed = year
+        elif isinstance(year, float):
+            if not math.isfinite(year) or not year.is_integer():
+                return ValidationResult.failure("Year must be an integer value.")
+            parsed = int(year)
+        else:
+            cleaned = str(year).strip()
+            if not cleaned:
+                return ValidationResult.failure("Year must be an integer value.")
+            try:
+                candidate = Decimal(cleaned)
+            except (InvalidOperation, ValueError):
+                return ValidationResult.failure("Year must be an integer value.")
+            if not candidate.is_finite():
+                return ValidationResult.failure("Year must be an integer value.")
+            if candidate != candidate.to_integral_value():
+                return ValidationResult.failure("Year must be an integer value.")
+            parsed = int(candidate)
 
         if parsed < 1900 or parsed > 2100:
             return ValidationResult.failure("Year must be between 1900 and 2100.")

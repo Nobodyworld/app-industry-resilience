@@ -34,13 +34,12 @@ def compute_metrics(
 
     metric_config = config or MetricConfig()
     app_config = load_config()
-    cache_instance = cache
+    cache_instance: Cache | None = cache
     if cache_instance is None and app_config.cache.enabled:
         cache_instance = get_computation_cache(app_config.cache)
-    use_cache = metric_config.use_cache and cache_instance is not None
 
-    cache_key = None
-    if use_cache:
+    cache_key: str | None = None
+    if metric_config.use_cache and cache_instance is not None:
         cache_key = _hash_dataframe(df)
         cached = cache_instance.get(cache_key)
         if cached is not None:
@@ -81,7 +80,11 @@ def compute_metrics(
 
     work = work.replace([float("inf"), float("-inf")], pd.NA)
 
-    if use_cache and cache_key is not None:
+    if (
+        metric_config.use_cache
+        and cache_instance is not None
+        and cache_key is not None
+    ):
         cache_instance.set(cache_key, work.to_dict(orient="records"))
 
     return work

@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 
 @dataclass(frozen=True)
 class ValidationResult(Generic[T]):
-    """Generic validation outcome with an optional value."""
+    """Generic validation outcome.
+
+    ``value`` is ``None`` when ``ok`` is ``False`` unless a caller explicitly
+    passes an alternate payload. Keeping the optional semantics at the class
+    level avoids widening the public ``ValidationResult[T]`` type to
+    ``ValidationResult[Optional[T]]`` which complicated downstream use and
+    broke ``mypy`` inference.
+    """
 
     ok: bool
-    value: Optional[T]
+    value: T | None
     message: str
 
     @classmethod
@@ -22,8 +29,8 @@ class ValidationResult(Generic[T]):
 
     @classmethod
     def failure(
-        cls, message: str, *, value: Optional[T] = None
-    ) -> "ValidationResult[Optional[T]]":
+        cls, message: str, *, value: T | None = None
+    ) -> "ValidationResult[T]":
         return cls(False, value, message)
 
 

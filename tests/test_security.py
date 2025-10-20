@@ -86,6 +86,39 @@ def test_validate_year_bounds() -> None:
     assert "between" in out_of_range.message
 
 
+def test_validate_year_accepts_string_input() -> None:
+    result = SecurityUtils.validate_year(" 2023 ")
+    assert result.ok is True
+    assert result.value == 2023
+
+
+def test_validate_year_rejects_blank() -> None:
+    result = SecurityUtils.validate_year("   ")
+    assert result.ok is False
+    assert "integer" in result.message.lower()
+
+
+def test_validate_year_rejects_fractional_values() -> None:
+    fractional_float = SecurityUtils.validate_year(2023.5)
+    assert fractional_float.ok is False
+
+    fractional_string = SecurityUtils.validate_year("2023.75")
+    assert fractional_string.ok is False
+
+
+def test_validate_year_rejects_boolean_input() -> None:
+    result = SecurityUtils.validate_year(True)
+    assert result.ok is False
+
+
+def test_validate_year_allows_integral_floats_and_decimals() -> None:
+    float_value = SecurityUtils.validate_year(2023.0)
+    assert float_value.ok and float_value.value == 2023
+
+    decimal_string = SecurityUtils.validate_year("2023.0")
+    assert decimal_string.ok and decimal_string.value == 2023
+
+
 def test_sanitize_string_input_strips_and_escapes() -> None:
     sanitized = SecurityUtils.sanitize_string_input("  <script>alert('x')</script>  ")
     assert "<" not in sanitized

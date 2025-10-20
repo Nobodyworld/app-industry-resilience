@@ -287,7 +287,7 @@ def render_signal_bar(df: pd.DataFrame) -> None:
     )
     avg_idiot_index = df["idiot_index"].mean() if "idiot_index" in df.columns else None
 
-    cards = [
+    cards: list[dict[str, str]] = [
         {
             "label": "Rows",
             "value": f"{total_rows:,}",
@@ -300,7 +300,7 @@ def render_signal_bar(df: pd.DataFrame) -> None:
         },
         {
             "label": "Modal year",
-            "value": dominant_year,
+            "value": str(dominant_year),
             "hint": "most common reporting year",
         },
         {

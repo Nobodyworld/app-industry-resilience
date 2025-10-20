@@ -8,6 +8,8 @@ from typing import Mapping
 
 import pandas as pd
 
+from .security import SecurityUtils
+
 REQUIRED_COLS: tuple[str, ...] = (
     "industry_code",
     "industry_name",
@@ -91,10 +93,13 @@ def normalize_columns(
 def _coerce_year(value: object) -> int:
     if pd.isna(value):
         raise ValueError("Year column contains null values after normalisation.")
-    try:
-        return int(float(value))
-    except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
-        raise ValueError(f"Unable to parse year value '{value}'.") from exc
+
+    result = SecurityUtils.validate_year(value)
+    if not result.ok or result.value is None:
+        message = result.message or f"Unable to parse year value '{value}'."
+        raise ValueError(message)
+
+    return result.value
 
 
 def _coerce_numeric(value: object) -> float | None:
