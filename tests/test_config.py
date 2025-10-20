@@ -40,3 +40,19 @@ def test_validate_config_warnings_for_missing_keys(monkeypatch) -> None:
     result = validate_config(config)
     assert result.errors == ()
     assert any("BEA_API_KEY" in warning for warning in result.warnings)
+
+
+def test_load_config_rejects_non_http_urls() -> None:
+    with pytest.raises(ConfigError) as excinfo:
+        load_config({"BEA_API_BASE_URLS": "ftp://example.com"})
+
+    message = str(excinfo.value).lower()
+    assert "http" in message and "url" in message
+
+
+def test_load_config_deduplicates_url_entries() -> None:
+    config = load_config(
+        {"BEA_API_BASE_URLS": "https://apps.bea.gov/api/data, https://apps.bea.gov/api/data"}
+    )
+
+    assert config.bea_api_base_urls == ("https://apps.bea.gov/api/data",)

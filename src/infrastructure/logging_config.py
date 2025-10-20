@@ -9,7 +9,7 @@ import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, MutableMapping, Optional
+from typing import Iterable, Mapping, Optional
 
 from ..core import AppConfig
 
@@ -33,7 +33,7 @@ class RedactingJSONFormatter(logging.Formatter):
         self._redact_fields = tuple(redact_fields)
 
     def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - exercised via tests
-        payload = {
+        payload: dict[str, object] = {
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -81,8 +81,8 @@ def setup_logging(
     logger = logging.getLogger()
     logger.setLevel(_safe_level(level))
 
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
+    for existing_handler in logger.handlers[:]:
+        logger.removeHandler(existing_handler)
 
     formatter: logging.Formatter
     if structured:
@@ -111,14 +111,15 @@ def setup_logging(
         logger.addHandler(file_handler)
 
     if remote:
-        handler: logging.Handler
-        if remote.protocol.lower() == "tcp":
-            handler = logging.handlers.SocketHandler(remote.host, remote.port)
+        protocol = _normalise_protocol(remote.protocol)
+        remote_handler: logging.Handler
+        if protocol == "tcp":
+            remote_handler = logging.handlers.SocketHandler(remote.host, remote.port)
         else:
-            handler = logging.handlers.DatagramHandler(remote.host, remote.port)
-        handler.setLevel(logging.INFO)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
+            remote_handler = logging.handlers.DatagramHandler(remote.host, remote.port)
+        remote_handler.setLevel(logging.INFO)
+        remote_handler.setFormatter(formatter)
+        logger.addHandler(remote_handler)
 
     app_logger = logging.getLogger("idiot_index")
     app_logger.setLevel(_safe_level(level))
@@ -159,16 +160,15 @@ def log_api_call(
     success: bool = True,
     error: Optional[str] = None,
 ) -> None:
-    payload = {"service": service, "endpoint": endpoint}
+    payload: dict[str, object] = {"service": service, "endpoint": endpoint}
     if params:
         payload["params"] = _redact_mapping(params, _SENSITIVE_TOKENS)
     if success:
         logger.info("API call successful", extra={"payload": payload})
     else:
-        logger.error(
-            "API call failed",
-            extra={"payload": {**payload, "error": error or "unknown"}},
-        )
+        failure_payload = dict(payload)
+        failure_payload["error"] = error or "unknown"
+        logger.error("API call failed", extra={"payload": failure_payload})
 
 
 def log_performance(operation: str, duration: float, *, success: bool = True) -> None:
@@ -223,7 +223,7 @@ def _remote_from_env() -> RemoteLoggingConfig | None:
         port = int(port_raw)
     except ValueError:
         raise ValueError("LOG_SHIP_PORT must be an integer if provided.") from None
-    protocol = os.getenv("LOG_SHIP_PROTOCOL", "udp")
+    protocol = _normalise_protocol(os.getenv("LOG_SHIP_PROTOCOL", "udp"))
     return RemoteLoggingConfig(host=host, port=port, protocol=protocol)
 
 
@@ -234,8 +234,8 @@ def _safe_level(level: str) -> int:
 def _redact_mapping(
     mapping: Mapping[str, object],
     sensitive_tokens: Iterable[str],
-) -> MutableMapping[str, object]:
-    redacted: MutableMapping[str, object] = {}
+) -> dict[str, object]:
+    redacted: dict[str, object] = {}
     lower_tokens = tuple(token.lower() for token in sensitive_tokens)
     for key, value in mapping.items():
         if any(token in key.lower() for token in lower_tokens):
@@ -243,6 +243,13 @@ def _redact_mapping(
         else:
             redacted[key] = value
     return redacted
+
+
+def _normalise_protocol(candidate: str) -> str:
+    protocol = candidate.lower()
+    if protocol not in {"tcp", "udp"}:
+        raise ValueError("Remote logging protocol must be 'tcp' or 'udp'.")
+    return protocol
 
 
 logger = setup_logging()

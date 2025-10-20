@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 
 class HTTPRequestError(RuntimeError):

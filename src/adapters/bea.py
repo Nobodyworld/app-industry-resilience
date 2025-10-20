@@ -46,14 +46,16 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
     start_time = time.time()
     config = load_config()
     api_key_result = SecurityUtils.validate_api_key(api_key, "BEA")
-    if not api_key_result.ok:
+    if not api_key_result.ok or api_key_result.value is None:
         logger.error(api_key_result.message)
         raise BEAClientError(api_key_result.message)
+    api_key_clean = api_key_result.value
 
     years = _ensure_years(year)
     year_validation = [SecurityUtils.validate_year(item) for item in years]
+    years_clean: list[int] = []
     for result in year_validation:
-        if not result.ok:
+        if not result.ok or result.value is None:
             raise BEAClientError(result.message)
         if result.value not in config.supported_years_bea:
             raise BEAClientError(
@@ -63,11 +65,12 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
                     end=config.supported_years_bea.stop - 1,
                 )
             )
+        years_clean.append(result.value)
 
-    years_clean = tuple(result.value for result in year_validation)
+    years_tuple = tuple(years_clean)
 
     cache = get_api_cache(config.cache)
-    cache_key = _cache_key(years_clean, config.bea_api_version)
+    cache_key = _cache_key(years_tuple, config.bea_api_version)
     if cache:
         cached_payload = cache.get(cache_key)
         if cached_payload is not None:
@@ -83,24 +86,28 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
     data_frames: list[pd.DataFrame] = []
     metadata_aggregate: dict[str, Any] = defaultdict(list)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(years_clean), 4)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(years_tuple), 4)) as executor:
         futures = {
             executor.submit(
                 _fetch_year_bundle,
                 base_url,
-                api_key_result.value,
+                api_key_clean,
                 year_value,
                 config,
             ): year_value
-            for year_value in years_clean
+            for year_value in years_tuple
         }
         for future in concurrent.futures.as_completed(futures):
             year_value = futures[future]
             try:
                 year_frame, year_meta = future.result()
             except Exception as exc:  # pragma: no cover - defensive logging
-                logger.error("Failed to fetch BEA data for %s: %s", year_value, exc)
-                raise
+                logger.error(
+                    "Failed to fetch BEA data for %s: %s", year_value, exc, exc_info=exc
+                )
+                raise BEAClientError(
+                    f"Failed to fetch BEA data for {year_value}: {exc}"
+                ) from exc
             else:
                 data_frames.append(year_frame)
                 for key, value in year_meta.items():
@@ -119,7 +126,7 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
     combined["value_added"] = pd.NA
 
     combined.attrs["bea_metadata"] = {
-        "years": years_clean,
+        "years": years_tuple,
         "endpoint": base_url,
         "tables": ["Gross Output", "Intermediate Inputs"],
         "notes": metadata_aggregate.get("notes", []),

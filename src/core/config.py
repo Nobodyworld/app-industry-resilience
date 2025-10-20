@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Mapping, MutableMapping
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -343,7 +344,17 @@ def _parse_url_list(raw: str, name: str) -> tuple[str, ...]:
     urls = [part.strip() for part in raw.split(",") if part.strip()]
     if not urls:
         raise ConfigError(f"{name} must contain at least one URL.")
-    return tuple(urls)
+
+    validated: dict[str, None] = {}
+    for candidate in urls:
+        parsed = urlparse(candidate)
+        if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+            raise ConfigError(
+                f"{name} entry '{candidate}' must be an absolute http(s) URL."
+            )
+        validated[candidate] = None
+
+    return tuple(validated.keys())
 
 
 __all__ = [
