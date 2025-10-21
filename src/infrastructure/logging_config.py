@@ -6,14 +6,160 @@ import json
 import logging
 import logging.handlers
 import os
+import re
 import sys
-from dataclasses import dataclass
+from collections.abc import Mapping as MappingABC, Sequence as SequenceABC, Set as SetABC
+from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping, Optional
+from typing import Pattern
 
 from ..core import AppConfig
 
 _SENSITIVE_TOKENS = ("key", "token", "secret", "password", "credential")
+DEFAULT_REDACTION_SENTINEL = "***redacted***"
+RECURSIVE_REFERENCE_PLACEHOLDER = "<recursive reference>"
+
+
+@dataclass(frozen=True, slots=True)
+class PayloadRedactor:
+    """Redact mapping-like payloads while guarding against cycles and custom objects."""
+
+    sensitive_tokens: tuple[str, ...]
+    sentinel: str = DEFAULT_REDACTION_SENTINEL
+    _tokens_casefold: tuple[str, ...] = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "_tokens_casefold",
+            tuple(token.casefold() for token in self.sensitive_tokens),
+        )
+
+    @property
+    def tokens_casefold(self) -> tuple[str, ...]:
+        return self._tokens_casefold
+
+    def redact_mapping(self, mapping: Mapping[Any, Any]) -> dict[Any, Any]:
+        memo: dict[int, Any] = {}
+        return self._redact_mapping(mapping, memo)
+
+    def _redact_mapping(self, mapping: Mapping[Any, Any], memo: dict[int, Any]) -> dict[Any, Any]:
+        mapping_id = id(mapping)
+        existing = memo.get(mapping_id)
+        if existing is not None:
+            if existing is _IN_PROGRESS_MARKER:
+                return RECURSIVE_REFERENCE_PLACEHOLDER
+            return existing
+
+        memo[mapping_id] = _IN_PROGRESS_MARKER
+        redacted: dict[Any, Any] = {}
+        for key, value in mapping.items():
+            if self._key_contains_token(key):
+                redacted[key] = self.sentinel
+                continue
+            redacted[key] = self._redact_value(value, memo)
+        memo[mapping_id] = redacted
+        return redacted
+
+    def _redact_value(self, value: Any, memo: dict[int, Any]) -> Any:
+        if isinstance(value, MappingABC):
+            return self._redact_mapping(value, memo)
+        if self._is_namedtuple(value):
+            return self._redact_mapping(value._asdict(), memo)
+        if is_dataclass(value) and not isinstance(value, type):
+            return self._redact_dataclass(value, memo)
+        if isinstance(value, SequenceABC) and not isinstance(value, (str, bytes, bytearray)):
+            return self._redact_sequence(value, memo)
+        if isinstance(value, SetABC):
+            return self._redact_set(value, memo)
+        if hasattr(value, "__dict__") and not isinstance(value, type):
+            return self._redact_object(value, memo)
+        return value
+
+    def _redact_sequence(self, sequence: SequenceABC, memo: dict[int, Any]) -> Any:
+        sequence_id = id(sequence)
+        existing = memo.get(sequence_id)
+        if existing is not None:
+            if existing is _IN_PROGRESS_MARKER:
+                return RECURSIVE_REFERENCE_PLACEHOLDER
+            return existing
+
+        memo[sequence_id] = _IN_PROGRESS_MARKER
+        redacted_items = [self._redact_value(item, memo) for item in sequence]
+
+        if isinstance(sequence, tuple):
+            result: Any = tuple(redacted_items)
+        elif isinstance(sequence, list):
+            result = redacted_items
+        else:
+            result = list(redacted_items)
+        memo[sequence_id] = result
+        return result
+
+    def _redact_dataclass(self, instance: Any, memo: dict[int, Any]) -> dict[str, Any]:
+        instance_id = id(instance)
+        existing = memo.get(instance_id)
+        if existing is not None:
+            if existing is _IN_PROGRESS_MARKER:
+                return RECURSIVE_REFERENCE_PLACEHOLDER
+            return existing
+
+        memo[instance_id] = _IN_PROGRESS_MARKER
+        redacted: dict[str, Any] = {}
+        for field in fields(instance):
+            field_name = field.name
+            if self._key_contains_token(field_name):
+                redacted[field_name] = self.sentinel
+                continue
+            redacted[field_name] = self._redact_value(getattr(instance, field_name), memo)
+        memo[instance_id] = redacted
+        return redacted
+
+    def _redact_set(self, values: SetABC, memo: dict[int, Any]) -> list[Any]:
+        set_id = id(values)
+        existing = memo.get(set_id)
+        if existing is not None:
+            if existing is _IN_PROGRESS_MARKER:
+                return RECURSIVE_REFERENCE_PLACEHOLDER
+            return existing
+
+        memo[set_id] = _IN_PROGRESS_MARKER
+        redacted_items = [self._redact_value(item, memo) for item in values]
+        result: list[Any] = list(redacted_items)
+        memo[set_id] = result
+        return result
+
+    def _redact_object(self, obj: Any, memo: dict[int, Any]) -> dict[str, Any]:
+        obj_id = id(obj)
+        existing = memo.get(obj_id)
+        if existing is not None:
+            if existing is _IN_PROGRESS_MARKER:
+                return RECURSIVE_REFERENCE_PLACEHOLDER
+            return existing
+
+        memo[obj_id] = _IN_PROGRESS_MARKER
+        attribute_map = {
+            key: value for key, value in vars(obj).items() if not key.startswith("_")
+        }
+        redacted = self._redact_mapping(attribute_map, memo)
+        memo[obj_id] = redacted
+        return redacted
+
+    def _key_contains_token(self, key: Any) -> bool:
+        if not isinstance(key, str):
+            return False
+        key_casefold = key.casefold()
+        tokens = self.tokens_casefold
+        return any(token in key_casefold for token in tokens)
+
+    @staticmethod
+    def _is_namedtuple(value: Any) -> bool:
+        return hasattr(value, "_asdict") and hasattr(value, "_fields")
+
+
+_IN_PROGRESS_MARKER = object()
+_DEFAULT_REDACTOR = PayloadRedactor(_SENSITIVE_TOKENS)
 
 
 @dataclass(frozen=True)
@@ -28,9 +174,16 @@ class RemoteLoggingConfig:
 class RedactingJSONFormatter(logging.Formatter):
     """Formatter emitting JSON with sensitive field redaction."""
 
-    def __init__(self, *, redact_fields: Iterable[str] = _SENSITIVE_TOKENS) -> None:
+    def __init__(
+        self,
+        *,
+        redact_fields: Iterable[str] = _SENSITIVE_TOKENS,
+        sentinel: str = DEFAULT_REDACTION_SENTINEL,
+    ) -> None:
         super().__init__()
         self._redact_fields = tuple(redact_fields)
+        self._sentinel = sentinel
+        self._redactor = _build_redactor(self._redact_fields, sentinel)
 
     def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - exercised via tests
         payload: dict[str, object] = {
@@ -43,25 +196,38 @@ class RedactingJSONFormatter(logging.Formatter):
             payload["exception"] = self.formatException(record.exc_info)
         extra_payload = getattr(record, "payload", None)
         if isinstance(extra_payload, Mapping):
-            payload.update(_redact_mapping(extra_payload, self._redact_fields))
+            payload.update(self._redactor.redact_mapping(extra_payload))
         return json.dumps(payload, ensure_ascii=False)
 
 
 class RedactingTextFormatter(logging.Formatter):
     """Formatter that redacts sensitive substrings in plain text output."""
 
-    def __init__(self, fmt: str, *, redact_fields: Iterable[str] = _SENSITIVE_TOKENS) -> None:
+    def __init__(
+        self,
+        fmt: str,
+        *,
+        redact_fields: Iterable[str] = _SENSITIVE_TOKENS,
+        sentinel: str = DEFAULT_REDACTION_SENTINEL,
+    ) -> None:
         super().__init__(fmt)
         self._redact_fields = tuple(redact_fields)
+        self._sentinel = sentinel
+        self._redactor = _build_redactor(self._redact_fields, sentinel)
+        self._token_pattern = _compile_token_pattern(self._redact_fields)
 
     def format(self, record: logging.LogRecord) -> str:  # pragma: no cover - exercised via tests
         rendered = super().format(record)
         extra_payload = getattr(record, "payload", None)
         if isinstance(extra_payload, Mapping):
-            sanitized = _redact_mapping(extra_payload, self._redact_fields)
+            sanitized = self._redactor.redact_mapping(extra_payload)
             rendered = f"{rendered} | {json.dumps(sanitized, ensure_ascii=False)}"
-        for token in self._redact_fields:
-            rendered = rendered.replace(token, f"{token[0]}***")
+        rendered = _mask_text(
+            rendered,
+            self._redact_fields,
+            self._sentinel,
+            pattern=self._token_pattern,
+        )
         return rendered
 
 
@@ -232,17 +398,54 @@ def _safe_level(level: str) -> int:
 
 
 def _redact_mapping(
-    mapping: Mapping[str, object],
-    sensitive_tokens: Iterable[str],
-) -> dict[str, object]:
-    redacted: dict[str, object] = {}
-    lower_tokens = tuple(token.lower() for token in sensitive_tokens)
-    for key, value in mapping.items():
-        if any(token in key.lower() for token in lower_tokens):
-            redacted[key] = "***redacted***"
-        else:
-            redacted[key] = value
-    return redacted
+    mapping: Mapping[Any, object],
+    sensitive_tokens: Iterable[str] = _SENSITIVE_TOKENS,
+    *,
+    sentinel: str = DEFAULT_REDACTION_SENTINEL,
+) -> dict[Any, object]:
+    tokens_tuple = tuple(sensitive_tokens)
+    redactor = _build_redactor(tokens_tuple, sentinel)
+    return redactor.redact_mapping(mapping)
+
+
+def _build_redactor(tokens: Iterable[str], sentinel: str) -> PayloadRedactor:
+    tokens_tuple = tuple(tokens)
+    if (
+        sentinel == _DEFAULT_REDACTOR.sentinel
+        and tuple(token.casefold() for token in tokens_tuple)
+        == _DEFAULT_REDACTOR.tokens_casefold
+    ):
+        return _DEFAULT_REDACTOR
+    return PayloadRedactor(tokens_tuple, sentinel=sentinel)
+
+
+def _mask_text(
+    text: str,
+    tokens: Iterable[str],
+    sentinel: str,
+    *,
+    pattern: Pattern[str] | None = None,
+) -> str:
+    pattern_obj = pattern or _compile_token_pattern(tokens)
+    if pattern_obj is None:
+        return text
+
+    def _replace(match: re.Match[str]) -> str:
+        matched = match.group(0)
+        if matched == sentinel:
+            return matched
+        if len(matched) <= 1:
+            return sentinel
+        return f"{matched[0]}***"
+
+    return pattern_obj.sub(_replace, text)
+
+
+def _compile_token_pattern(tokens: Iterable[str]) -> Pattern[str] | None:
+    token_list = [token for token in tokens if token]
+    if not token_list:
+        return None
+    return re.compile("|".join(re.escape(token) for token in token_list), re.IGNORECASE)
 
 
 def _normalise_protocol(candidate: str) -> str:
