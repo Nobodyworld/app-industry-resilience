@@ -1,5 +1,12 @@
 """Streamlit interface layer for the Idiot Index application."""
 
+from .bootstrap import (
+    BootstrapError,
+    BootstrapState,
+    SidebarContext,
+    get_bootstrap_state,
+    reset_bootstrap_state,
+)
 from .components import (
     SidebarState,
     build_data_story,
@@ -23,6 +30,9 @@ from .helpers import (
 )
 
 __all__ = [
+    "BootstrapError",
+    "BootstrapState",
+    "SidebarContext",
     "DownloadArtifact",
     "SidebarState",
     "build_comparison_table",
@@ -33,6 +43,7 @@ __all__ = [
     "load_custom_styles",
     "prepare_download_artifacts",
     "prepare_trend_data",
+    "get_bootstrap_state",
     "render_deep_dive",
     "render_download_panel",
     "render_insight_tabs",
@@ -40,4 +51,5 @@ __all__ = [
     "render_sidebar",
     "render_signal_bar",
     "render_state_banner",
+    "reset_bootstrap_state",
 ]
