@@ -15,9 +15,11 @@ from src.core import (
     compute_metrics,
     format_for_display,
     get_config_summary,
-    load_config,
     normalize_columns,
-    validate_config,
+)
+from src.interfaces.streamlit.bootstrap import (
+    BootstrapError,
+    get_bootstrap_state,
 )
 from src.interfaces.streamlit.components import (
     build_data_story,
@@ -38,10 +40,6 @@ from src.interfaces.streamlit.helpers import (
     prepare_download_artifacts,
     prepare_trend_data,
 )
-
-APP_CONFIG = load_config()
-CONFIG_VALIDATION = validate_config(APP_CONFIG)
-
 
 @st.cache_data(show_spinner=False)
 def load_sample() -> pd.DataFrame:
@@ -106,12 +104,23 @@ def process_uploaded_file(
 st.set_page_config(page_title="Idiot Index – Industry Dashboard", layout="wide")
 load_custom_styles()
 
-if CONFIG_VALIDATION.errors:
-    for err in CONFIG_VALIDATION.errors:
-        st.sidebar.error(err)
+try:
+    bootstrap_state = get_bootstrap_state()
+except BootstrapError as exc:
+    st.sidebar.error(f"Configuration error: {exc}")
     st.stop()
 
-for warning in CONFIG_VALIDATION.warnings:
+CONFIG_VALIDATION = bootstrap_state.validation
+
+try:
+    APP_CONFIG = bootstrap_state.ensure_ready()
+except BootstrapError as exc:
+    for err in bootstrap_state.errors:
+        st.sidebar.error(err)
+    st.sidebar.error(str(exc))
+    st.stop()
+
+for warning in bootstrap_state.warnings:
     st.sidebar.warning(warning)
 
 with st.sidebar.expander("Configuration summary", expanded=False):
@@ -137,13 +146,17 @@ if "industry_selection_code" not in st.session_state:
 if "comparison_codes" not in st.session_state:
     st.session_state["comparison_codes"] = query_params_initial.get("compare", [])
 
-year_override = APP_CONFIG.default_year
+sidebar_context = bootstrap_state.sidebar_context
+
+year_override = sidebar_context.default_year
 year_override_raw = _last_value("year")
 if year_override_raw:
     try:
         year_override = int(year_override_raw)
     except ValueError:
-        year_override = APP_CONFIG.default_year
+        year_override = sidebar_context.default_year
+
+year_override = sidebar_context.normalise_year(year_override)
 
 sidebar_modes = [
     "Sample (offline)",
@@ -158,9 +171,11 @@ if mode_raw:
     if resolved_mode:
         st.session_state["Source"] = resolved_mode
 
+year_bounds = sidebar_context.year_bounds
+
 sidebar_state = render_sidebar(
     default_year=year_override,
-    year_bounds=(1997, 2100),
+    year_bounds=year_bounds,
     bea_key=APP_CONFIG.bea_api_key or "",
     census_key=APP_CONFIG.census_api_key or "",
     security_utils=SecurityUtils,
