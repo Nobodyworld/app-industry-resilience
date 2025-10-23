@@ -1,4 +1,4 @@
-"""Utilities for normalising user or API provided industry data."""
+"""Column normalisation helpers for harmonising disparate economic datasets."""
 
 from __future__ import annotations
 
@@ -74,6 +74,8 @@ def normalize_columns(
     for optional in OPTIONAL_COLS:
         if optional not in normalized.columns:
             normalized[optional] = pd.NA
+    # TODO - (schema-evolution): Allow callers to provide dtype overrides instead of
+    # assuming all optional columns are nullable floats.
 
     normalized["industry_code"] = (
         normalized["industry_code"].astype(str).str.strip().str.upper()
@@ -91,6 +93,8 @@ def normalize_columns(
 
 
 def _coerce_year(value: object) -> int:
+    """Validate and coerce a single year value into an integer."""
+
     if pd.isna(value):
         raise ValueError("Year column contains null values after normalisation.")
 
@@ -103,6 +107,8 @@ def _coerce_year(value: object) -> int:
 
 
 def _coerce_numeric(value: object) -> float | None:
+    """Convert free-form numeric input to a float while tolerating noise."""
+
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
     if isinstance(value, (int, float)) and not pd.isna(value):

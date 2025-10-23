@@ -1,4 +1,4 @@
-"""Utility helpers shared between API modules and the Streamlit app."""
+"""HTTP helper utilities shared across adapters and infrastructure layers."""
 
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ class InvalidJSONError(HTTPRequestError):
 
 @dataclass(frozen=True)
 class RetryPolicy:
+    """Configuration governing retry behaviour for HTTP requests."""
+
     max_attempts: int = 3
     base_delay: float = 1.0
     backoff_factor: float = 2.0
@@ -78,6 +80,8 @@ def safe_get_json(
             delay = policy.base_delay * (policy.backoff_factor ** (attempt - 1))
             if policy.jitter:
                 delay *= random.uniform(0.8, 1.2)
+            # TODO - (telemetry): Emit structured retry metrics so upstream callers can
+            # diagnose flaky network dependencies more easily.
             time.sleep(delay)
 
     finally:

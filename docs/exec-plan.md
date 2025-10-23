@@ -111,6 +111,7 @@ Key current behaviours:
 
 - Capture sample JSON-formatted log output in tests to assert redaction.
 - Provide test fixture data for BEA responses including pagination tokens and metadata fields.
+- Link updated onboarding docs for future contributors: [README.md](../README.md), [ARCHITECTURE.md](../ARCHITECTURE.md), and [docs/AI_INTERFACE.md](AI_INTERFACE.md).
 
 ## Interfaces and Dependencies
 

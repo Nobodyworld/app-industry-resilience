@@ -1,4 +1,11 @@
-"""Agent-facing helpers for computing Idiot Index summaries."""
+"""Agent-accessible pipeline for computing Idiot Index summaries.
+
+This module exposes a single tool, ``compute_idiot_index_summary``, that wraps
+the full data lifecycle: loading data from the configured sources, normalising
+fields, computing Idiot Index metrics, and returning lightweight dataclass
+snapshots. The functions here intentionally avoid Streamlit dependencies so
+they can be consumed by automated agents or CLI scripts.
+"""
 
 from __future__ import annotations
 
@@ -34,7 +41,13 @@ class DataSource(str, Enum):
 
 @dataclass
 class IdiotIndexRequest:
-    """Input payload accepted by :func:`compute_idiot_index_summary`."""
+    """Input payload accepted by :func:`compute_idiot_index_summary`.
+
+    The dataclass is validated eagerly so automated callers receive quick
+    feedback on invalid parameters before any network traffic occurs. Search
+    strings are sanitised using :class:`~src.core.SecurityUtils` to neutralise
+    potentially unsafe patterns.
+    """
 
     year: int = field(metadata={"description": "Calendar year to evaluate."})
     source: DataSource = field(
@@ -103,6 +116,13 @@ class IdiotIndexResponse:
 
 
 def _load_dataset(payload: IdiotIndexRequest) -> pd.DataFrame:
+    """Return a raw dataframe for the requested data source.
+
+    The helper inspects ``payload.source`` to determine which backend to call
+    and reuses the configured API keys from :func:`src.core.load_config`. It
+    raises :class:`ValueError` when required API keys are absent so the calling
+    agent can surface an actionable error.
+    """
     config = load_config()
     if payload.source is DataSource.SAMPLE:
         frame = pd.read_csv(_SAMPLE_DATA)
@@ -122,6 +142,12 @@ def _load_dataset(payload: IdiotIndexRequest) -> pd.DataFrame:
 
 
 def _filter_dataset(frame: pd.DataFrame, payload: IdiotIndexRequest) -> pd.DataFrame:
+    """Return ``frame`` filtered by the optional search string.
+
+    Filtering is performed case-insensitively across both the industry name and
+    industry code. When the payload does not include ``search`` the original
+    dataframe is returned untouched.
+    """
     sanitized = payload.search
     if not sanitized:
         return frame

@@ -1,4 +1,4 @@
-"""Security helpers for validating untrusted user input."""
+"""Security validation helpers for uploads, API keys, and user-supplied input."""
 
 from __future__ import annotations
 
@@ -31,12 +31,16 @@ _DANGEROUS_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 
 @dataclass(frozen=True)
 class FilePolicy:
+    """Constraints applied to uploaded files before persisting them."""
+
     allowed_extensions: frozenset[str] = frozenset({".csv", ".xlsx", ".xls"})
     max_size_mb: int = 50
 
 
 @dataclass(frozen=True)
 class CsvPolicy:
+    """Limits applied when inspecting CSV contents for dangerous payloads."""
+
     max_columns: int = 100
     max_rows: int = 100_000
     max_cell_length: int = 10_000
@@ -56,6 +60,8 @@ class SecurityUtils:
         *,
         file_size_bytes: int | None = None,
     ) -> ValidationResult[Path]:
+        """Validate basic file attributes before any further processing."""
+
         policy = policy or SecurityUtils.default_file_policy
         path = Path(file_path)
 
@@ -86,6 +92,8 @@ class SecurityUtils:
 
     @staticmethod
     def sanitize_filename(filename: str, fallback: str = "uploaded_file.csv") -> str:
+        """Return a filesystem-friendly filename preserving the original suffix."""
+
         if not filename:
             return fallback
 
@@ -109,6 +117,8 @@ class SecurityUtils:
     def validate_csv_content(
         df: pd.DataFrame, policy: CsvPolicy | None = None
     ) -> ValidationResult[None]:
+        """Inspect a dataframe for unreasonably large or risky values."""
+
         policy = policy or SecurityUtils.default_csv_policy
 
         if len(df.columns) > policy.max_columns:
@@ -144,6 +154,8 @@ class SecurityUtils:
 
     @staticmethod
     def validate_api_key(api_key: str, service_name: str) -> ValidationResult[str]:
+        """Ensure an API key resembles a valid credential before using it."""
+
         cleaned = api_key.strip() if api_key else ""
         if not cleaned:
             return ValidationResult.failure(f"{service_name} API key is required.")
@@ -167,6 +179,8 @@ class SecurityUtils:
 
     @staticmethod
     def validate_year(year: object) -> ValidationResult[int]:
+        """Validate numeric year input, coercing from floats or strings when possible."""
+
         if year is None or isinstance(year, bool):
             return ValidationResult.failure("Year must be an integer value.")
 
@@ -198,6 +212,8 @@ class SecurityUtils:
 
     @staticmethod
     def sanitize_string_input(value: str, *, max_length: int = 1000) -> str:
+        """Remove potentially harmful substrings from free-form user input."""
+
         if not value:
             return ""
 
@@ -215,13 +231,18 @@ class SecurityUtils:
         max_requests: int,
         window_seconds: int,
     ) -> ValidationResult[None]:
+        """Perform an in-memory rate-limit check placeholder."""
+
         if max_requests <= 0 or window_seconds <= 0:
             return ValidationResult.failure("Rate limit parameters must be positive.")
-        # Placeholder – integrate with persistent store if required.
+        # TODO - (rate-limits): Integrate with a shared store (Redis) to enforce limits
+        # across multiple application instances instead of relying on in-process state.
         return ValidationResult.success(None, "Rate limit check passed.")
 
 
 def _contains_dangerous_patterns(text: str) -> bool:
+    """Return ``True`` when ``text`` contains substrings matching dangerous regexes."""
+
     lowered = text.lower()
     return any(pattern.search(lowered) for pattern in _DANGEROUS_PATTERNS)
 

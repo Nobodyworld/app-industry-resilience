@@ -96,11 +96,54 @@ Commit messages must follow the Conventional Commits spec; the provided hooks wi
 
 ## Architecture
 
-The project is organised into dedicated layers (`core`, `adapters`, `infrastructure`, `interfaces`, and `agents`) to keep domain logic decoupled from interfaces. Refer to [ARCHITECTURE.md](ARCHITECTURE.md) for a full breakdown of the new layout and compatibility shims.
+The project is organised into dedicated layers (`core`, `adapters`, `infrastructure`, `interfaces`, and `agents`) to keep domain logic decoupled from presentation and automation surfaces.
+
+```
+Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + metrics)
+                                              │
+                                              ├──▶ interfaces/streamlit (app.py)
+                                              └──▶ agents (toolkit + schemas)
+```
+
+Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
+
+1. **Bootstrap** – `app.py` loads configuration through `src.core.config`, validates environment state, and renders the sidebar context.
+2. **Acquire data** – depending on the selected mode, adapters fetch BEA/ASM datasets or load the bundled CSV. Responses are cached on disk when enabled.
+3. **Normalise & compute** – `src.core.normalize` standardises column names before `src.core.metrics.compute_metrics` derives Idiot Index, value-added %, and related measures.
+4. **Render narrative** – Streamlit components under `src.interfaces.streamlit` build the hero header, signal cards, tables, charts, and deep-dive story, exposing the same helpers used by automated tests.
+5. **Share or automate** – downloads are prepared through `src.interfaces.streamlit.helpers`, while the agent toolkit (`agents/`) exposes the same pipeline for headless clients. See [ARCHITECTURE.md](ARCHITECTURE.md) for an expanded breakdown of each module and data contract.
+
+### Typical workflows
+
+- **Offline demo** – launch `streamlit run app.py`, keep the default "Sample" data source, and explore tables/charts instantly. Use the "Comparisons & benchmarking" section to see relative performance.
+- **Live BEA data** – add a BEA API key to `.env`, select "BEA (Economy-wide)" in the sidebar, and fetch multi-year data with automatic NAICS enrichment, caching, and retry logic.
+- **Bring your own CSV** – choose "Upload CSV" and drop a file that matches the schema outlined below. The app validates file metadata and contents before merging with the same metrics pipeline.
+
+### Key metrics
+
+- **Idiot Index** – `gross_output ÷ materials_cost` or `gross_output ÷ intermediate_inputs` when materials are absent.
+- **Value-Added %** – `(value_added ÷ gross_output) × 100` when both fields exist.
+- **Materials Share %** – `(materials_cost ÷ gross_output) × 100`.
+
+The `src/core.metrics` module documents the calculations in depth, while the agent docs detail the JSON responses that expose them for automation.
 
 ## Agent integrations
 
 Automated clients can call the Idiot Index pipeline through the agent toolkit under `agents/`. The primary tool, `compute_idiot_index_summary`, exposes validated dataclass payloads and JSON schemas for integration. See [docs/AI_INTERFACE.md](docs/AI_INTERFACE.md) for invocation details and schema definitions.
+
+## Programmatic usage example
+
+```python
+from agents import IdiotIndexRequest, compute_idiot_index_summary
+
+payload = IdiotIndexRequest(year=2022, source="sample", top_n=3)
+result = compute_idiot_index_summary(payload)
+
+for industry in result.top_industries:
+    print(industry.code, industry.name, f"Index: {industry.idiot_index:.2f}")
+```
+
+The agent toolkit mirrors the Streamlit pipeline, making it safe to reuse for background jobs, chat assistants, or scheduled reporting.
 
 ## API Keys
 
@@ -157,6 +200,20 @@ At minimum, provide: `industry_code`, `industry_name`, `year`, and either:
 - `gross_output` + `intermediate_inputs` (used as materials proxy).
 
 ---
+
+## Testing & quality gates
+
+- `make check` (or `pytest` + `ruff` + `mypy` individually) should pass before merging.
+- Agents rely on type hints; run `mypy` to ensure interface compatibility when editing dataclasses or adapters.
+- Streamlit helpers have unit tests in `tests/interfaces/streamlit`; add coverage there when altering UI-facing utilities.
+
+## Troubleshooting
+
+- **API failures** – check the sidebar banner for validation errors. Enable debug logs with `LOG_LEVEL=DEBUG` when running `streamlit run app.py` to see adapter retries.
+- **Slow dashboard** – enable caching via `.env` (`CACHE_ENABLED=true`) to persist API responses between sessions.
+- **Excel downloads missing** – install `xlsxwriter` (already included in `requirements.txt`) or rely on CSV/JSON outputs if the optional dependency is unavailable.
+
+For architecture deep dives, see [ARCHITECTURE.md](ARCHITECTURE.md). For agent schemas and JSON examples, see [docs/AI_INTERFACE.md](docs/AI_INTERFACE.md).
 
 ## Export
 

@@ -1,3 +1,5 @@
+"""Helper utilities shared by Streamlit components for state and exports."""
+
 from __future__ import annotations
 
 import io
@@ -10,6 +12,8 @@ import pandas as pd
 
 @dataclass(frozen=True)
 class DownloadArtifact:
+    """Materialised file ready to be served via a Streamlit download button."""
+
     label: str
     file_name: str
     mime: str
@@ -22,7 +26,12 @@ def prepare_download_artifacts(
     *,
     base_name: str,
 ) -> list[DownloadArtifact]:
-    """Return download payloads for the full and filtered datasets."""
+    """Return download payloads for the full and filtered datasets.
+
+    The helper eagerly renders CSV, JSON, and optional Excel artefacts so the
+    Streamlit layer simply iterates over the resulting dataclasses when
+    building download buttons.
+    """
 
     artifacts: list[DownloadArtifact] = []
 
@@ -84,7 +93,7 @@ def build_comparison_table(
     df: pd.DataFrame,
     selected_codes: Sequence[str],
 ) -> pd.DataFrame:
-    """Return metrics for the selected industries for side-by-side comparison."""
+    """Return metrics for ``selected_codes`` suitable for side-by-side display."""
 
     if not selected_codes:
         return pd.DataFrame(columns=[
@@ -144,7 +153,7 @@ def prepare_trend_data(
     df: pd.DataFrame,
     selected_codes: Sequence[str],
 ) -> pd.DataFrame:
-    """Return time-series data for selected industries."""
+    """Return time-series data for the provided industry codes."""
 
     if not selected_codes:
         return pd.DataFrame(columns=["year", "industry_name", "idiot_index"])

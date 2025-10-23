@@ -2,9 +2,8 @@
 
 This module centralises how the application interprets environment variables
 and exposes a strongly typed configuration object that other modules can
-depend on.  Configuration is intentionally loaded lazily so tests can supply
-custom environments without mutating global state.
-"""
+depend on. Configuration is intentionally loaded lazily so tests can supply
+custom environments without mutating global state."""
 
 from __future__ import annotations
 
@@ -301,6 +300,8 @@ def get_config_summary(config: AppConfig | None = None) -> dict[str, object]:
 
 
 def _parse_int(value: str, name: str) -> int:
+    """Return ``value`` as an integer or raise :class:`ConfigError`."""
+
     try:
         return int(value)
     except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
@@ -308,12 +309,16 @@ def _parse_int(value: str, name: str) -> int:
 
 
 def _parse_bool(value: str | None) -> bool:
+    """Interpret a string flag into a boolean value."""
+
     if value is None:
         return False
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _parse_year_range(value: str, name: str) -> range:
+    """Parse a ``start-end`` formatted string into an inclusive range."""
+
     try:
         start_str, end_str = value.split("-", maxsplit=1)
         start = int(start_str)
@@ -330,6 +335,8 @@ def _parse_year_range(value: str, name: str) -> range:
 
 
 def _clean_secret(value: str | None) -> str | None:
+    """Strip whitespace from a secret value and normalise empty strings to ``None``."""
+
     if value is None:
         return None
     cleaned = value.strip()
@@ -337,10 +344,14 @@ def _clean_secret(value: str | None) -> str | None:
 
 
 def _range_to_tuple(value: range) -> tuple[int, int]:
+    """Convert a ``range`` to an inclusive ``(start, end)`` tuple."""
+
     return value.start, value.stop - 1
 
 
 def _parse_url_list(raw: str, name: str) -> tuple[str, ...]:
+    """Split and validate a comma-separated list of absolute URLs."""
+
     urls = [part.strip() for part in raw.split(",") if part.strip()]
     if not urls:
         raise ConfigError(f"{name} must contain at least one URL.")
@@ -354,6 +365,8 @@ def _parse_url_list(raw: str, name: str) -> tuple[str, ...]:
             )
         validated[candidate] = None
 
+    # TODO - (config-cache): Cache parsed URLs on disk to avoid reparsing large lists
+    # on every process start once configuration hot-reload lands.
     return tuple(validated.keys())
 
 
