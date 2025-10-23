@@ -89,6 +89,13 @@ def tool_names() -> Iterable[str]:
 
 
 def _schema_for_dataclass(cls: Type[Any]) -> Dict[str, Any]:
+    """Return a JSON schema dictionary for the provided dataclass type.
+
+    The schema is intentionally minimal, focusing on field names, basic typing,
+    and optional descriptions sourced from ``field.metadata``. Required fields
+    are derived from dataclass defaults so downstream tooling can validate
+    payloads before invoking a tool.
+    """
     if not is_dataclass(cls):  # pragma: no cover - defensive guard
         raise TypeError(f"{cls!r} is not a dataclass.")
 
@@ -111,6 +118,7 @@ def _schema_for_dataclass(cls: Type[Any]) -> Dict[str, Any]:
 
 
 def _schema_for_annotation(annotation: Any) -> Dict[str, Any]:
+    """Translate a Python typing annotation into a JSON schema fragment."""
     origin = get_origin(annotation)
     if origin in {list, List, tuple, Tuple, Iterable}:
         args = get_args(annotation) or (Any,)

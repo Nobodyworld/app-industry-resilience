@@ -64,6 +64,12 @@ All changes are additive or refactors within version-controlled files. Re-runnin
 
 None yet.
 
+For deeper architectural and agent references created after this ExecPlan was executed, consult:
+
+- [README.md](../../README.md#architecture)
+- [ARCHITECTURE.md](../../ARCHITECTURE.md)
+- [docs/AI_INTERFACE.md](../AI_INTERFACE.md)
+
 ## Interfaces and Dependencies
 
 The new component functions rely solely on Streamlit and existing app data structures (Pandas DataFrame with fields such as `industry_name`, `industry_code`, `idiot_index`, etc.). No external dependencies are added.

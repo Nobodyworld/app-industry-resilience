@@ -40,12 +40,56 @@ for industry in response.top_industries:
     print(industry.code, industry.name, industry.idiot_index)
 ```
 
+### Inspecting JSON Schema programmatically
+
+```python
+from agents import get_tool
+
+tool = get_tool("compute_idiot_index_summary")
+print(tool.input_schema)
+print(tool.output_schema)
+```
+
+Both schemas follow JSON Schema Draft 7 conventions. Optional fields surface under the `required` key.
+
+### Running from the command line
+
+The repo ships with a helper script that mirrors the agent call:
+
+```bash
+python - <<'PY'
+from agents import IdiotIndexRequest, compute_idiot_index_summary
+
+payload = IdiotIndexRequest(year=2020, source="sample", top_n=3)
+summary = compute_idiot_index_summary(payload)
+
+print(f"Rows evaluated: {summary.rows_evaluated}")
+for row in summary.top_industries:
+    print(f"{row.code}: {row.name} ({row.idiot_index:.2f})")
+PY
+```
+
 ## Validation Behaviour
 - Invalid years or leaderboard sizes raise `ValueError` before any network calls occur.
 - Search strings are sanitised using `SecurityUtils.sanitize_string_input` to strip dangerous patterns.
 - When live data sources are requested without API keys, a `ValueError` is raised immediately.
 
+## Error handling
+
+- `ValueError` – user misconfiguration (year out of range, missing API keys, invalid `top_n`).
+- `RuntimeError` – propagated from adapters when upstream services are unavailable even after retries.
+- Network exceptions are converted to domain-specific errors within adapters and logged via `src.infrastructure.log_performance`.
+
+Applications embedding the toolkit should catch `ValueError` for actionable user feedback and re-raise or log other exceptions.
+
 ## Extending the Toolkit
 1. Create a dataclass for the request and response payloads.
 2. Decorate the callable with `@tool(name="...", description="...")`.
 3. The decorator automatically registers the tool and captures JSON schemas for integration.
+
+### Integration checklist
+
+- [ ] Import request/response dataclasses from `agents` to keep type hints stable.
+- [ ] Validate API keys are present before invoking live sources (BEA or Census).
+- [ ] Handle pagination in long-running conversations by storing `IdiotIndexRequest` copies if you expect to reuse them.
+- [ ] Leverage the JSON schema metadata to configure third-party agent platforms.

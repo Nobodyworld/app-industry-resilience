@@ -1,3 +1,11 @@
+"""Streamlit dashboard for exploring Idiot Index metrics and narratives.
+
+The app composes domain helpers from ``src.core`` with Streamlit components to
+fetch data, compute metrics, and render an adaptive user interface. The module
+also exposes a handful of utility functions that are reused by tests to mock
+API calls and CSV uploads.
+"""
+
 from __future__ import annotations
 
 from typing import Mapping, Optional, Sequence, Tuple
@@ -43,14 +51,20 @@ from src.interfaces.streamlit.helpers import (
 
 @st.cache_data(show_spinner=False)
 def load_sample() -> pd.DataFrame:
+    """Return the bundled sample dataset for offline exploration."""
+
     return pd.read_csv("data/sample_industries.csv")
 
 
 def try_fetch_census(year: int, api_key: str) -> pd.DataFrame:
+    """Fetch Census ASM data for ``year`` using the provided ``api_key``."""
+
     return fetch_asm_manufacturing(api_key=api_key, year=year)
 
 
 def try_fetch_bea(year: int, api_key: str) -> pd.DataFrame:
+    """Fetch BEA GDP-by-industry aggregates for ``year``."""
+
     return fetch_go_ii_by_industry(api_key=api_key, year=year)
 
 
@@ -130,6 +144,8 @@ query_params_initial = decode_query_params(st.experimental_get_query_params())
 
 
 def _last_value(key: str, default: str | None = None) -> str | None:
+    """Return the last query parameter value for ``key`` if present."""
+
     values = query_params_initial.get(key)
     if not values:
         return default
@@ -480,6 +496,8 @@ share_mapping = encode_query_params(
 )
 
 def _normalise(mapping: Mapping[str, list[str]]) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Normalise query mappings for deterministic comparisons."""
+
     return tuple(sorted((key, tuple(values)) for key, values in mapping.items()))
 
 if _normalise(share_mapping) != _normalise(query_params_initial):

@@ -12,6 +12,8 @@ from ..core import RateLimitConfig, load_config
 
 @dataclass
 class RateLimiter:
+    """Token bucket limiter for a single logical stream of requests."""
+
     requests_per_minute: int
 
     def __post_init__(self) -> None:
@@ -21,9 +23,13 @@ class RateLimiter:
 
     @property
     def _requests_per_second(self) -> float:
+        """Return the configured throughput expressed as requests per second."""
+
         return self.requests_per_minute / 60.0
 
     def acquire(self) -> bool:
+        """Return ``True`` when a token is available, ``False`` otherwise."""
+
         with self._lock:
             now = time.time()
             elapsed = now - self._last_update
@@ -39,11 +45,15 @@ class RateLimiter:
             return False
 
     def wait(self) -> None:
+        """Block until a token is available for consumption."""
+
         while not self.acquire():
             time.sleep(max(0.1, 1.0 / self._requests_per_second))
 
 
 class APIRateLimiter:
+    """Facade around multiple :class:`RateLimiter` instances for external APIs."""
+
     def __init__(self, limits: RateLimitConfig | None = None) -> None:
         config = limits or load_config().rate_limits
         self._limiters: Dict[str, RateLimiter] = {
@@ -53,7 +63,11 @@ class APIRateLimiter:
         }
 
     def wait_for_api(self, api_name: str) -> None:
+        """Block until the caller may execute a request for ``api_name``."""
+
         limiter = self._limiters.get(api_name.lower(), self._limiters["default"])
+        # TODO - (distributed-limits): Persist limiter state to coordinate across
+        # horizontally scaled workers when the ingestion service is deployed.
         limiter.wait()
 
 
