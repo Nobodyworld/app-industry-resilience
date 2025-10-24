@@ -9,10 +9,11 @@ Thanks for investing time in the Idiot Index project! This guide explains how to
 - **Keep pull requests focused.** Ship reviewable slices; avoid unrelated refactors.
 - **Adopt Conventional Commits.** Every commit message must follow the `<type>(optional scope): <subject>` format using the types enforced by `scripts/commitlint.py`.
 - **Run the full quality suite** before opening a pull request.
+- **Document significant work with an ExecPlan.** Place plans under `.agent/execplans/` so reviewers can trace decisions.
 
 ## Prerequisites
 
-- Python 3.9 or newer.
+- Python 3.11 or newer.
 - `pip` and `make` available on your PATH.
 
 ## First-time Setup
@@ -57,6 +58,7 @@ pre-commit install --hook-type commit-msg
    make test          # Run pytest without coverage
    make security      # Run pip-audit and detect-secrets checks
    make sbom          # Build a CycloneDX SBOM for dependencies
+   make docs          # List key documentation links in the terminal
    ```
 
 5. Commit using Conventional Commits. The `commit-msg` hook will reject messages that do not comply.

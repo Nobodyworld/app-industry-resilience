@@ -1,20 +1,33 @@
+"""BEA adapter responsible for fetching and normalising external datasets.
+
+This module orchestrates requests to the Bureau of Economic Analysis (BEA)
+GDP-by-industry endpoints. It validates caller inputs, selects a healthy API
+endpoint, downloads the Gross Output and Intermediate Inputs tables, enriches
+them with NAICS metadata, and caches the result for reuse across requests.
+
+Public helpers raise :class:`BEAClientError` when invalid inputs are supplied or
+when BEA data cannot be retrieved. All network access is wrapped in
+``safe_get_json`` to ensure retries and consistent error reporting.
+"""
+
 from __future__ import annotations
 
 import concurrent.futures
 import time
-from collections import defaultdict
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import pandas as pd
 
 from ..core import (
     AppConfig,
+    RetryPolicy,
     SecurityUtils,
     get_api_cache,
     load_config,
     normalize_columns,
-    RetryPolicy,
     safe_get_json,
 )
 from ..infrastructure import (
@@ -37,11 +50,65 @@ _HEALTH_PARAMS = {
 
 
 class BEAClientError(RuntimeError):
-    """Raised when BEA data cannot be retrieved after retries."""
+    """Raised when BEA data cannot be retrieved after retries or validation."""
+
+
+@dataclass(frozen=True)
+class BEATable:
+    """Representation of a BEA table to fetch for a given year."""
+
+    table_id: str
+    description: str
+    value_column: str
+
+
+@dataclass(frozen=True)
+class BEARequestContext:
+    """Context for building BEA requests for a specific year."""
+
+    base_url: str
+    api_key: str
+    year: int
+    config: AppConfig
+
+    def build_params(self, table: BEATable) -> dict[str, str]:
+        """Return BEA request parameters for ``table`` and ``self.year``."""
+
+        params = {
+            "UserID": self.api_key,
+            "method": "GetData",
+            "datasetname": "GDPbyIndustry",
+            "Frequency": "A",
+            "Industry": "ALL",
+            "Year": str(self.year),
+            "TableID": table.table_id,
+            "ResultFormat": "json",
+        }
+        if self.config.bea_api_version:
+            params["v"] = self.config.bea_api_version
+        return params
+
+
+BEA_TABLES: tuple[BEATable, ...] = (
+    BEATable(table_id="1", description="GDPbyIndustry Table 1", value_column="gross_output"),
+    BEATable(table_id="2", description="GDPbyIndustry Table 2", value_column="intermediate_inputs"),
+)
 
 
 def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataFrame:
-    """Fetch Gross Output and Intermediate Inputs for one or more years."""
+    """Fetch Gross Output and Intermediate Inputs for one or more years.
+
+    Args:
+        api_key: BEA API key provided by the caller.
+        year: Single year or iterable of years to retrieve.
+
+    Returns:
+        Pandas DataFrame containing merged BEA tables enriched with NAICS data.
+
+    Raises:
+        BEAClientError: If the API key or years are invalid, or if the BEA API
+            cannot be reached successfully after retries.
+    """
 
     start_time = time.time()
     config = load_config()
@@ -84,7 +151,7 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
     base_url = select_bea_endpoint(config)
 
     data_frames: list[pd.DataFrame] = []
-    metadata_aggregate: dict[str, Any] = defaultdict(list)
+    metadata_notes: list[str] = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(years_tuple), 4)) as executor:
         futures = {
@@ -110,11 +177,7 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
                 ) from exc
             else:
                 data_frames.append(year_frame)
-                for key, value in year_meta.items():
-                    if isinstance(value, list):
-                        metadata_aggregate[key].extend(value)
-                    else:
-                        metadata_aggregate[key].append(value)
+                metadata_notes.extend(year_meta.get("notes", []))
 
     if not data_frames:
         raise BEAClientError("No BEA data returned for requested years.")
@@ -129,7 +192,7 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
         "years": years_tuple,
         "endpoint": base_url,
         "tables": ["Gross Output", "Intermediate Inputs"],
-        "notes": metadata_aggregate.get("notes", []),
+        "notes": _merge_metadata_notes(metadata_notes),
     }
 
     if cache:
@@ -150,7 +213,18 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
 
 
 def select_bea_endpoint(config: AppConfig) -> str:
-    """Return the first healthy BEA endpoint, raising if none succeed."""
+    """Return the first healthy BEA endpoint, raising if none succeed.
+
+    Args:
+        config: Application configuration containing the ordered list of BEA
+            base URLs to test.
+
+    Returns:
+        Base URL for the first endpoint that responds successfully.
+
+    Raises:
+        BEAClientError: If no configured endpoints respond successfully.
+    """
 
     errors: list[str] = []
     for base_url in config.bea_api_base_urls:
@@ -176,55 +250,72 @@ def _fetch_year_bundle(
     year: int,
     config: AppConfig,
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
-    params_common = {
-        "UserID": api_key,
-        "method": "GetData",
-        "datasetname": "GDPbyIndustry",
-        "Frequency": "A",
-        "Industry": "ALL",
-        "Year": str(year),
-        "ResultFormat": "json",
-    }
-    if config.bea_api_version:
-        params_common["v"] = config.bea_api_version
+    """Fetch both BEA tables for ``year`` and return merged results.
 
-    go_rows, go_meta = _fetch_table(
-        base_url,
-        {**params_common, "TableID": "1"},
-        description="GDPbyIndustry Table 1",
-    )
-    ii_rows, ii_meta = _fetch_table(
-        base_url,
-        {**params_common, "TableID": "2"},
-        description="GDPbyIndustry Table 2",
-    )
+    Args:
+        base_url: Healthy BEA endpoint URL.
+        api_key: Sanitised BEA API key.
+        year: Year to fetch.
+        config: Application configuration supplying version metadata.
 
-    go_df = _process_bea_table(go_rows, "gross_output")
-    ii_df = _process_bea_table(ii_rows, "intermediate_inputs")
-    merged = pd.merge(
-        go_df,
+    Returns:
+        Tuple containing the merged DataFrame and metadata dictionary.
+
+    Raises:
+        BEAClientError: If either table cannot be retrieved.
+    """
+
+    context = BEARequestContext(base_url=base_url, api_key=api_key, year=year, config=config)
+
+    frames: list[pd.DataFrame] = []
+    notes_groups: list[list[str]] = []
+
+    for table in BEA_TABLES:
+        params = context.build_params(table)
+        rows, metadata = _fetch_table(base_url, params, description=table.description)
+        frame = _process_bea_table(rows, value_column=table.value_column)
+        frames.append(frame)
+        notes_groups.append(list(metadata.get("notes", [])))
+
+    if len(frames) != len(BEA_TABLES):
+        raise BEAClientError("Incomplete BEA data returned for requested year.")
+
+    go_df, ii_df = frames
+    merged = go_df.merge(
         ii_df,
         on=["industry_code", "industry_name", "year"],
         how="outer",
     )
     merged["source"] = "BEA (Economy-wide)"
-    metadata = {"notes": go_meta.get("notes", []) + ii_meta.get("notes", [])}
+    metadata = {"notes": _merge_metadata_notes(*notes_groups)}
     return merged, metadata
 
 
 def _fetch_table(
     base_url: str,
-    params: dict[str, str],
+    params: Mapping[str, str],
     *,
     description: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Fetch a table from BEA handling pagination and retries."""
+    """Fetch a table from BEA handling pagination and retries.
+
+    Args:
+        base_url: Endpoint used for the request.
+        params: Request parameters constructed for the table.
+        description: Human readable table description for logging.
+
+    Returns:
+        Tuple of row dictionaries and metadata including accumulated notes.
+
+    Raises:
+        BEAClientError: When the request fails even after retries.
+    """
 
     log_api_call("BEA", description, params)
 
     rows: list[dict[str, Any]] = []
     notes: list[str] = []
-    page_params = dict(params)
+    page_params: MutableMapping[str, str] = dict(params)
     retry_policy = RetryPolicy(max_attempts=3, base_delay=1.0, backoff_factor=2.0)
 
     while True:
@@ -248,7 +339,21 @@ def _fetch_table(
     return rows, {"notes": notes}
 
 
-def _parse_bea_response(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], list[str], str | None]:
+def _parse_bea_response(payload: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[str], str | None]:
+    """Parse a BEA API payload returning rows, notes, and next page token.
+
+    Args:
+        payload: Raw JSON payload returned by ``safe_get_json``.
+
+    Returns:
+        Tuple containing parsed row dictionaries, textual notes, and an
+        optional pagination token.
+
+    Raises:
+        BEAClientError: When the payload reports an API error or has an
+            unexpected structure.
+    """
+
     if not payload or "BEAAPI" not in payload:
         raise BEAClientError("Unexpected BEA API response structure")
 
@@ -284,35 +389,64 @@ def _parse_bea_response(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], 
     return parsed_rows, notes, next_page
 
 
-def _process_bea_table(data: Sequence[dict[str, Any]], value_column: str) -> pd.DataFrame:
-    rows = []
-    for item in data:
-        value_raw = str(item.get("DataValue", "0"))
-        try:
-            value = float(value_raw.replace(",", "")) * 1_000_000
-        except ValueError:
-            value = None
-        try:
-            year_int = int(item.get("Year", 0))
-        except (TypeError, ValueError):
-            year_int = 0
-        rows.append(
-            {
-                "industry_code": item.get("Industry", ""),
-                "industry_name": item.get("IndustrYDescription", item.get("Industry", "")),
-                "year": year_int,
-                value_column: value,
-            }
-        )
-    return pd.DataFrame(rows)
+def _process_bea_table(data: Sequence[Mapping[str, Any]], value_column: str) -> pd.DataFrame:
+    """Convert BEA table rows into a DataFrame with numeric values.
+
+    Args:
+        data: Sequence of row mappings returned by the BEA API.
+        value_column: Name of the numeric column to populate.
+
+    Returns:
+        DataFrame with standardised columns for downstream processing.
+    """
+
+    if not data:
+        return pd.DataFrame(columns=["industry_code", "industry_name", "year", value_column])
+
+    frame = pd.DataFrame(list(data)).rename(
+        columns={"Industry": "industry_code", "IndustrYDescription": "industry_name"}
+    )
+
+    if "industry_code" not in frame:
+        frame["industry_code"] = ""
+    frame["industry_code"] = frame["industry_code"].astype(str)
+
+    if "industry_name" not in frame:
+        frame["industry_name"] = frame["industry_code"]
+    else:
+        frame["industry_name"] = frame["industry_name"].fillna(frame["industry_code"])
+
+    value_series = frame.get("DataValue", pd.Series(index=frame.index, dtype="object")).astype(str)
+    value_series = value_series.str.replace(",", "", regex=False)
+    frame[value_column] = pd.to_numeric(value_series, errors="coerce") * 1_000_000
+
+    year_series = pd.to_numeric(frame.get("Year", 0), errors="coerce").fillna(0).astype(int)
+    frame["year"] = year_series
+
+    return frame.loc[:, ["industry_code", "industry_name", "year", value_column]]
 
 
 @lru_cache(maxsize=1)
 def _load_naics_map() -> pd.DataFrame:
+    """Load the NAICS lookup table used to enrich BEA results.
+
+    Returns:
+        DataFrame containing NAICS codes and friendly names.
+    """
+
     return pd.read_csv("assets/naics_map.csv")
 
 
 def _enrich_with_naics_map(df: pd.DataFrame) -> pd.DataFrame:
+    """Merge NAICS metadata, preferring provided names when available.
+
+    Args:
+        df: DataFrame produced from BEA data.
+
+    Returns:
+        DataFrame enriched with NAICS names.
+    """
+
     mapping = _load_naics_map()
     merged = df.merge(mapping, on="industry_code", how="left", suffixes=("", "_mapped"))
     if "industry_name_mapped" in merged.columns:
@@ -322,18 +456,72 @@ def _enrich_with_naics_map(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _ensure_years(year: int | Iterable[int]) -> tuple[int, ...]:
+    """Normalise the ``year`` argument into a validated tuple of integers.
+
+    Args:
+        year: Single year or iterable of candidate years.
+
+    Returns:
+        Sorted tuple of validated years.
+
+    Raises:
+        BEAClientError: If values are missing, duplicated, or invalid.
+    """
+
     if isinstance(year, int):
-        return (year,)
-    years = tuple(int(value) for value in year)
+        years = (year,)
+    else:
+        try:
+            years = tuple(int(value) for value in year)
+        except (TypeError, ValueError) as exc:
+            raise BEAClientError(f"Invalid BEA year value: {year}") from exc
+
     if not years:
         raise BEAClientError("At least one year must be provided for BEA fetch.")
-    return years
+
+    if any(item <= 0 for item in years):
+        raise BEAClientError("Years must be positive integers for BEA fetch.")
+
+    if len(set(years)) != len(years):
+        raise BEAClientError("Duplicate years are not allowed in BEA fetch.")
+
+    return tuple(sorted(years))
 
 
 def _cache_key(years: Sequence[int], version: str | None) -> str:
+    """Return a stable cache key for a set of years and API version.
+
+    Args:
+        years: Iterable of year integers.
+        version: Optional BEA API version string.
+
+    Returns:
+        Cache key combining the year set and version.
+    """
+
     years_component = "_".join(str(y) for y in sorted(set(years)))
     version_component = version or "default"
     return f"bea_go_ii_{years_component}_v{version_component}"
 
 
-__all__ = ["BEAClientError", "fetch_go_ii_by_industry", "select_bea_endpoint"]
+def _merge_metadata_notes(*note_groups: Sequence[str]) -> list[str]:
+    """Deduplicate and stabilise ordering of metadata notes.
+
+    Args:
+        *note_groups: Iterables of note strings captured during fetches.
+
+    Returns:
+        Deterministically ordered list of unique note strings.
+    """
+
+    ordered: dict[str, None] = {}
+    for group in note_groups:
+        for note in group:
+            normalised = str(note).strip()
+            if not normalised:
+                continue
+            ordered.setdefault(normalised, None)
+    return list(ordered.keys())
+
+
+__all__: tuple[str, ...] = ("BEAClientError", "fetch_go_ii_by_industry", "select_bea_endpoint")

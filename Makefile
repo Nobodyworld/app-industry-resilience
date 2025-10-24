@@ -1,4 +1,4 @@
-.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom
+.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs
 
 PYTHON := python
 SKIP_PIP ?= 0
@@ -20,7 +20,8 @@ help:
 	@echo "  test               Execute pytest suite"
 	@echo "  coverage           Generate XML coverage report"
 	@echo "  pre-commit         Run all pre-commit hooks against the repository"
-	@echo "  check              Run repository-wide quality checks"
+        @echo "  check              Run repository-wide quality checks"
+        @echo "  docs               Show key architecture and workflow documentation"
 
 install:
 	@if [ "${SKIP_PIP}" = "1" ]; then \
@@ -97,12 +98,20 @@ security:
 	fi
 
 sbom:
-	@mkdir -p $(SBOM_DIR)
-	@if [ -x scripts/generate_sbom.py ]; then \
-		$(PYTHON) scripts/generate_sbom.py --output $(SBOM_FILE) $(SBOM_REQUIREMENTS); \
-	else \
-		echo 'generate_sbom.py missing or not executable'; \
-	fi
+        @mkdir -p $(SBOM_DIR)
+        @if [ -x scripts/generate_sbom.py ]; then \
+                $(PYTHON) scripts/generate_sbom.py --output $(SBOM_FILE) $(SBOM_REQUIREMENTS); \
+        else \
+                echo 'generate_sbom.py missing or not executable'; \
+        fi
+
+docs:
+        @echo "Core documentation links:"
+        @echo "  README.md"
+        @echo "  docs/ARCHITECTURE_OVERVIEW.md"
+        @echo "  docs/API_REFERENCE.md"
+        @echo "  docs/WORKFLOWS_DATA_REFRESH.md"
+        @echo "  docs/DEPENDENCIES.md"
 
 clean:
-	rm -rf .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml htmlcov node_modules
+        rm -rf .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml htmlcov node_modules
