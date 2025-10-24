@@ -1,13 +1,14 @@
 """Streamlit dashboard for exploring Idiot Index metrics and narratives.
 
-The app composes domain helpers from ``src.core`` with Streamlit components to
-fetch data, compute metrics, and render an adaptive user interface. The module
-also exposes a handful of utility functions that are reused by tests to mock
-API calls and CSV uploads.
+The app composes application services with Streamlit components to fetch data,
+compute metrics, and render an adaptive user interface. The module also
+exposes a handful of utility functions that are reused by tests to mock API
+calls and CSV uploads.
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Mapping, Optional, Sequence, Tuple
 
 import pandas as pd
@@ -16,15 +17,8 @@ import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 from urllib.parse import urlencode
 
-from src.adapters import fetch_asm_manufacturing, fetch_go_ii_by_industry
-from src.core import (
-    FilePolicy,
-    SecurityUtils,
-    compute_metrics,
-    format_for_display,
-    get_config_summary,
-    normalize_columns,
-)
+from src.application import DataSource, evaluate_idiot_index
+from src.core import FilePolicy, SecurityUtils, get_config_summary
 from src.interfaces.streamlit.bootstrap import (
     BootstrapError,
     get_bootstrap_state,
@@ -54,18 +48,6 @@ def load_sample() -> pd.DataFrame:
     """Return the bundled sample dataset for offline exploration."""
 
     return pd.read_csv("data/sample_industries.csv")
-
-
-def try_fetch_census(year: int, api_key: str) -> pd.DataFrame:
-    """Fetch Census ASM data for ``year`` using the provided ``api_key``."""
-
-    return fetch_asm_manufacturing(api_key=api_key, year=year)
-
-
-def try_fetch_bea(year: int, api_key: str) -> pd.DataFrame:
-    """Fetch BEA GDP-by-industry aggregates for ``year``."""
-
-    return fetch_go_ii_by_industry(api_key=api_key, year=year)
 
 
 def process_uploaded_file(
@@ -207,42 +189,61 @@ bea_key = sidebar_state.bea_key.strip()
 census_key = sidebar_state.census_key.strip()
 uploaded_file = sidebar_state.uploaded_file
 
-df_raw: Optional[pd.DataFrame] = None
+mode_to_source = {
+    "Sample (offline)": DataSource.SAMPLE,
+    "Census ASM (Manufacturing)": DataSource.CENSUS,
+    "BEA (Economy-wide)": DataSource.BEA,
+}
+
+service_source = mode_to_source.get(data_mode, DataSource.SAMPLE)
+dataframe_override: Optional[pd.DataFrame] = None
+service_config = APP_CONFIG
 error: Optional[str] = None
 
-if data_mode == "Sample (offline)":
-    df_raw = load_sample()
-elif data_mode == "Upload CSV":
+if data_mode == "Upload CSV":
     if uploaded_file is None:
         st.stop()
-    df_raw, error = process_uploaded_file(
+    dataframe_override, error = process_uploaded_file(
         uploaded_file, policy=FilePolicy(max_size_mb=APP_CONFIG.max_csv_size_mb)
     )
     if error:
         st.sidebar.error(error)
         st.stop()
     st.sidebar.success("CSV loaded and validated.")
-elif data_mode == "Census ASM (Manufacturing)":
-    try:
-        df_raw = try_fetch_census(year=year_clean, api_key=census_key)
-        st.sidebar.success(f"ASM fetched for {year_clean}.")
-    except Exception as exc:  # pylint: disable=broad-except
-        error = str(exc)
-        st.sidebar.error(f"ASM fetch failed: {exc}")
-elif data_mode == "BEA (Economy-wide)":
-    try:
-        df_raw = try_fetch_bea(year=year_clean, api_key=bea_key)
-        st.sidebar.success(f"BEA fetched for {year_clean}.")
-    except Exception as exc:  # pylint: disable=broad-except
-        error = str(exc)
-        st.sidebar.error(f"BEA fetch failed: {exc}")
+else:
+    if service_source is DataSource.BEA and bea_key:
+        service_config = replace(APP_CONFIG, bea_api_key=bea_key)
+    elif service_source is DataSource.CENSUS and census_key:
+        service_config = replace(APP_CONFIG, census_api_key=census_key)
 
-if df_raw is None:
+summary = None
+if data_mode == "Upload CSV":
+    source_for_service = DataSource.SAMPLE
+else:
+    source_for_service = service_source
+
+try:
+    summary = evaluate_idiot_index(
+        year=year_clean,
+        source=source_for_service,
+        dataframe=dataframe_override,
+        config=service_config,
+        sample_loader=load_sample,
+        top_n=50,
+    )
+    if data_mode == "Census ASM (Manufacturing)":
+        st.sidebar.success(f"ASM fetched for {year_clean}.")
+    elif data_mode == "BEA (Economy-wide)":
+        st.sidebar.success(f"BEA fetched for {year_clean}.")
+except Exception as exc:  # pylint: disable=broad-except
+    error = str(exc)
+    st.sidebar.error(f"{data_mode.split(' (')[0]} fetch failed: {exc}")
+    summary = None
+
+if summary is None:
     st.stop()
 
-df_norm = normalize_columns(df_raw)
-df_metrics = compute_metrics(df_norm)
-df_display = format_for_display(df_metrics)
+df_display = summary.dataframe_full
 
 current_query_raw = st.session_state.get("search_query", "")
 current_query = SecurityUtils.sanitize_string_input(current_query_raw.strip())

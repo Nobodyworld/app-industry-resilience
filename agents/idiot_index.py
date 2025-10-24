@@ -1,52 +1,33 @@
-"""Agent-accessible pipeline for computing Idiot Index summaries.
+"""Agent-facing wrappers around the Idiot Index application service.
 
-This module exposes a single tool, ``compute_idiot_index_summary``, that wraps
-the full data lifecycle: loading data from the configured sources, normalising
-fields, computing Idiot Index metrics, and returning lightweight dataclass
-snapshots. The functions here intentionally avoid Streamlit dependencies so
-they can be consumed by automated agents or CLI scripts.
+The functions in this module delegate to :mod:`src.application` to perform data
+retrieval, normalisation, metric computation, and leaderboard derivation. The
+agent layer focuses on request validation, schema metadata, and logging so
+automation clients receive stable, well-documented responses without depending
+on Streamlit UI components.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
-from pathlib import Path
 from typing import List, Sequence
 
-import pandas as pd
-
-from src.adapters import fetch_asm_manufacturing, fetch_go_ii_by_industry
-from src.core import (
-    SecurityUtils,
-    compute_metrics,
-    format_for_display,
-    load_config,
-    normalize_columns,
-)
+from src.application import DataSource, evaluate_idiot_index
+from src.application.idiot_index_service import IndustryMetrics, LoggerHooks
+from src.core import SecurityUtils
 from src.infrastructure import log_data_processing, log_performance
 
 from .toolkit import tool
-
-_SAMPLE_DATA = Path("data/sample_industries.csv")
-
-
-class DataSource(str, Enum):
-    """Available data sources for agent requests."""
-
-    SAMPLE = "sample"
-    BEA = "bea"
-    CENSUS = "census"
 
 
 @dataclass
 class IdiotIndexRequest:
     """Input payload accepted by :func:`compute_idiot_index_summary`.
 
-    The dataclass is validated eagerly so automated callers receive quick
-    feedback on invalid parameters before any network traffic occurs. Search
-    strings are sanitised using :class:`~src.core.SecurityUtils` to neutralise
-    potentially unsafe patterns.
+    The dataclass performs validation eagerly so automated callers receive
+    immediate feedback on invalid parameters before any network traffic occurs.
+    Search strings are sanitised using :class:`~src.core.SecurityUtils` to
+    neutralise potentially unsafe patterns.
     """
 
     year: int = field(metadata={"description": "Calendar year to evaluate."})
@@ -87,7 +68,9 @@ class IndustrySnapshot:
 
     code: str = field(metadata={"description": "NAICS code for the industry."})
     name: str = field(metadata={"description": "Display label for the industry."})
-    idiot_index: float = field(metadata={"description": "Computed Idiot Index value."})
+    idiot_index: float = field(
+        metadata={"description": "Computed Idiot Index value (may be NaN if unavailable)."}
+    )
     value_added_pct: float | None = field(
         default=None,
         metadata={"description": "Share of value added as a percentage if available."},
@@ -115,47 +98,14 @@ class IdiotIndexResponse:
     )
 
 
-def _load_dataset(payload: IdiotIndexRequest) -> pd.DataFrame:
-    """Return a raw dataframe for the requested data source.
-
-    The helper inspects ``payload.source`` to determine which backend to call
-    and reuses the configured API keys from :func:`src.core.load_config`. It
-    raises :class:`ValueError` when required API keys are absent so the calling
-    agent can surface an actionable error.
-    """
-    config = load_config()
-    if payload.source is DataSource.SAMPLE:
-        frame = pd.read_csv(_SAMPLE_DATA)
-    elif payload.source is DataSource.BEA:
-        if not config.bea_api_key:
-            raise ValueError("BEA API key is required but missing from configuration.")
-        frame = fetch_go_ii_by_industry(api_key=config.bea_api_key, year=payload.year)
-    elif payload.source is DataSource.CENSUS:
-        if not config.census_api_key:
-            raise ValueError("Census API key is required but missing from configuration.")
-        frame = fetch_asm_manufacturing(api_key=config.census_api_key, year=payload.year)
-    else:  # pragma: no cover - Enum prevents reaching this branch
-        raise ValueError(f"Unsupported data source {payload.source}.")
-
-    log_data_processing("agent_dataset_loaded", len(frame))
-    return frame
-
-
-def _filter_dataset(frame: pd.DataFrame, payload: IdiotIndexRequest) -> pd.DataFrame:
-    """Return ``frame`` filtered by the optional search string.
-
-    Filtering is performed case-insensitively across both the industry name and
-    industry code. When the payload does not include ``search`` the original
-    dataframe is returned untouched.
-    """
-    sanitized = payload.search
-    if not sanitized:
-        return frame
-    lowered = sanitized.lower()
-    mask = frame["industry_name"].str.lower().str.contains(lowered) | frame[
-        "industry_code"
-    ].str.lower().str.contains(lowered)
-    return frame.loc[mask].copy()
+def _to_snapshot(entry: IndustryMetrics) -> IndustrySnapshot:
+    idiot_index = float(entry.idiot_index) if entry.idiot_index is not None else float("nan")
+    return IndustrySnapshot(
+        code=entry.industry_code,
+        name=entry.industry_name,
+        idiot_index=idiot_index,
+        value_added_pct=entry.value_added_pct,
+    )
 
 
 @tool(
@@ -165,40 +115,27 @@ def _filter_dataset(frame: pd.DataFrame, payload: IdiotIndexRequest) -> pd.DataF
 def compute_idiot_index_summary(payload: IdiotIndexRequest) -> IdiotIndexResponse:
     """Return a lightweight summary ready for conversational agents."""
 
-    start = pd.Timestamp.utcnow()
-    raw_frame = _load_dataset(payload)
-    normalized = normalize_columns(raw_frame)
-    metrics = compute_metrics(normalized)
-    display = format_for_display(metrics)
-    filtered = _filter_dataset(display, payload)
-
-    ranked = (
-        filtered.sort_values("idiot_index", ascending=False)
-        .head(payload.top_n)
-        .itertuples()
+    summary = evaluate_idiot_index(
+        year=payload.year,
+        source=payload.source,
+        search=payload.search,
+        top_n=payload.top_n,
+        logger_hooks=LoggerHooks(
+            log_performance=log_performance,
+            log_data_processing=lambda operation, count: log_data_processing(
+                operation, count
+            ),
+        ),
     )
-    top_industries = [
-        IndustrySnapshot(
-            code=row.industry_code,
-            name=row.industry_name,
-            idiot_index=float(row.idiot_index),
-            value_added_pct=float(row.value_added_pct)
-            if pd.notna(row.value_added_pct)
-            else None,
-        )
-        for row in ranked
-    ]
 
-    response = IdiotIndexResponse(
-        rows_evaluated=len(filtered),
-        idiot_index_average=float(filtered["idiot_index"].mean())
-        if not filtered.empty
-        else None,
+    top_industries = [_to_snapshot(entry) for entry in summary.leaderboard]
+
+    return IdiotIndexResponse(
+        rows_evaluated=len(summary.dataframe_filtered),
+        idiot_index_average=summary.average_idiot_index,
         top_industries=top_industries,
-        notes=list(filtered.attrs.get("bea_metadata", {}).get("notes", [])),
+        notes=list(summary.notes),
     )
-    log_performance("agent_compute_idiot_index", (pd.Timestamp.utcnow() - start).total_seconds())
-    return response
 
 
 __all__ = [

@@ -96,13 +96,15 @@ Commit messages must follow the Conventional Commits spec; the provided hooks wi
 
 ## Architecture
 
-The project is organised into dedicated layers (`core`, `adapters`, `infrastructure`, `interfaces`, and `agents`) to keep domain logic decoupled from presentation and automation surfaces.
+The project is organised into dedicated layers (`core`, `adapters`, `application`, `infrastructure`, `interfaces`, and `agents`) to keep domain logic decoupled from presentation and automation surfaces.
 
 ```
 Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + metrics)
                                               │
-                                              ├──▶ interfaces/streamlit (app.py)
-                                              └──▶ agents (toolkit + schemas)
+                                              └──▶ application (orchestrate Idiot Index use cases)
+                                                        │
+                                                        ├──▶ interfaces/streamlit (app.py)
+                                                        └──▶ agents (toolkit + schemas)
 ```
 
 Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
@@ -110,8 +112,9 @@ Each layer exposes public APIs via `__init__.py` shims so imports stay stable. T
 1. **Bootstrap** – `app.py` loads configuration through `src.core.config`, validates environment state, and renders the sidebar context.
 2. **Acquire data** – depending on the selected mode, adapters fetch BEA/ASM datasets or load the bundled CSV. Responses are cached on disk when enabled.
 3. **Normalise & compute** – `src.core.normalize` standardises column names before `src.core.metrics.compute_metrics` derives Idiot Index, value-added %, and related measures.
-4. **Render narrative** – Streamlit components under `src.interfaces.streamlit` build the hero header, signal cards, tables, charts, and deep-dive story, exposing the same helpers used by automated tests.
-5. **Share or automate** – downloads are prepared through `src.interfaces.streamlit.helpers`, while the agent toolkit (`agents/`) exposes the same pipeline for headless clients. See [ARCHITECTURE.md](ARCHITECTURE.md) for an expanded breakdown of each module and data contract.
+4. **Application orchestration** – `src.application` bundles dataset loading, normalisation, metric computation, and leaderboard derivation into testable services (`IdiotIndexService` and the convenience `evaluate_idiot_index`) that power both UI and automation flows. The service accepts injected fetchers/config so other entrypoints can reuse the pipeline without touching Streamlit internals.
+5. **Render narrative** – Streamlit components under `src.interfaces.streamlit` build the hero header, signal cards, tables, charts, and deep-dive story, exposing the same helpers used by automated tests.
+6. **Share or automate** – downloads are prepared through `src.interfaces.streamlit.helpers`, while the agent toolkit (`agents/`) reuses the application services for headless clients. See [ARCHITECTURE.md](ARCHITECTURE.md) for an expanded breakdown of each module and data contract.
 
 ### Typical workflows
 
