@@ -51,6 +51,25 @@ streamlit run app.py
 
 Open the local URL it prints (usually http://localhost:8501). The app will load the **sample dataset** so you can click around immediately.
 
+## Usage examples
+
+### Compare BEA industries for a target year
+
+1. Launch the app (`streamlit run app.py`).
+2. Enter your BEA API key in the sidebar and pick **BEA (Economy-wide)** from the data source selector.
+3. Select a year supported by BEA (the sidebar highlights the available range).
+4. Watch the new **fetch progress indicator** in the sidebar. When the call succeeds, the dashboard populates with the requested industries and a success callout confirming the fetch.
+5. Use the search box to filter industries or switch to *Focus mode* for a heads-up view of the highest Idiot Index readings.
+
+### Upload a custom CSV baseline
+
+1. Choose **Upload CSV** from the sidebar.
+2. Provide a CSV with the columns `industry_code`, `industry_name`, and `year` plus at least one metric column (`gross_output`, `materials_cost`, or `intermediate_inputs`).
+3. The upload validator confirms schema alignment; successful loads render instantly with local-only messaging so you know nothing leaves your machine.
+4. Combine the CSV data with BEA or ASM metrics by switching data sources and comparing Idiot Index narratives side-by-side.
+
+## Docker Deployment
+
 ## Docker Deployment
 
 For easy deployment and development:
@@ -90,6 +109,7 @@ make typecheck     # mypy static analysis
 make test          # pytest without coverage
 make security      # pip-audit + detect-secrets baseline validation
 make sbom          # Generate CycloneDX SBOM at build/sbom/cyclonedx.json
+make docs          # List key documentation links in the terminal
 ```
 
 Commit messages must follow the Conventional Commits spec; the provided hooks will prevent non-conforming messages.
@@ -121,6 +141,13 @@ Each layer exposes public APIs via `__init__.py` shims so imports stay stable. T
 - **Offline demo** – launch `streamlit run app.py`, keep the default "Sample" data source, and explore tables/charts instantly. Use the "Comparisons & benchmarking" section to see relative performance.
 - **Live BEA data** – add a BEA API key to `.env`, select "BEA (Economy-wide)" in the sidebar, and fetch multi-year data with automatic NAICS enrichment, caching, and retry logic.
 - **Bring your own CSV** – choose "Upload CSV" and drop a file that matches the schema outlined below. The app validates file metadata and contents before merging with the same metrics pipeline.
+
+Deeper context lives in the `/docs` directory:
+
+- [Architecture overview](docs/ARCHITECTURE_OVERVIEW.md) summarises system boundaries, caching flows, and fault domains.
+- [API reference](docs/API_REFERENCE.md) enumerates service entrypoints, adapter helpers, and expected responses.
+- [Data refresh workflow](docs/WORKFLOWS_DATA_REFRESH.md) guides rotating API keys, syncing assets, and validating new datasets.
+- [Dependency register](docs/DEPENDENCIES.md) tracks runtime and tooling libraries with license and review cadence notes.
 
 ### Key metrics
 

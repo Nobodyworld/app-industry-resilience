@@ -43,7 +43,9 @@ def compute_metrics(
         cache_key = _hash_dataframe(df)
         cached = cache_instance.get(cache_key)
         if cached is not None:
-            return pd.DataFrame(cached)
+            cached_df = pd.DataFrame(cached)
+            cached_df.attrs.update(df.attrs)
+            return cached_df
 
     work = df.copy()
 
@@ -87,6 +89,7 @@ def compute_metrics(
     ):
         cache_instance.set(cache_key, work.to_dict(orient="records"))
 
+    work.attrs.update(df.attrs)
     return work
 
 

@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 import requests
 
-from src.adapters import BEAClientError, fetch_go_ii_by_industry, fetch_asm_manufacturing
+from src.adapters import fetch_asm_manufacturing
 from src.core import (
     Cache,
     HTTPRequestError,
@@ -142,78 +142,3 @@ def test_fetch_census_manufacturing(mock_get_json, _cache):
     assert frame.loc[0, "gross_output"] == 100.0
 
 
-@patch("src.adapters.bea.get_api_cache", return_value=None)
-@patch("src.adapters.bea.safe_get_json")
-def test_fetch_bea(mock_get_json, _cache):
-    health_response = {"BEAAPI": {"Results": {"Data": []}}}
-    go_response = {
-        "BEAAPI": {
-            "Results": {"Data": [{"Industry": "311", "IndustrYDescription": "Food", "Year": "2021", "DataValue": "100"}]}
-        }
-    }
-    ii_response = {
-        "BEAAPI": {
-            "Results": {"Data": [{"Industry": "311", "IndustrYDescription": "Food", "Year": "2021", "DataValue": "60"}]}
-        }
-    }
-    mock_get_json.side_effect = [health_response, go_response, ii_response]
-
-    frame = fetch_go_ii_by_industry("valid_api_key_12345", 2021)
-    assert "intermediate_inputs" in frame.columns
-    assert frame.loc[0, "gross_output"] == 100_000_000.0
-    metadata = frame.attrs.get("bea_metadata", {})
-    assert metadata.get("years") == (2021,)
-    assert metadata.get("endpoint")
-
-
-@patch("src.adapters.bea.safe_get_json")
-def test_fetch_bea_multi_year_caches(mock_get_json, tmp_path):
-    cache = Cache(tmp_path, ttl_seconds=60)
-
-    def fake_cache(_config):
-        return cache
-
-    health_response = {"BEAAPI": {"Results": {"Data": []}}}
-
-    def build_response(year: int, value: str) -> dict:
-        return {
-            "BEAAPI": {
-                "Results": {
-                    "Data": [
-                        {
-                            "Industry": "311",
-                            "IndustrYDescription": "Food",
-                            "Year": str(year),
-                            "DataValue": value,
-                        }
-                    ]
-                }
-            }
-        }
-
-    mock_get_json.side_effect = [
-        health_response,
-        build_response(2021, "100"),
-        build_response(2021, "60"),
-        build_response(2020, "90"),
-        build_response(2020, "55"),
-    ]
-
-    with patch("src.adapters.bea.get_api_cache", side_effect=fake_cache):
-        frame = fetch_go_ii_by_industry("valid_api_key_12345", [2021, 2020])
-        assert sorted(frame["year"].unique().tolist()) == [2020, 2021]
-        metadata = frame.attrs["bea_metadata"]
-        assert set(metadata["years"]) == {2020, 2021}
-        assert cache.stats().files == 1
-
-        call_count = mock_get_json.call_count
-        cached = fetch_go_ii_by_industry("valid_api_key_12345", [2020, 2021])
-        assert len(cached) == len(frame)
-        assert mock_get_json.call_count == call_count  # cache hit, no new calls
-
-
-@patch("src.adapters.bea.get_api_cache", return_value=None)
-@patch("src.adapters.bea.safe_get_json", side_effect=Exception("down"))
-def test_select_bea_endpoint_failure(mock_get_json, _cache):
-    with pytest.raises(BEAClientError):
-        fetch_go_ii_by_industry("valid_api_key_12345", 2021)

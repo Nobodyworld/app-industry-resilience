@@ -222,22 +222,42 @@ if data_mode == "Upload CSV":
 else:
     source_for_service = service_source
 
+fetch_status = st.sidebar.empty()
+spinner_message = "Computing industry metrics…"
+if data_mode == "Sample (offline)":
+    fetch_status.info("Loading sample dataset…")
+    spinner_message = "Loading sample dataset…"
+elif data_mode == "Census ASM (Manufacturing)":
+    fetch_status.info(f"Contacting Census ASM for {year_clean}…")
+    spinner_message = f"Fetching Census ASM data for {year_clean}…"
+elif data_mode == "BEA (Economy-wide)":
+    fetch_status.info(f"Contacting BEA for {year_clean}…")
+    spinner_message = f"Fetching BEA tables for {year_clean}…"
+elif data_mode == "Upload CSV":
+    fetch_status.info("Validating uploaded dataset…")
+    spinner_message = "Validating uploaded dataset…"
+
 try:
-    summary = evaluate_idiot_index(
-        year=year_clean,
-        source=source_for_service,
-        dataframe=dataframe_override,
-        config=service_config,
-        sample_loader=load_sample,
-        top_n=50,
-    )
+    with st.spinner(spinner_message):
+        summary = evaluate_idiot_index(
+            year=year_clean,
+            source=source_for_service,
+            dataframe=dataframe_override,
+            config=service_config,
+            sample_loader=load_sample,
+            top_n=50,
+        )
     if data_mode == "Census ASM (Manufacturing)":
-        st.sidebar.success(f"ASM fetched for {year_clean}.")
+        fetch_status.success(f"Census ASM ready for {year_clean}.")
     elif data_mode == "BEA (Economy-wide)":
-        st.sidebar.success(f"BEA fetched for {year_clean}.")
+        fetch_status.success(f"BEA tables ready for {year_clean}.")
+    elif data_mode == "Sample (offline)":
+        fetch_status.success("Sample dataset ready.")
+    else:
+        fetch_status.success("Industry metrics computed.")
 except Exception as exc:  # pylint: disable=broad-except
     error = str(exc)
-    st.sidebar.error(f"{data_mode.split(' (')[0]} fetch failed: {exc}")
+    fetch_status.error(f"{data_mode.split(' (')[0]} fetch failed: {exc}")
     summary = None
 
 if summary is None:
