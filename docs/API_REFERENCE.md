@@ -4,15 +4,14 @@ This reference captures the primary Python entrypoints intended for reuse across
 
 ## Application services
 
-### `src.application.service.IdiotIndexService`
+### `src.application.idiot_index_service.IdiotIndexService`
 
 | Member | Description |
 | --- | --- |
-| `IdiotIndexService.evaluate(year, source, dataframe=None, top_n=50)` | Orchestrates dataset loading, normalisation, metric calculation, and leaderboard summarisation. Accepts a `DataSource` enum (`SAMPLE`, `CENSUS`, `BEA`) and an optional pre-loaded dataframe (used for uploads/tests). Returns an `IdiotIndexSummary` dataclass with `dataframe_full`, `leaderboard`, and metadata. |
-| `IdiotIndexService.from_config(config)` | Convenience constructor wiring cache, adapters, and retry policies from an `AppConfig`. |
+| `IdiotIndexService.evaluate(year, source, dataframe=None, top_n=50, metric_config=None, ...)` | Orchestrates dataset loading, normalisation, metric calculation, and leaderboard summarisation. Accepts a `DataSource` enum (`SAMPLE`, `CENSUS`, `BEA`), an optional pre-loaded dataframe (used for uploads/tests), and an optional `MetricConfig` to control caching. Returns an `IdiotIndexSummary` dataclass with `dataframe_full`, `leaderboard`, averages, and metadata. |
 
 ### `src.application.evaluate_idiot_index`
-High-level helper that instantiates `IdiotIndexService.from_config` and calls `evaluate`. Mirrors the signature above for convenience in UI code.
+Convenience wrapper delegating to the shared `IdiotIndexService` singleton. Accepts the same parameters as `.evaluate` for easy reuse in CLI tools and automation.
 
 ## Adapters
 
@@ -59,3 +58,18 @@ The `agents` package exposes dataclasses and helper functions that map 1:1 with 
 
 ---
 Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
+## Headless API
+
+### `src.interfaces.api.app`
+- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/evaluate`, `/scenario`, and `/metrics` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics and trace IDs.
+
+### `src.interfaces.api.schemas`
+- Lightweight Pydantic-style models (`EvaluateRequest`, `EvaluateResponse`, `ScenarioRequest`, etc.) plus helpers to convert pandas dataframes and service summaries into JSON-safe payloads.
+
+### `scripts/run_api.py`
+- CLI entrypoint to launch the headless API service with configurable host/port. Falls back to the built-in WSGI server when third-party servers are unavailable. Used by `make api` and the Docker `APP_MODE=api` entrypoint.
+
+### `src.extensions.manager`
+- `ExtensionManager` – registry that loads `SummaryExtension` and `ScenarioExtension` implementations declared in `extensions/manifest.json`. Provides `apply_summary_extensions` and `apply_scenario_extensions` helpers that augment service responses with extension metadata and notes.
+- `load_extensions(modules=None)` – import modules and invoke their `register(manager)` function.
+- `get_extension_manager()` – singleton accessor used by the API, services, and scripts.

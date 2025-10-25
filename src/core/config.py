@@ -8,10 +8,10 @@ custom environments without mutating global state."""
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Mapping, MutableMapping
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -31,7 +31,7 @@ class Environment(str, Enum):
     TESTING = "testing"
 
     @classmethod
-    def from_raw(cls, raw: str | None) -> "Environment":
+    def from_raw(cls, raw: str | None) -> Environment:
         if raw is None:
             return cls.DEVELOPMENT
         value = raw.strip().lower()
@@ -127,7 +127,7 @@ class ConfigValidationResult:
     def is_ok(self) -> bool:
         return not self.errors
 
-    def merge(self, other: "ConfigValidationResult") -> "ConfigValidationResult":
+    def merge(self, other: ConfigValidationResult) -> ConfigValidationResult:
         return ConfigValidationResult(
             errors=self.errors + other.errors,
             warnings=self.warnings + other.warnings,
@@ -175,15 +175,11 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
             "BEA_RATE_LIMIT",
         ),
         census=_parse_int(
-            values.get(
-                "CENSUS_RATE_LIMIT", "20" if environment.is_production else "50"
-            ),
+            values.get("CENSUS_RATE_LIMIT", "20" if environment.is_production else "50"),
             "CENSUS_RATE_LIMIT",
         ),
         default=_parse_int(
-            values.get(
-                "DEFAULT_RATE_LIMIT", "5" if environment.is_production else "20"
-            ),
+            values.get("DEFAULT_RATE_LIMIT", "5" if environment.is_production else "20"),
             "DEFAULT_RATE_LIMIT",
         ),
     )
@@ -223,9 +219,7 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
     warnings: list[str] = []
 
     if config.log_level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
-        errors.append(
-            "LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, or CRITICAL."
-        )
+        errors.append("LOG_LEVEL must be one of DEBUG, INFO, WARNING, ERROR, or CRITICAL.")
 
     if config.default_year not in config.supported_years_bea:
         errors.append(
@@ -243,9 +237,7 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
     if config.cache.api_ttl_seconds <= 0:
         errors.append("CACHE_TTL_API must be a positive integer of seconds.")
     if config.cache.computation_ttl_seconds <= 0:
-        errors.append(
-            "CACHE_TTL_COMPUTATION must be a positive integer of seconds."
-        )
+        errors.append("CACHE_TTL_COMPUTATION must be a positive integer of seconds.")
 
     if config.max_csv_size_mb <= 0:
         errors.append("MAX_CSV_SIZE_MB must be a positive integer.")
@@ -258,18 +250,12 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
         if not config.bea_api_key:
             errors.append("BEA_API_KEY is required when ENVIRONMENT is production.")
         if not config.census_api_key:
-            errors.append(
-                "CENSUS_API_KEY is required when ENVIRONMENT is production."
-            )
+            errors.append("CENSUS_API_KEY is required when ENVIRONMENT is production.")
     else:
         if not config.bea_api_key:
-            warnings.append(
-                "BEA_API_KEY is not set – production data will be unavailable."
-            )
+            warnings.append("BEA_API_KEY is not set – production data will be unavailable.")
         if not config.census_api_key:
-            warnings.append(
-                "CENSUS_API_KEY is not set – Census data will be unavailable."
-            )
+            warnings.append("CENSUS_API_KEY is not set – Census data will be unavailable.")
 
     return ConfigValidationResult(errors=tuple(errors), warnings=tuple(warnings))
 
@@ -324,13 +310,9 @@ def _parse_year_range(value: str, name: str) -> range:
         start = int(start_str)
         end = int(end_str)
     except (ValueError, TypeError) as exc:  # pragma: no cover - defensive
-        raise ConfigError(
-            f"{name} must use 'start-end' format, received '{value}'."
-        ) from exc
+        raise ConfigError(f"{name} must use 'start-end' format, received '{value}'.") from exc
     if start >= end:
-        raise ConfigError(
-            f"{name} start must be less than end, received '{value}'."
-        )
+        raise ConfigError(f"{name} start must be less than end, received '{value}'.")
     return range(start, end + 1)
 
 
@@ -360,9 +342,7 @@ def _parse_url_list(raw: str, name: str) -> tuple[str, ...]:
     for candidate in urls:
         parsed = urlparse(candidate)
         if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
-            raise ConfigError(
-                f"{name} entry '{candidate}' must be an absolute http(s) URL."
-            )
+            raise ConfigError(f"{name} entry '{candidate}' must be an absolute http(s) URL.")
         validated[candidate] = None
 
     # TODO - (config-cache): Cache parsed URLs on disk to avoid reparsing large lists
@@ -381,4 +361,3 @@ __all__ = [
     "load_config",
     "validate_config",
 ]
-

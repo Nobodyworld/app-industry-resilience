@@ -1,8 +1,8 @@
 import pytest
 
+import src.interfaces.streamlit.bootstrap as bootstrap_module
 from src.interfaces.streamlit import get_bootstrap_state, reset_bootstrap_state
 from src.interfaces.streamlit.bootstrap import BootstrapError
-import src.interfaces.streamlit.bootstrap as bootstrap_module
 
 
 @pytest.fixture(autouse=True)

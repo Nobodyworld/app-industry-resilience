@@ -1,4 +1,4 @@
-.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs
+.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs scenario prefetch-cache quality-gate
 
 PYTHON := python
 SKIP_PIP ?= 0
@@ -20,8 +20,12 @@ help:
 	@echo "  test               Execute pytest suite"
 	@echo "  coverage           Generate XML coverage report"
 	@echo "  pre-commit         Run all pre-commit hooks against the repository"
-        @echo "  check              Run repository-wide quality checks"
-        @echo "  docs               Show key architecture and workflow documentation"
+	@echo "  quality-gate       Run linting, type checks, tests w/ coverage, and security scans"
+	@echo "  check              Backwards-compatible alias for quality-gate"
+	@echo "  docs               Show key architecture and workflow documentation"
+	@echo "  scenario           Run the scenario planner CLI (pass extra args via ARGS=...)"
+	@echo "  prefetch-cache     Warm caches using the prefetch utility (pass extra args via ARGS=...)"
+	@echo "  api                Launch the headless API service (pass extra args via ARGS=...)"
 
 install:
 	@if [ "${SKIP_PIP}" = "1" ]; then \
@@ -72,14 +76,19 @@ pre-commit:
 		${PYTHON} scripts/run_quality_checks.py; \
 	fi
 
-check:
-	$(MAKE) pre-commit
-	$(MAKE) security
+quality-gate:
+	$(MAKE) format-check
+	$(MAKE) lint
+	$(MAKE) typecheck
 	@if python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('pytest_cov') else 1)" >/dev/null 2>&1; then \
-		pytest --cov=src --cov-report=term-missing --cov-report=xml; \
+		pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=90; \
 	else \
+		echo 'pytest-cov not installed; running pytest without coverage'; \
 		pytest; \
 	fi
+	$(MAKE) security
+
+check: quality-gate
 
 security:
 	@mkdir -p $(REPORT_DIR)
@@ -98,20 +107,29 @@ security:
 	fi
 
 sbom:
-        @mkdir -p $(SBOM_DIR)
-        @if [ -x scripts/generate_sbom.py ]; then \
-                $(PYTHON) scripts/generate_sbom.py --output $(SBOM_FILE) $(SBOM_REQUIREMENTS); \
+	@mkdir -p $(SBOM_DIR)
+	@if [ -x scripts/generate_sbom.py ]; then \
+        	$(PYTHON) scripts/generate_sbom.py --output $(SBOM_FILE) $(SBOM_REQUIREMENTS); \
         else \
-                echo 'generate_sbom.py missing or not executable'; \
+        	echo 'generate_sbom.py missing or not executable'; \
         fi
 
 docs:
-        @echo "Core documentation links:"
-        @echo "  README.md"
-        @echo "  docs/ARCHITECTURE_OVERVIEW.md"
-        @echo "  docs/API_REFERENCE.md"
-        @echo "  docs/WORKFLOWS_DATA_REFRESH.md"
-        @echo "  docs/DEPENDENCIES.md"
+	@echo "Core documentation links:"
+	@echo "  README.md"
+	@echo "  docs/ARCHITECTURE_OVERVIEW.md"
+	@echo "  docs/API_REFERENCE.md"
+	@echo "  docs/WORKFLOWS_DATA_REFRESH.md"
+	@echo "  docs/DEPENDENCIES.md"
+
+scenario:
+	${PYTHON} scripts/run_scenario.py ${ARGS}
+
+prefetch-cache:
+	${PYTHON} scripts/prefetch_data.py ${ARGS}
+
+api:
+	${PYTHON} scripts/run_api.py ${ARGS}
 
 clean:
-        rm -rf .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml htmlcov node_modules
+	rm -rf .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml htmlcov node_modules

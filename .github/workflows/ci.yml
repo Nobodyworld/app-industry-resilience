@@ -2,93 +2,34 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "main", "master" ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ "main", "master" ]
 
 jobs:
-  quality:
+  quality-gate:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11"]
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
+          cache: "pip"
 
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-py${{ matrix.python-version }}-
-
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run quality gate
-        env:
-          PYTHONPATH: src
-        run: make check
+        run: make quality-gate
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: python-${{ matrix.python-version }}
-          fail_ci_if_error: false
-
-  security:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          config: .gitleaks.toml
-          args: --redact --no-banner
-
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-py311-${{ hashFiles('requirements.txt', 'requirements-dev.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-py311-
-
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
-
-      - name: Run security checks
-        env:
-          PYTHONPATH: src
-        run: make security
-
-      - name: Generate SBOM
-        run: make sbom
-
-      - name: Upload security artifacts
+      - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: security-artifacts
-          path: |
-            build/reports
-            build/sbom
+          name: coverage-xml
+          path: coverage.xml

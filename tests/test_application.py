@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import pandas as pd
 import pytest
 
@@ -54,7 +52,8 @@ def test_evaluate_sample_uses_loader() -> None:
     assert summary.dataframe_full.shape[0] == 2
     assert summary.average_idiot_index is not None
     assert len(summary.leaderboard) == 2
-    assert summary.notes == ("demo note",)
+    assert "demo note" in summary.notes
+    assert any("manufacturing_cost_driver" in note for note in summary.notes)
 
 
 def test_evaluate_with_search_filters_results() -> None:
@@ -130,4 +129,6 @@ def test_sanitize_search_handles_blank_and_malicious_input() -> None:
 
 def test_evaluate_requires_positive_topn() -> None:
     with pytest.raises(ValueError):
-        evaluate_idiot_index(year=2021, source=DataSource.SAMPLE, top_n=0, sample_loader=_sample_frame)
+        evaluate_idiot_index(
+            year=2021, source=DataSource.SAMPLE, top_n=0, sample_loader=_sample_frame
+        )

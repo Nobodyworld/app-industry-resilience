@@ -36,15 +36,21 @@ The Idiot Index application follows a layered Python architecture designed for t
 
 ### Interfaces
 - **Location:** `src/interfaces`
-- **Purpose:** Present data via Streamlit (`interfaces/streamlit`) or CLI/automation helpers. Streamlit components follow a modular pattern for reusability and test coverage.
+- **Purpose:** Present data via Streamlit (`interfaces/streamlit`), the headless API surface (`interfaces/api`) implemented with a FastAPI-compatible façade, or CLI/automation helpers. Streamlit components follow a modular pattern for reusability and test coverage, while the API reuses the same application services to support machine-to-machine access.
 
 ### Infrastructure
 - **Location:** `src/infrastructure`
 - **Purpose:** Cross-cutting concerns like logging, throttling (`api_limiter`), and telemetry. These modules are shared across adapters and services to keep observability consistent.
+- **Highlights:** `src/infrastructure/observability` provides Prometheus-compatible metrics, lightweight tracing, and helpers used by the instrumented FastAPI façade. Logs automatically include the active `trace_id`.
 
 ### Agents
 - **Location:** `agents`
 - **Purpose:** Provide dataclass-driven schemas and functions so downstream automation or LLM agents can reuse the Idiot Index service without touching Streamlit internals.
+
+### Extensions
+- **Location:** `src/extensions`
+- **Purpose:** Load modular analytics via `ExtensionManager`. Summary extensions enrich `IdiotIndexSummary` objects with additional notes or metadata, while scenario extensions decorate `ScenarioResult` payloads. Modules are discovered through `extensions/manifest.json` and the `IDIOT_INDEX_EXTENSIONS` environment variable.
+- **Highlights:** The built-in `manufacturing_cost_driver` extension demonstrates how to calculate additional insights and surface them in API responses.
 
 ## Data flow summary
 
@@ -68,8 +74,10 @@ The Idiot Index application follows a layered Python architecture designed for t
 
 ## Observability
 
-- Structured logging is handled through `src.infrastructure.logger` helpers.
+- Structured logging is handled through `src.infrastructure.logging_config` which attaches trace IDs and redacts sensitive data.
+- The headless API records request metrics via `src/interfaces/api/telemetry` and serves them under `/metrics`. Latency histograms, in-flight gauges, and error counters are available for Prometheus scrapers.
 - `log_performance`, `log_api_call`, and `log_data_processing` annotate key milestones for debugging and performance monitoring.
+- Incident response procedures are documented in `docs/OPERATIONS_INCIDENT_RESPONSE.md`.
 
 ---
 Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).

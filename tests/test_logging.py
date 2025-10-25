@@ -26,9 +26,7 @@ def _configure_text_logger(**formatter_kwargs: object) -> tuple[io.StringIO, log
     buffer = io.StringIO()
     handler = logging.StreamHandler(buffer)
     handler.setFormatter(
-        logging_config.RedactingTextFormatter(
-            "%(levelname)s:%(message)s", **formatter_kwargs
-        )
+        logging_config.RedactingTextFormatter("%(levelname)s:%(message)s", **formatter_kwargs)
     )
     logging_config.logger.addHandler(handler)
     return buffer, handler
@@ -140,9 +138,7 @@ def test_redactor_converts_sets_and_namedtuples() -> None:
     output = json.loads(buffer.getvalue())
     records = output["params"]["records"]
     assert isinstance(records, list)
-    assert any(
-        record["token"] == logging_config.DEFAULT_REDACTION_SENTINEL for record in records
-    )
+    assert any(record["token"] == logging_config.DEFAULT_REDACTION_SENTINEL for record in records)
     tuple_wrapper = output["params"]["tupleWrapper"]
     assert tuple_wrapper[0] == "safe"
     assert tuple_wrapper[1]["password"] == logging_config.DEFAULT_REDACTION_SENTINEL
@@ -167,9 +163,7 @@ def test_redactor_handles_non_string_keys() -> None:
 
 def test_json_formatter_respects_custom_sentinel() -> None:
     custom_sentinel = "<<hidden>>"
-    buffer, handler = _configure_json_logger(
-        sentinel=custom_sentinel, redact_fields=("secret",)
-    )
+    buffer, handler = _configure_json_logger(sentinel=custom_sentinel, redact_fields=("secret",))
     try:
         logging_config.log_api_call(
             "TestService",
@@ -237,9 +231,7 @@ def test_remote_from_env_validates_protocol(monkeypatch) -> None:
 
 
 def test_setup_logging_rejects_invalid_remote_protocol() -> None:
-    remote = logging_config.RemoteLoggingConfig(
-        host="logs.example.com", port=9000, protocol="smtp"
-    )
+    remote = logging_config.RemoteLoggingConfig(host="logs.example.com", port=9000, protocol="smtp")
 
     with pytest.raises(ValueError):
         logging_config.setup_logging(log_file=None, remote=remote)

@@ -73,12 +73,34 @@ def test_compute_metrics_uses_cache(tmp_path) -> None:
 
     result_first = compute_metrics(data, cache=cache, config=MetricConfig(use_cache=True))
     assert "idiot_index" in result_first.columns
+    assert result_first.loc[0, "resilience_score"] == pytest.approx(1.0)
+    assert result_first.loc[0, "materials_dependency_ratio"] == pytest.approx(0.5)
+    assert result_first.loc[0, "shock_sensitivity_index"] == pytest.approx(0.5)
     assert cache.stats().files == 1
 
     with patch.object(cache, "set", wraps=cache.set) as mocked_set:
         result_second = compute_metrics(data, cache=cache, config=MetricConfig(use_cache=True))
         mocked_set.assert_not_called()
     pd.testing.assert_frame_equal(result_first, result_second)
+
+
+def test_compute_metrics_handles_zero_denominators() -> None:
+    data = pd.DataFrame(
+        {
+            "industry_code": ["000"],
+            "industry_name": ["Zero"],
+            "year": [2021],
+            "gross_output": [100.0],
+            "materials_cost": [0.0],
+            "intermediate_inputs": [0.0],
+            "value_added": [0.0],
+        }
+    )
+
+    result = compute_metrics(data, config=MetricConfig(use_cache=False))
+    assert pd.isna(result.loc[0, "resilience_score"])
+    assert result.loc[0, "materials_dependency_ratio"] == pytest.approx(0.0)
+    assert pd.isna(result.loc[0, "shock_sensitivity_index"])
 
 
 def test_cache_removes_corrupted_entries(tmp_path) -> None:
@@ -140,5 +162,3 @@ def test_fetch_census_manufacturing(mock_get_json, _cache):
     frame = fetch_asm_manufacturing("valid_api_key_12345", 2021)
     assert frame.loc[0, "industry_code"] == "311"
     assert frame.loc[0, "gross_output"] == 100.0
-
-

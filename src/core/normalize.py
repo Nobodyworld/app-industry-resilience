@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from decimal import Decimal, InvalidOperation
-from typing import Mapping
 
 import pandas as pd
 
@@ -67,9 +67,7 @@ def normalize_columns(
 
     missing_required = [col for col in REQUIRED_COLS if col not in normalized.columns]
     if missing_required:
-        raise ValueError(
-            "Missing required columns: " + ", ".join(sorted(missing_required))
-        )
+        raise ValueError("Missing required columns: " + ", ".join(sorted(missing_required)))
 
     for optional in OPTIONAL_COLS:
         if optional not in normalized.columns:
@@ -77,12 +75,8 @@ def normalize_columns(
     # TODO - (schema-evolution): Allow callers to provide dtype overrides instead of
     # assuming all optional columns are nullable floats.
 
-    normalized["industry_code"] = (
-        normalized["industry_code"].astype(str).str.strip().str.upper()
-    )
-    normalized["industry_name"] = (
-        normalized["industry_name"].astype(str).str.strip()
-    )
+    normalized["industry_code"] = normalized["industry_code"].astype(str).str.strip().str.upper()
+    normalized["industry_name"] = normalized["industry_name"].astype(str).str.strip()
     normalized["source"] = normalized["source"].fillna("Unknown").astype(str).str.strip()
 
     normalized["year"] = normalized["year"].apply(_coerce_year)
@@ -111,7 +105,7 @@ def _coerce_numeric(value: object) -> float | None:
 
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return None
-    if isinstance(value, (int, float)) and not pd.isna(value):
+    if isinstance(value, int | float) and not pd.isna(value):
         return float(value)
     if isinstance(value, str):
         cleaned = value.strip()
@@ -135,4 +129,3 @@ __all__ = [
     "REQUIRED_COLS",
     "normalize_columns",
 ]
-

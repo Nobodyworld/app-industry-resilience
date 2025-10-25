@@ -60,33 +60,48 @@ def compute_metrics(
     denominator = denominator.astype("float64")
     denominator.replace({0.0: pd.NA}, inplace=True)
 
-    work["idiot_index"] = (
-        work["gross_output"].astype("float64") / denominator
-    ).replace([float("inf"), float("-inf")], pd.NA)
+    work["idiot_index"] = (work["gross_output"].astype("float64") / denominator).replace(
+        [float("inf"), float("-inf")], pd.NA
+    )
 
     fallback_inputs = denominator.fillna(0.0)
     if "value_added" not in work.columns:
         work["value_added"] = work["gross_output"].astype("float64") - fallback_inputs
     else:
-        work["value_added"] = work["value_added"].astype("float64").where(
-            work["value_added"].notna(),
-            work["gross_output"].astype("float64") - fallback_inputs,
+        work["value_added"] = (
+            work["value_added"]
+            .astype("float64")
+            .where(
+                work["value_added"].notna(),
+                work["gross_output"].astype("float64") - fallback_inputs,
+            )
         )
 
-    work["value_added_pct"] = (
-        work["value_added"].astype("float64") / work["gross_output"].astype("float64")
-    ) * 100.0
-    work["materials_share_pct"] = (
-        fallback_inputs / work["gross_output"].astype("float64")
-    ) * 100.0
+    gross_output = work["gross_output"].astype("float64")
+
+    work["value_added_pct"] = (work["value_added"].astype("float64") / gross_output) * 100.0
+    work["materials_share_pct"] = (fallback_inputs / gross_output) * 100.0
+
+    # Derived resilience metrics guard against divide-by-zero behaviour by
+    # explicitly masking invalid denominators. These values feed the scenario
+    # planner and benchmarking helpers downstream.
+    with pd.option_context("mode.use_inf_as_na", True):
+        denominator_resilience = fallback_inputs.where(fallback_inputs > 0)
+        work["resilience_score"] = work["value_added"].astype("float64") / denominator_resilience
+
+        work["materials_dependency_ratio"] = fallback_inputs / gross_output
+
+        total_cost_basis = work["value_added"].astype("float64") + fallback_inputs
+        shock_series = pd.Series(float("nan"), index=work.index, dtype="float64")
+        valid_shock = total_cost_basis > 0
+        shock_series.loc[valid_shock] = (
+            fallback_inputs.loc[valid_shock] / total_cost_basis.loc[valid_shock]
+        )
+        work["shock_sensitivity_index"] = shock_series
 
     work = work.replace([float("inf"), float("-inf")], pd.NA)
 
-    if (
-        metric_config.use_cache
-        and cache_instance is not None
-        and cache_key is not None
-    ):
+    if metric_config.use_cache and cache_instance is not None and cache_key is not None:
         cache_instance.set(cache_key, work.to_dict(orient="records"))
 
     work.attrs.update(df.attrs)
@@ -105,11 +120,12 @@ def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
         "idiot_index",
         "value_added_pct",
         "materials_share_pct",
+        "resilience_score",
+        "materials_dependency_ratio",
+        "shock_sensitivity_index",
     }
     for column in numeric_columns.intersection(formatted.columns):
-        formatted[column] = pd.to_numeric(formatted[column], errors="coerce").astype(
-            "float64"
-        )
+        formatted[column] = pd.to_numeric(formatted[column], errors="coerce").astype("float64")
     return formatted
 
 
@@ -121,4 +137,3 @@ def _hash_dataframe(df: pd.DataFrame) -> str:
 
 
 __all__ = ["MetricConfig", "compute_metrics", "format_for_display"]
-

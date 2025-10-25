@@ -7,9 +7,9 @@ of Streamlit imports to keep layering clean and simplify unit testing.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Mapping, Tuple
 
 from src.core import AppConfig, ConfigError, ConfigValidationResult, load_config, validate_config
 
@@ -23,7 +23,7 @@ class SidebarContext:
     """Details required to render sidebar controls safely."""
 
     default_year: int
-    year_bounds: Tuple[int, int]
+    year_bounds: tuple[int, int]
 
     def clamp_year(self, year: int) -> int:
         """Clamp ``year`` to the configured inclusive bounds."""
@@ -51,13 +51,13 @@ class BootstrapState:
     validation: ConfigValidationResult
 
     @property
-    def errors(self) -> Tuple[str, ...]:
+    def errors(self) -> tuple[str, ...]:
         """Return validation errors discovered during bootstrap."""
 
         return self.validation.errors
 
     @property
-    def warnings(self) -> Tuple[str, ...]:
+    def warnings(self) -> tuple[str, ...]:
         """Return non-blocking validation warnings."""
 
         return self.validation.warnings
@@ -75,7 +75,7 @@ class BootstrapState:
         return bool(self.validation.warnings)
 
     @property
-    def supported_year_bounds(self) -> Tuple[int, int]:
+    def supported_year_bounds(self) -> tuple[int, int]:
         """Return inclusive min/max year supported by either data source."""
 
         bea_range = self.config.supported_years_bea
@@ -106,21 +106,17 @@ class BootstrapState:
         return self.config
 
 
-def _normalise_env(env: Mapping[str, object] | None) -> Tuple[Tuple[str, str], ...] | None:
+def _normalise_env(env: Mapping[str, object] | None) -> tuple[tuple[str, str], ...] | None:
     if env is None:
         return None
     items = tuple(
-        sorted(
-            (key.upper(), str(value))
-            for key, value in env.items()
-            if value is not None
-        )
+        sorted((key.upper(), str(value)) for key, value in env.items() if value is not None)
     )
     return items or None
 
 
 @lru_cache(maxsize=32)
-def _load_state(env_items: Tuple[Tuple[str, str], ...] | None) -> BootstrapState:
+def _load_state(env_items: tuple[tuple[str, str], ...] | None) -> BootstrapState:
     mapping = dict(env_items) if env_items is not None else None
     config = load_config(mapping)
     validation = validate_config(config)

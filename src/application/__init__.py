@@ -8,6 +8,13 @@ from .idiot_index_service import (
     evaluate_idiot_index,
     sanitize_search,
 )
+from .scenario_planner import (
+    ScenarioAdjustment,
+    ScenarioPlanner,
+    ScenarioResult,
+    ScenarioSummary,
+    plan_scenario,
+)
 
 __all__ = [
     "DataSource",
@@ -16,4 +23,9 @@ __all__ = [
     "IndustryMetrics",
     "evaluate_idiot_index",
     "sanitize_search",
+    "ScenarioAdjustment",
+    "ScenarioPlanner",
+    "ScenarioResult",
+    "ScenarioSummary",
+    "plan_scenario",
 ]

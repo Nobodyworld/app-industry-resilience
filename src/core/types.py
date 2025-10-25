@@ -24,15 +24,12 @@ class ValidationResult(Generic[T]):
     message: str
 
     @classmethod
-    def success(cls, value: T, message: str = "") -> "ValidationResult[T]":
+    def success(cls, value: T, message: str = "") -> ValidationResult[T]:
         return cls(True, value, message)
 
     @classmethod
-    def failure(
-        cls, message: str, *, value: T | None = None
-    ) -> "ValidationResult[T]":
+    def failure(cls, message: str, *, value: T | None = None) -> ValidationResult[T]:
         return cls(False, value, message)
 
 
 __all__ = ["ValidationResult"]
-

@@ -8,16 +8,21 @@ calls and CSV uploads.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from typing import Mapping, Optional, Sequence, Tuple
+from urllib.parse import urlencode
 
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
-from urllib.parse import urlencode
 
-from src.application import DataSource, evaluate_idiot_index
+from src.application import (
+    DataSource,
+    ScenarioAdjustment,
+    ScenarioPlanner,
+    evaluate_idiot_index,
+)
 from src.core import FilePolicy, SecurityUtils, get_config_summary
 from src.interfaces.streamlit.bootstrap import (
     BootstrapError,
@@ -30,18 +35,23 @@ from src.interfaces.streamlit.components import (
     render_download_panel,
     render_insight_tabs,
     render_page_header,
+    render_scenario_controls,
+    render_scenario_results,
     render_sidebar,
     render_signal_bar,
     render_state_banner,
 )
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
+    build_scenario_comparison_table,
     calculate_benchmark,
     decode_query_params,
     encode_query_params,
     prepare_download_artifacts,
     prepare_trend_data,
+    summarise_scenario_deltas,
 )
+
 
 @st.cache_data(show_spinner=False)
 def load_sample() -> pd.DataFrame:
@@ -52,7 +62,7 @@ def load_sample() -> pd.DataFrame:
 
 def process_uploaded_file(
     uploaded_file: UploadedFile, *, policy: FilePolicy
-) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+) -> tuple[pd.DataFrame | None, str | None]:
     """Validate and materialize a CSV upload into a dataframe."""
 
     try:
@@ -99,6 +109,8 @@ def process_uploaded_file(
 
 st.set_page_config(page_title="Idiot Index – Industry Dashboard", layout="wide")
 load_custom_styles()
+
+SCENARIO_PLANNER = ScenarioPlanner()
 
 try:
     bootstrap_state = get_bootstrap_state()
@@ -196,9 +208,9 @@ mode_to_source = {
 }
 
 service_source = mode_to_source.get(data_mode, DataSource.SAMPLE)
-dataframe_override: Optional[pd.DataFrame] = None
+dataframe_override: pd.DataFrame | None = None
 service_config = APP_CONFIG
-error: Optional[str] = None
+error: str | None = None
 
 if data_mode == "Upload CSV":
     if uploaded_file is None:
@@ -310,9 +322,7 @@ else:
 if not focus_mode:
     render_signal_bar(df_filtered)
 
-pulse_tab, industries_tab, signals_tab = render_insight_tabs(
-    ["Pulse", "Industries", "Top Signals"]
-)
+pulse_tab, industries_tab, signals_tab = render_insight_tabs(["Pulse", "Industries", "Top Signals"])
 
 with pulse_tab:
     st.subheader("Pulse overview")
@@ -387,9 +397,9 @@ with signals_tab:
     st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Deep dive")
-code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"]))
+code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"], strict=False))
 choices: Sequence[str] = list(dict.fromkeys(df_filtered["industry_code"]))
-selected_code: Optional[str] = None
+selected_code: str | None = None
 if not choices:
     st.warning("No industries match the current filters.")
 else:
@@ -466,9 +476,7 @@ with metric_cols[0]:
         "Dataset average Idiot Index",
         f"{idiot_avg:.2f}" if idiot_avg is not None and pd.notna(idiot_avg) else "—",
         delta=(
-            f"{idiot_delta:+.2f}"
-            if idiot_delta is not None and pd.notna(idiot_delta)
-            else None
+            f"{idiot_delta:+.2f}" if idiot_delta is not None and pd.notna(idiot_delta) else None
         ),
     )
 
@@ -479,9 +487,7 @@ with metric_cols[1]:
         "Dataset average Value-Added %",
         f"{value_avg:.1f}%" if value_avg is not None and pd.notna(value_avg) else "—",
         delta=(
-            f"{value_delta:+.1f}%"
-            if value_delta is not None and pd.notna(value_delta)
-            else None
+            f"{value_delta:+.1f}%" if value_delta is not None and pd.notna(value_delta) else None
         ),
     )
 
@@ -490,15 +496,141 @@ materials_delta = benchmark_stats.get("materials_share_pct_delta")
 with metric_cols[2]:
     st.metric(
         "Dataset average Materials Share %",
-        f"{materials_avg:.1f}%"
-        if materials_avg is not None and pd.notna(materials_avg)
-        else "—",
+        f"{materials_avg:.1f}%" if materials_avg is not None and pd.notna(materials_avg) else "—",
         delta=(
             f"{materials_delta:+.1f}%"
             if materials_delta is not None and pd.notna(materials_delta)
             else None
         ),
     )
+
+resilience_avg = benchmark_stats.get("resilience_score_avg")
+resilience_delta = benchmark_stats.get("resilience_score_delta")
+dependency_avg = benchmark_stats.get("materials_dependency_ratio_avg")
+dependency_delta = benchmark_stats.get("materials_dependency_ratio_delta")
+shock_avg = benchmark_stats.get("shock_sensitivity_index_avg")
+shock_delta = benchmark_stats.get("shock_sensitivity_index_delta")
+
+res_cols = st.columns(3)
+with res_cols[0]:
+    st.metric(
+        "Dataset average Resilience score",
+        f"{resilience_avg:.2f}" if resilience_avg is not None and pd.notna(resilience_avg) else "—",
+        delta=(
+            f"{resilience_delta:+.2f}"
+            if resilience_delta is not None and pd.notna(resilience_delta)
+            else None
+        ),
+    )
+with res_cols[1]:
+    st.metric(
+        "Materials dependency ratio",
+        f"{dependency_avg:.2f}" if dependency_avg is not None and pd.notna(dependency_avg) else "—",
+        delta=(
+            f"{dependency_delta:+.2f}"
+            if dependency_delta is not None and pd.notna(dependency_delta)
+            else None
+        ),
+    )
+with res_cols[2]:
+    st.metric(
+        "Shock sensitivity index",
+        f"{shock_avg:.2f}" if shock_avg is not None and pd.notna(shock_avg) else "—",
+        delta=(
+            f"{shock_delta:+.2f}" if shock_delta is not None and pd.notna(shock_delta) else None
+        ),
+    )
+
+st.markdown("---")
+st.subheader("Scenario Lab")
+
+
+def _last_float_query(key: str, default: float = 0.0) -> float:
+    values = query_params_initial.get(key)
+    if not values:
+        return default
+    try:
+        return float(values[-1])
+    except (TypeError, ValueError):
+        return default
+
+
+scenario_defaults_selection = [
+    code for code in query_params_initial.get("scenario_codes", []) if code in code_lookup
+]
+scenario_default_gross = _last_float_query("scenario_gross")
+scenario_default_materials = _last_float_query("scenario_materials")
+scenario_default_value = _last_float_query("scenario_value")
+scenario_default_intermediate = _last_float_query("scenario_intermediate")
+
+scenario_controls = render_scenario_controls(
+    available_codes=comparison_options,
+    code_formatter=lambda code: f"{code_lookup.get(code, code)} ({code})",
+    default_selection=(
+        scenario_defaults_selection
+        or comparison_selection
+        or ([selected_code] if selected_code else [])
+    ),
+    default_gross_delta=scenario_default_gross,
+    default_materials_delta=scenario_default_materials,
+    default_value_delta=scenario_default_value,
+    default_intermediate_delta=scenario_default_intermediate,
+)
+
+adjustment_active = bool(scenario_controls.target_codes) or any(
+    abs(value) > 0.001
+    for value in [
+        scenario_controls.gross_output_delta_pct,
+        scenario_controls.materials_cost_delta_pct,
+        scenario_controls.value_added_delta_pct,
+        scenario_controls.intermediate_inputs_delta_pct,
+    ]
+)
+
+if adjustment_active:
+    scenario_adjustment = ScenarioAdjustment(
+        industry_codes=scenario_controls.target_codes or None,
+        gross_output_delta_pct=scenario_controls.gross_output_delta_pct,
+        materials_cost_delta_pct=scenario_controls.materials_cost_delta_pct,
+        value_added_delta_pct=scenario_controls.value_added_delta_pct,
+        intermediate_inputs_delta_pct=scenario_controls.intermediate_inputs_delta_pct,
+    )
+
+    scenario_result = SCENARIO_PLANNER.plan(df_display, [scenario_adjustment])
+    scenario_summary = summarise_scenario_deltas(scenario_result, top_n=10)
+
+    focus_codes: Sequence[str] = scenario_controls.target_codes or comparison_selection
+    if not focus_codes and selected_code:
+        focus_codes = [selected_code]
+
+    scenario_table = build_scenario_comparison_table(
+        scenario_result, focus_codes=focus_codes or None
+    )
+    top_deltas = scenario_summary["top"].copy()
+    chart_source = scenario_result.deltas
+    if focus_codes:
+        chart_source = chart_source[chart_source["industry_code"].isin(focus_codes)]
+    chart_slice = chart_source.sort_values("idiot_index", ascending=False).head(10)
+    scenario_fig = px.bar(
+        chart_slice,
+        x="idiot_index",
+        y="industry_name",
+        orientation="h",
+        title="Idiot Index delta (scenario vs baseline)",
+        labels={"idiot_index": "Δ Idiot Index", "industry_name": "Industry"},
+        color="idiot_index",
+        color_continuous_scale="RdYlGn",
+    )
+    scenario_fig.update_layout(xaxis_title="Δ Idiot Index", yaxis_title="Industry")
+
+    render_scenario_results(
+        summary=scenario_summary,
+        comparison_table=scenario_table,
+        top_deltas=top_deltas,
+        figure=scenario_fig,
+    )
+else:
+    st.info("Select industries or adjust the sliders to model a scenario.")
 
 download_artifacts = prepare_download_artifacts(
     df_full=df_display,
@@ -516,10 +648,39 @@ share_mapping = encode_query_params(
     mode=data_mode_slug,
 )
 
+
+def _store_scenario_param(key: str, value: float) -> None:
+    if abs(value) > 0.001:
+        share_mapping[key] = [f"{value:.1f}"]
+    else:
+        share_mapping.pop(key, None)
+
+
+if adjustment_active:
+    if scenario_controls.target_codes:
+        share_mapping["scenario_codes"] = list(scenario_controls.target_codes)
+    else:
+        share_mapping.pop("scenario_codes", None)
+    _store_scenario_param("scenario_gross", scenario_controls.gross_output_delta_pct)
+    _store_scenario_param("scenario_materials", scenario_controls.materials_cost_delta_pct)
+    _store_scenario_param("scenario_value", scenario_controls.value_added_delta_pct)
+    _store_scenario_param("scenario_intermediate", scenario_controls.intermediate_inputs_delta_pct)
+else:
+    for key in [
+        "scenario_codes",
+        "scenario_gross",
+        "scenario_materials",
+        "scenario_value",
+        "scenario_intermediate",
+    ]:
+        share_mapping.pop(key, None)
+
+
 def _normalise(mapping: Mapping[str, list[str]]) -> tuple[tuple[str, tuple[str, ...]], ...]:
     """Normalise query mappings for deterministic comparisons."""
 
     return tuple(sorted((key, tuple(values)) for key, values in mapping.items()))
+
 
 if _normalise(share_mapping) != _normalise(query_params_initial):
     st.experimental_set_query_params(**share_mapping)

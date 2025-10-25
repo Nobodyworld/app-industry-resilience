@@ -65,6 +65,7 @@ __all__ = [
     "RateLimitConfig",
     "RateLimiter",
     "RemoteLoggingConfig",
+    "configure_logging_from_config",
     "RetryPolicy",
     "SecurityUtils",
     "ValidationResult",

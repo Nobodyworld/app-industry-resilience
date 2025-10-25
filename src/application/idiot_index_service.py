@@ -10,15 +10,25 @@ schema concerns.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass, replace
 from enum import Enum
-from pathlib import Path
 from functools import lru_cache
-from typing import Callable, Iterable, Protocol, Sequence
+from pathlib import Path
+from typing import Protocol
 
 import pandas as pd
 
-from src.core import AppConfig, SecurityUtils, compute_metrics, format_for_display, load_config, normalize_columns
+from src.core import (
+    AppConfig,
+    MetricConfig,
+    SecurityUtils,
+    compute_metrics,
+    format_for_display,
+    load_config,
+    normalize_columns,
+)
+from src.extensions.manager import ExtensionManager, get_extension_manager
 
 
 class DataSource(str, Enum):
@@ -77,10 +87,13 @@ class IdiotIndexService:
     default_bea_fetcher: BEAFetcher | None = None
     default_census_fetcher: CensusFetcher | None = None
     timer: Callable[[], float] = time.perf_counter
+    extension_manager: ExtensionManager | None = None
 
     def __post_init__(self) -> None:
         if self.default_sample_loader is None:
             self.default_sample_loader = _default_sample_loader
+        if self.extension_manager is None:
+            self.extension_manager = get_extension_manager()
 
     def evaluate(
         self,
@@ -95,6 +108,7 @@ class IdiotIndexService:
         fetch_census: CensusFetcher | None = None,
         sample_loader: SampleLoader | None = None,
         logger_hooks: LoggerHooks | None = None,
+        metric_config: MetricConfig | None = None,
     ) -> IdiotIndexSummary:
         hooks = logger_hooks or LoggerHooks()
         active_config = config or self.config_loader()
@@ -117,7 +131,17 @@ class IdiotIndexService:
             logger_hooks=hooks,
             timer_start=start,
             timer=self.timer,
+            metric_config=metric_config,
         )
+
+        if self.extension_manager is not None:
+            contributions = self.extension_manager.apply_summary_extensions(summary)
+            if contributions.notes:
+                summary = replace(summary, notes=summary.notes + contributions.notes)
+            if contributions.metadata:
+                for frame in (summary.dataframe_full, summary.dataframe_filtered):
+                    extensions_meta = frame.attrs.setdefault("extensions", {})
+                    extensions_meta.update(contributions.metadata)
 
         return summary
 
@@ -131,7 +155,7 @@ class BEAFetcher(Protocol):
 class CensusFetcher(Protocol):
     """Protocol describing Census ASM data fetchers."""
 
-    def __call__(self, api_key: str, year: int | Iterable[int]) -> pd.DataFrame: ...
+    def __call__(self, api_key: str, year: int) -> pd.DataFrame: ...
 
 
 class SampleLoader(Protocol):
@@ -161,6 +185,7 @@ def evaluate_idiot_index(
     fetch_census: CensusFetcher | None = None,
     sample_loader: SampleLoader | None = None,
     logger_hooks: LoggerHooks | None = None,
+    metric_config: MetricConfig | None = None,
 ) -> IdiotIndexSummary:
     """Return Idiot Index metrics for the requested configuration."""
 
@@ -176,6 +201,7 @@ def evaluate_idiot_index(
         fetch_census=fetch_census,
         sample_loader=sample_loader,
         logger_hooks=logger_hooks,
+        metric_config=metric_config,
     )
 
 
@@ -193,6 +219,7 @@ def _evaluate_idiot_index(
     logger_hooks: LoggerHooks,
     timer_start: float,
     timer: Callable[[], float],
+    metric_config: MetricConfig | None,
 ) -> IdiotIndexSummary:
     if top_n <= 0:
         raise ValueError("top_n must be greater than zero.")
@@ -209,7 +236,7 @@ def _evaluate_idiot_index(
     )
 
     normalized = normalize_columns(dataset)
-    metrics = compute_metrics(normalized)
+    metrics = compute_metrics(normalized, config=metric_config)
     display = format_for_display(metrics)
 
     filtered = _filter_dataframe(display, sanitized_search)
@@ -254,14 +281,14 @@ def _resolve_dataset(
     if source is DataSource.BEA:
         if not config.bea_api_key:
             raise ValueError("BEA API key is required but missing from configuration.")
-        resolver = fetch_bea or _get_default_bea_fetcher()
-        return resolver(config.bea_api_key, year)
+        bea_resolver = fetch_bea or _get_default_bea_fetcher()
+        return bea_resolver(config.bea_api_key, year)
 
     if source is DataSource.CENSUS:
         if not config.census_api_key:
             raise ValueError("Census API key is required but missing from configuration.")
-        resolver = fetch_census or _get_default_census_fetcher()
-        return resolver(config.census_api_key, year)
+        census_resolver = fetch_census or _get_default_census_fetcher()
+        return census_resolver(config.census_api_key, year)
 
     raise ValueError(f"Unsupported data source: {source}")
 
@@ -311,12 +338,14 @@ def _build_leaderboard(df: pd.DataFrame, top_n: int) -> tuple[IndustryMetrics, .
                 industry_code=row.industry_code,
                 industry_name=row.industry_name,
                 idiot_index=float(row.idiot_index) if pd.notna(row.idiot_index) else None,
-                value_added_pct=
-                    float(row.value_added_pct) if pd.notna(row.value_added_pct) else None,
-                materials_share_pct=
+                value_added_pct=(
+                    float(row.value_added_pct) if pd.notna(row.value_added_pct) else None
+                ),
+                materials_share_pct=(
                     float(row.materials_share_pct)
                     if hasattr(row, "materials_share_pct") and pd.notna(row.materials_share_pct)
-                    else None,
+                    else None
+                ),
                 gross_output=float(row.gross_output) if pd.notna(row.gross_output) else None,
                 value_added=float(row.value_added) if pd.notna(row.value_added) else None,
             )
@@ -329,7 +358,7 @@ def _extract_notes(df: pd.DataFrame) -> tuple[str, ...]:
     notes = metadata.get("notes")
     if not notes:
         return tuple()
-    if isinstance(notes, Sequence) and not isinstance(notes, (str, bytes)):
+    if isinstance(notes, Sequence) and not isinstance(notes, str | bytes):
         return tuple(str(item) for item in notes)
     return (str(notes),)
 
