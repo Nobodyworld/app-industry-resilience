@@ -81,6 +81,11 @@ class Tracer:
     def export(self) -> list[dict[str, Any]]:
         return [span.to_dict() for span in self._spans]
 
+    def span_count(self) -> int:
+        """Return the total number of completed spans captured so far."""
+
+        return len(self._spans)
+
 
 def current_trace_context() -> TraceContext | None:
     return _current_context.get()

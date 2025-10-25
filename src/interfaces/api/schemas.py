@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -43,17 +44,33 @@ class DatasetRecord(BaseModel):
     model_config = ConfigDict(extra="allow")
 
 
+class HealthComponentModel(BaseModel):
+    name: str
+    status: Literal["pass", "warn", "fail"]
+    summary: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
 class HealthResponse(BaseModel):
-    status: Literal["ok"] = Field(default="ok")
+    status: Literal["pass", "warn", "fail"]
     service: str = Field(default="idiot-index-api")
     version: str
+    checked_at: datetime
     trace_id: str | None = Field(
         default=None,
         description="Active trace identifier to correlate logs and metrics.",
     )
+    components: list[HealthComponentModel] = Field(
+        default_factory=list,
+        description="Detailed component-level health signals.",
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Structured metadata describing configuration and observability state.",
+    )
     telemetry: dict[str, Any] = Field(
         default_factory=dict,
-        description="Snapshot of instrumentation readiness signals.",
+        description="Shortcut field mirroring metadata['telemetry'] for backward compatibility.",
     )
 
 

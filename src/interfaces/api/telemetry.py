@@ -109,6 +109,20 @@ class ApiTelemetry:
     def correlation_id(self) -> str | None:
         return current_trace_id()
 
+    def health_snapshot(self) -> dict[str, Any]:
+        """Return lightweight readiness metadata for health probes."""
+
+        return {
+            "metrics": {
+                "counters": len(self.registry.counters),
+                "gauges": len(self.registry.gauges),
+                "histograms": len(self.registry.histograms),
+            },
+            "tracing": {
+                "exported_spans": self.tracer.span_count(),
+            },
+        }
+
 
 DEFAULT_TELEMETRY = ApiTelemetry()
 

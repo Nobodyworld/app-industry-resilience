@@ -6,7 +6,7 @@ This runbook captures the high-level steps for responding to production issues i
 
 1. Check the Prometheus metrics endpoint (`/metrics`) for request spikes or elevated error counters (`idiot_index_api_errors_total`).
 2. Correlate trace IDs from logs (look for `trace=<id>` in structured log output) with client reports. Each API response exposes the current `trace_id` via `/health` and in the `metadata.telemetry.trace_id` field.
-3. Validate platform health by calling `/healthz`.
+3. Validate platform health by calling `/healthz` or running `python scripts/check_health.py --pretty` from a shell on the target host.
 
 ## 2. Contain & Mitigate
 
