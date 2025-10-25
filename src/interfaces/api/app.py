@@ -11,6 +11,8 @@ from typing import Any, cast
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from src.application import DataSource, IdiotIndexService, ScenarioPlanner
+from src.extensions.manager import get_extension_manager
+from src.infrastructure.observability import build_default_probe
 from src.interfaces.api.dependencies import (
     get_idiot_index_service,
     get_scenario_planner,
@@ -65,6 +67,10 @@ class InstrumentedFastAPI(FastAPI):
 
 
 app = InstrumentedFastAPI(title="Idiot Index API", version=__version__)
+_health_probe = build_default_probe(
+    telemetry_snapshot=lambda: app.telemetry.health_snapshot(),
+    extension_manager_provider=get_extension_manager,
+)
 
 
 def _allowed_origins() -> list[str]:
@@ -97,15 +103,20 @@ def health() -> HealthResponse:
     """Return a simple health payload."""
 
     telemetry = app.telemetry
+    report = _health_probe.snapshot()
+    metadata = dict(report.metadata)
+    metadata.setdefault("telemetry", telemetry.health_snapshot())
     trace_id = telemetry.correlation_id()
-    snapshot = {
-        "metrics": {
-            "counters": len(telemetry.registry.counters),
-            "gauges": len(telemetry.registry.gauges),
-            "histograms": len(telemetry.registry.histograms),
-        }
-    }
-    return HealthResponse(version=__version__, trace_id=trace_id, telemetry=snapshot)
+    return HealthResponse(
+        status=report.status,
+        service="idiot-index-api",
+        version=__version__,
+        checked_at=report.checked_at,
+        trace_id=trace_id,
+        components=[component.as_dict() for component in report.components],
+        metadata=metadata,
+        telemetry=metadata.get("telemetry", {}),
+    )
 
 
 @app.get("/healthz", response_model=HealthResponse, tags=["system"])
@@ -142,34 +153,32 @@ def evaluate(
 ) -> EvaluateResponse:
     telemetry = app.telemetry
     service = cast(IdiotIndexService, service)
-    telemetry_context = telemetry.tracer.start_span(
+    with telemetry.tracer.start_span(
         "service.evaluate_idiot_index",
         attributes={"source": request.source, "year": request.year},
-    )
-    telemetry_context.__enter__()
-    dataframe = None
-    if request.records:
+    ):
+        dataframe = None
+        if request.records:
+            try:
+                dataframe = records_to_dataframe(request.records)
+            except ValueError as exc:  # pragma: no cover - validated by Pydantic but defensive
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+                ) from exc
+            dataframe.attrs.setdefault("source", "api-inline")
+            dataframe.attrs.setdefault("source_origin", "api")
+
         try:
-            dataframe = records_to_dataframe(request.records)
-        except ValueError as exc:  # pragma: no cover - validated by Pydantic but defensive
+            summary = service.evaluate(
+                year=request.year,
+                source=request.source,
+                search=request.search,
+                top_n=request.top_n,
+                dataframe=dataframe,
+                metric_config=metric_config_from_flag(request.use_cache),
+            )
+        except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-        dataframe.attrs.setdefault("source", "api-inline")
-        dataframe.attrs.setdefault("source_origin", "api")
-
-    try:
-        summary = service.evaluate(
-            year=request.year,
-            source=request.source,
-            search=request.search,
-            top_n=request.top_n,
-            dataframe=dataframe,
-            metric_config=metric_config_from_flag(request.use_cache),
-        )
-    except ValueError as exc:
-        telemetry_context.__exit__(type(exc), exc, None)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    telemetry_context.__exit__(None, None, None)
 
     filters = EvaluateFilters(search=request.search, top_n=request.top_n)
     response = summary_to_response(
@@ -190,33 +199,29 @@ def run_scenario(
 ) -> ScenarioResponse:
     telemetry = app.telemetry
     planner = cast(ScenarioPlanner, planner)
-    span_cm = telemetry.tracer.start_span(
+    with telemetry.tracer.start_span(
         "service.scenario_plan",
         attributes={"adjustments": len(request.adjustments)},
-    )
-    span_cm.__enter__()
-    try:
-        base_df = records_to_dataframe(request.base_records)
-    except ValueError as exc:  # pragma: no cover - request validation should prevent
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    ):
+        try:
+            base_df = records_to_dataframe(request.base_records)
+        except ValueError as exc:  # pragma: no cover - request validation should prevent
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    base_df.attrs.setdefault("source", "api-scenario")
+        base_df.attrs.setdefault("source", "api-scenario")
 
-    adjustments = adjustments_to_domain(request.adjustments)
+        adjustments = adjustments_to_domain(request.adjustments)
 
-    active_planner = planner
-    if request.use_cache is not None and request.use_cache != planner.metric_config.use_cache:
-        active_planner = ScenarioPlanner(
-            metric_config=metric_config_from_flag(request.use_cache) or planner.metric_config
-        )
+        active_planner = planner
+        if request.use_cache is not None and request.use_cache != planner.metric_config.use_cache:
+            active_planner = ScenarioPlanner(
+                metric_config=metric_config_from_flag(request.use_cache) or planner.metric_config
+            )
 
-    try:
-        result = active_planner.plan(base_df, adjustments)
-    except ValueError as exc:
-        span_cm.__exit__(type(exc), exc, None)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-
-    span_cm.__exit__(None, None, None)
+        try:
+            result = active_planner.plan(base_df, adjustments)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     response = scenario_to_response(result)
     trace_id = telemetry.correlation_id()
     if trace_id:

@@ -135,6 +135,7 @@ make scenario      # Run the scenario planner CLI (pass ARGS="--adjust codes=311
 make prefetch-cache # Warm caches using the prefetch utility
 make api             # Launch the headless API service (pass ARGS="--port 9100" for custom ports)
 make docs          # List key documentation links in the terminal
+python scripts/check_health.py --pretty  # Run the consolidated health probe without the HTTP API
 python -m trace --count --coverdir build/coverage scripts/run_pytest_trace.py  # Generate offline coverage without pytest-cov
 ```
 
@@ -150,7 +151,7 @@ make api
 
 This invokes `scripts/run_api.py`, which serves the lightweight FastAPI-compatible app using Python's built-in WSGI server at `http://localhost:9000` by default. Key endpoints:
 
-- `GET /health` – readiness probe returning service metadata.
+- `GET /health` – readiness probe returning service metadata, component-level status, and telemetry counts.
 - `GET /healthz` – Kubernetes-style alias that also exposes trace correlation IDs.
 - `GET /meta/sources` – list of supported data sources.
 - `POST /evaluate` – compute Idiot Index metrics for a dataset or remote source.

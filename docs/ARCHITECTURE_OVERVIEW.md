@@ -77,6 +77,7 @@ The Idiot Index application follows a layered Python architecture designed for t
 - Structured logging is handled through `src.infrastructure.logging_config` which attaches trace IDs and redacts sensitive data.
 - The headless API records request metrics via `src/interfaces/api/telemetry` and serves them under `/metrics`. Latency histograms, in-flight gauges, and error counters are available for Prometheus scrapers.
 - `log_performance`, `log_api_call`, and `log_data_processing` annotate key milestones for debugging and performance monitoring.
+- `src/infrastructure/observability/health.py` provides the reusable `HealthProbe`, powering both the HTTP `/health` endpoint and the `scripts/check_health.py` CLI for consistent readiness insights.
 - Incident response procedures are documented in `docs/OPERATIONS_INCIDENT_RESPONSE.md`.
 
 ---

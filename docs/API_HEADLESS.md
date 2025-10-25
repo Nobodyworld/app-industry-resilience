@@ -20,22 +20,40 @@ Inside Docker, set `APP_MODE=api` to boot the same service from the container en
 ## Endpoints
 
 ### `GET /health`
-Returns service metadata, version, and a trace identifier useful for correlating logs.
+Returns service metadata, component-level health status, and a trace identifier useful for correlating logs.
 
 ```json
 {
-  "status": "ok",
+  "status": "warn",
   "service": "idiot-index-api",
   "version": "0.1.0",
+  "checked_at": "2025-10-25T03:45:12.456789+00:00",
   "trace_id": "1f3e8b7157c448c1aaeb87b7e0e1d2b6",
+  "components": [
+    {"name": "configuration", "status": "warn", "summary": "Configuration validated with warnings"},
+    {"name": "cache", "status": "pass", "summary": "Cache directories ready"},
+    {"name": "extensions", "status": "pass", "summary": "1 summary extensions, 0 scenario extensions active"}
+  ],
+  "metadata": {
+    "config": {
+      "environment": "development",
+      "log_level": "INFO"
+    },
+    "telemetry": {
+      "metrics": {"counters": 4, "gauges": 1, "histograms": 1},
+      "tracing": {"exported_spans": 12}
+    }
+  },
   "telemetry": {
-    "metrics": {"counters": 4, "gauges": 1, "histograms": 1}
+    "metrics": {"counters": 4, "gauges": 1, "histograms": 1},
+    "tracing": {"exported_spans": 12}
   }
 }
 ```
 
 ### `GET /healthz`
-Returns the same payload as `/health` and is intended for Kubernetes probes. Trace IDs rotate per request.
+Returns the same payload as `/health` and is intended for Kubernetes probes. Trace IDs rotate per request, while component
+status and metadata remain aligned.
 
 ### `GET /meta/sources`
 Lists supported data sources (`sample`, `bea`, `census`). Use this to drive UI dropdowns or validation in clients.

@@ -22,11 +22,19 @@ def test_health_endpoint_reports_ok() -> None:
     payload = response.json()
 
     assert response.status_code == 200
-    assert payload["status"] == "ok"
+    assert payload["status"] in {"pass", "warn"}
     assert payload["service"] == "idiot-index-api"
     assert "version" in payload
-    assert "telemetry" in payload
-    assert payload["telemetry"]["metrics"]["counters"] >= 1
+    assert "checked_at" in payload
+    assert isinstance(payload["components"], list)
+    component_names = {component["name"] for component in payload["components"]}
+    assert {"configuration", "cache", "extensions"}.issubset(component_names)
+    assert payload["metadata"]["config"]["environment"] in {
+        "development",
+        "testing",
+        "production",
+    }
+    assert payload["telemetry"] == payload["metadata"].get("telemetry", {})
     assert payload.get("trace_id") is None or isinstance(payload["trace_id"], str)
 
 
@@ -34,8 +42,10 @@ def test_healthz_alias_matches_health() -> None:
     base = client.get("/health").json()
     probe = client.get("/healthz").json()
 
-    comparable_keys = {key: value for key, value in base.items() if key != "trace_id"}
-    assert comparable_keys == {key: value for key, value in probe.items() if key != "trace_id"}
+    ignore_keys = {"trace_id", "checked_at", "metadata", "telemetry"}
+    comparable_keys = {key: value for key, value in base.items() if key not in ignore_keys}
+    assert comparable_keys == {key: value for key, value in probe.items() if key not in ignore_keys}
+    assert base["metadata"]["config"] == probe["metadata"]["config"]
     if base.get("trace_id") and probe.get("trace_id"):
         assert base["trace_id"] != probe["trace_id"]
 
