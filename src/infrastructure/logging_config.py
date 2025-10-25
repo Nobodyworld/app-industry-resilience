@@ -8,13 +8,13 @@ import logging.handlers
 import os
 import re
 import sys
-from collections.abc import Mapping as MappingABC, Sequence as SequenceABC, Set as SetABC
+from collections.abc import Iterable, Mapping, Sequence, Set
 from dataclasses import dataclass, field, fields, is_dataclass
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Optional
-from typing import Pattern
+from typing import Any, cast
 
 from ..core import AppConfig
+from .observability import current_trace_id
 
 _SENSITIVE_TOKENS = ("key", "token", "secret", "password", "credential")
 DEFAULT_REDACTION_SENTINEL = "***redacted***"
@@ -49,8 +49,8 @@ class PayloadRedactor:
         existing = memo.get(mapping_id)
         if existing is not None:
             if existing is _IN_PROGRESS_MARKER:
-                return RECURSIVE_REFERENCE_PLACEHOLDER
-            return existing
+                return RECURSIVE_REFERENCE_PLACEHOLDER  # type: ignore[return-value]
+            return cast(dict[Any, Any], existing)
 
         memo[mapping_id] = _IN_PROGRESS_MARKER
         redacted: dict[Any, Any] = {}
@@ -63,21 +63,21 @@ class PayloadRedactor:
         return redacted
 
     def _redact_value(self, value: Any, memo: dict[int, Any]) -> Any:
-        if isinstance(value, MappingABC):
+        if isinstance(value, Mapping):
             return self._redact_mapping(value, memo)
         if self._is_namedtuple(value):
             return self._redact_mapping(value._asdict(), memo)
         if is_dataclass(value) and not isinstance(value, type):
             return self._redact_dataclass(value, memo)
-        if isinstance(value, SequenceABC) and not isinstance(value, (str, bytes, bytearray)):
+        if isinstance(value, Sequence) and not isinstance(value, str | bytes | bytearray):
             return self._redact_sequence(value, memo)
-        if isinstance(value, SetABC):
+        if isinstance(value, Set):
             return self._redact_set(value, memo)
         if hasattr(value, "__dict__") and not isinstance(value, type):
             return self._redact_object(value, memo)
         return value
 
-    def _redact_sequence(self, sequence: SequenceABC, memo: dict[int, Any]) -> Any:
+    def _redact_sequence(self, sequence: Sequence, memo: dict[int, Any]) -> Any:
         sequence_id = id(sequence)
         existing = memo.get(sequence_id)
         if existing is not None:
@@ -102,13 +102,13 @@ class PayloadRedactor:
         existing = memo.get(instance_id)
         if existing is not None:
             if existing is _IN_PROGRESS_MARKER:
-                return RECURSIVE_REFERENCE_PLACEHOLDER
-            return existing
+                return RECURSIVE_REFERENCE_PLACEHOLDER  # type: ignore[return-value]
+            return cast(dict[str, Any], existing)
 
         memo[instance_id] = _IN_PROGRESS_MARKER
         redacted: dict[str, Any] = {}
-        for field in fields(instance):
-            field_name = field.name
+        for data_field in fields(instance):
+            field_name = data_field.name
             if self._key_contains_token(field_name):
                 redacted[field_name] = self.sentinel
                 continue
@@ -116,13 +116,13 @@ class PayloadRedactor:
         memo[instance_id] = redacted
         return redacted
 
-    def _redact_set(self, values: SetABC, memo: dict[int, Any]) -> list[Any]:
+    def _redact_set(self, values: Set, memo: dict[int, Any]) -> list[Any]:
         set_id = id(values)
         existing = memo.get(set_id)
         if existing is not None:
             if existing is _IN_PROGRESS_MARKER:
-                return RECURSIVE_REFERENCE_PLACEHOLDER
-            return existing
+                return RECURSIVE_REFERENCE_PLACEHOLDER  # type: ignore[return-value]
+            return cast(list[Any], existing)
 
         memo[set_id] = _IN_PROGRESS_MARKER
         redacted_items = [self._redact_value(item, memo) for item in values]
@@ -135,13 +135,11 @@ class PayloadRedactor:
         existing = memo.get(obj_id)
         if existing is not None:
             if existing is _IN_PROGRESS_MARKER:
-                return RECURSIVE_REFERENCE_PLACEHOLDER
-            return existing
+                return RECURSIVE_REFERENCE_PLACEHOLDER  # type: ignore[return-value]
+            return cast(dict[str, Any], existing)
 
         memo[obj_id] = _IN_PROGRESS_MARKER
-        attribute_map = {
-            key: value for key, value in vars(obj).items() if not key.startswith("_")
-        }
+        attribute_map = {key: value for key, value in vars(obj).items() if not key.startswith("_")}
         redacted = self._redact_mapping(attribute_map, memo)
         memo[obj_id] = redacted
         return redacted
@@ -192,6 +190,9 @@ class RedactingJSONFormatter(logging.Formatter):
             "message": record.getMessage(),
             "time": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
         }
+        trace_id = getattr(record, "trace_id", None)
+        if trace_id:
+            payload["trace_id"] = trace_id
         if record.exc_info:
             payload["exception"] = self.formatException(record.exc_info)
         extra_payload = getattr(record, "payload", None)
@@ -231,9 +232,18 @@ class RedactingTextFormatter(logging.Formatter):
         return rendered
 
 
+class TraceIdFilter(logging.Filter):
+    """Attach the current trace identifier to log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # pragma: no cover - minimal logic
+        trace_id = current_trace_id()
+        record.trace_id = trace_id or "-"
+        return True
+
+
 def setup_logging(
     level: str = "INFO",
-    log_file: Optional[str] = "logs/app.log",
+    log_file: str | None = "logs/app.log",
     *,
     max_bytes: int = 10 * 1024 * 1024,
     backup_count: int = 5,
@@ -255,13 +265,15 @@ def setup_logging(
         formatter = RedactingJSONFormatter(redact_fields=redact_fields)
     else:
         formatter = RedactingTextFormatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
+            "%(asctime)s - %(name)s - %(levelname)s - trace=%(trace_id)s - %(funcName)s:%(lineno)d - %(message)s",
             redact_fields=redact_fields,
         )
 
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(formatter)
+    trace_filter = TraceIdFilter()
+    console_handler.addFilter(trace_filter)
     logger.addHandler(console_handler)
 
     if log_file:
@@ -274,6 +286,7 @@ def setup_logging(
         )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
+        file_handler.addFilter(trace_filter)
         logger.addHandler(file_handler)
 
     if remote:
@@ -285,6 +298,7 @@ def setup_logging(
             remote_handler = logging.handlers.DatagramHandler(remote.host, remote.port)
         remote_handler.setLevel(logging.INFO)
         remote_handler.setFormatter(formatter)
+        remote_handler.addFilter(trace_filter)
         logger.addHandler(remote_handler)
 
     app_logger = logging.getLogger("idiot_index")
@@ -321,10 +335,10 @@ def refresh_log_level(level: str) -> None:
 def log_api_call(
     service: str,
     endpoint: str,
-    params: Optional[Mapping[str, object]] = None,
+    params: Mapping[str, object] | None = None,
     *,
     success: bool = True,
-    error: Optional[str] = None,
+    error: str | None = None,
 ) -> None:
     payload: dict[str, object] = {"service": service, "endpoint": endpoint}
     if params:
@@ -412,8 +426,7 @@ def _build_redactor(tokens: Iterable[str], sentinel: str) -> PayloadRedactor:
     tokens_tuple = tuple(tokens)
     if (
         sentinel == _DEFAULT_REDACTOR.sentinel
-        and tuple(token.casefold() for token in tokens_tuple)
-        == _DEFAULT_REDACTOR.tokens_casefold
+        and tuple(token.casefold() for token in tokens_tuple) == _DEFAULT_REDACTOR.tokens_casefold
     ):
         return _DEFAULT_REDACTOR
     return PayloadRedactor(tokens_tuple, sentinel=sentinel)
@@ -424,7 +437,7 @@ def _mask_text(
     tokens: Iterable[str],
     sentinel: str,
     *,
-    pattern: Pattern[str] | None = None,
+    pattern: re.Pattern[str] | None = None,
 ) -> str:
     pattern_obj = pattern or _compile_token_pattern(tokens)
     if pattern_obj is None:
@@ -441,7 +454,7 @@ def _mask_text(
     return pattern_obj.sub(_replace, text)
 
 
-def _compile_token_pattern(tokens: Iterable[str]) -> Pattern[str] | None:
+def _compile_token_pattern(tokens: Iterable[str]) -> re.Pattern[str] | None:
     token_list = [token for token in tokens if token]
     if not token_list:
         return None

@@ -12,7 +12,6 @@ import pandas as pd
 
 from .types import ValidationResult
 
-
 _DANGEROUS_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(pattern, re.IGNORECASE)
     for pattern in (
@@ -84,9 +83,7 @@ class SecurityUtils:
             )
 
         if _contains_dangerous_patterns(path.name):
-            return ValidationResult.failure(
-                "Filename contains potentially dangerous characters."
-            )
+            return ValidationResult.failure("Filename contains potentially dangerous characters.")
 
         return ValidationResult.success(path, "File validation passed.")
 
@@ -133,9 +130,7 @@ class SecurityUtils:
 
         for column in df.columns:
             if _contains_dangerous_patterns(str(column)):
-                return ValidationResult.failure(
-                    f"Column name contains dangerous pattern: {column}"
-                )
+                return ValidationResult.failure(f"Column name contains dangerous pattern: {column}")
 
         sample_size = min(policy.sample_size, len(df))
         for row in range(sample_size):
@@ -161,19 +156,13 @@ class SecurityUtils:
             return ValidationResult.failure(f"{service_name} API key is required.")
 
         if len(cleaned) < 10:
-            return ValidationResult.failure(
-                f"{service_name} API key appears too short."
-            )
+            return ValidationResult.failure(f"{service_name} API key appears too short.")
 
         if len(cleaned) > 200:
-            return ValidationResult.failure(
-                f"{service_name} API key appears excessively long."
-            )
+            return ValidationResult.failure(f"{service_name} API key appears excessively long.")
 
         if re.search(r"[<>]", cleaned):
-            return ValidationResult.failure(
-                f"{service_name} API key contains invalid characters."
-            )
+            return ValidationResult.failure(f"{service_name} API key contains invalid characters.")
 
         return ValidationResult.success(cleaned, "API key validation passed.")
 
@@ -252,4 +241,3 @@ __all__ = [
     "FilePolicy",
     "SecurityUtils",
 ]
-

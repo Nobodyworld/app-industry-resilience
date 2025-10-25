@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import cast
 
 import pandas as pd
+
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
@@ -18,12 +20,23 @@ class SidebarState:
 
     data_mode: str
     year_input: int
-    year_clean: Optional[int]
+    year_clean: int | None
     bea_key: str
     census_key: str
-    uploaded_file: Optional[UploadedFile]
-    errors: List[str]
+    uploaded_file: UploadedFile | None
+    errors: list[str]
     halt: bool
+
+
+@dataclass
+class ScenarioControlState:
+    """Reflect user selections from the Scenario Lab panel."""
+
+    target_codes: list[str]
+    gross_output_delta_pct: float
+    materials_cost_delta_pct: float
+    value_added_delta_pct: float
+    intermediate_inputs_delta_pct: float
 
 
 def load_custom_styles() -> None:
@@ -163,7 +176,7 @@ def load_custom_styles() -> None:
 def render_page_header(
     title: str,
     subtitle: str,
-    meta: Dict[str, str],
+    meta: dict[str, str],
     focus_mode: bool,
 ) -> bool:
     """Render the hero header and return the current focus mode toggle state."""
@@ -196,7 +209,7 @@ def render_page_header(
 def render_sidebar(
     *,
     default_year: int,
-    year_bounds: Tuple[int, int],
+    year_bounds: tuple[int, int],
     bea_key: str,
     census_key: str,
     security_utils,
@@ -220,7 +233,7 @@ def render_sidebar(
         )
     )
 
-    errors: List[str] = []
+    errors: list[str] = []
     year_result = security_utils.validate_year(year_input)
     if not year_result.ok or year_result.value is None:
         st.sidebar.error(year_result.message)
@@ -311,7 +324,7 @@ def render_signal_bar(df: pd.DataFrame) -> None:
     ]
 
     cols = st.columns(len(cards))
-    for col, card in zip(cols, cards):
+    for col, card in zip(cols, cards, strict=False):
         with col:
             st.markdown(
                 f"""
@@ -334,7 +347,7 @@ def render_state_banner(message: str) -> None:
     )
 
 
-def render_insight_tabs(labels: Iterable[str]) -> List[st.delta_generator.DeltaGenerator]:
+def render_insight_tabs(labels: Iterable[str]) -> list[st.delta_generator.DeltaGenerator]:
     """Create the primary insight tabs and return them."""
 
     return list(st.tabs(list(labels)))
@@ -355,7 +368,9 @@ def render_deep_dive(
             f"<div class='deep-dive__heading'>{row['industry_name']}</div>",
             unsafe_allow_html=True,
         )
-        st.caption(f"Code: {row['industry_code']} · Year: {int(row['year']) if pd.notna(row['year']) else 'N/A'}")
+        st.caption(
+            f"Code: {row['industry_code']} · Year: {int(row['year']) if pd.notna(row['year']) else 'N/A'}"
+        )
 
         metric_cols = container.columns(4 if not focus_mode else 2)
         key_metrics = [
@@ -387,6 +402,7 @@ def render_deep_dive(
                 ("Intermediate Inputs", "intermediate_inputs"),
                 ("Source", "source"),
             ],
+            strict=False,
         ):
             with col:
                 value = row.get(key)
@@ -399,6 +415,139 @@ def render_deep_dive(
         st.markdown(story)
         st.markdown("""</div>""", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
+
+
+def render_scenario_controls(
+    *,
+    available_codes: Sequence[str],
+    code_formatter: Callable[[str], str],
+    default_selection: Sequence[str] | None = None,
+    default_gross_delta: float = 0.0,
+    default_materials_delta: float = 0.0,
+    default_value_delta: float = 0.0,
+    default_intermediate_delta: float = 0.0,
+) -> ScenarioControlState:
+    """Render Scenario Lab controls and return selected deltas."""
+
+    st.markdown(
+        "The Scenario Lab applies percentage shocks to industries so you can probe resilience and dependency instantly."
+    )
+    selection = st.multiselect(
+        "Target industries",
+        options=list(available_codes),
+        default=list(default_selection or []),
+        format_func=code_formatter,
+        help="Leave empty to stress test the entire dataset.",
+    )
+
+    with st.expander("Adjust cost structure", expanded=True):
+        gross_delta = st.slider(
+            "Gross output change (%)",
+            min_value=-50.0,
+            max_value=50.0,
+            value=default_gross_delta,
+            step=1.0,
+        )
+        materials_delta = st.slider(
+            "Materials cost change (%)",
+            min_value=-50.0,
+            max_value=50.0,
+            value=default_materials_delta,
+            step=1.0,
+        )
+        value_delta = st.slider(
+            "Value added change (%)",
+            min_value=-25.0,
+            max_value=25.0,
+            value=default_value_delta,
+            step=1.0,
+        )
+        intermediate_delta = st.slider(
+            "Intermediate inputs change (%)",
+            min_value=-50.0,
+            max_value=50.0,
+            value=default_intermediate_delta,
+            step=1.0,
+            help="Applies when intermediate inputs are available separately from materials cost.",
+        )
+
+    return ScenarioControlState(
+        target_codes=list(selection),
+        gross_output_delta_pct=gross_delta,
+        materials_cost_delta_pct=materials_delta,
+        value_added_delta_pct=value_delta,
+        intermediate_inputs_delta_pct=intermediate_delta,
+    )
+
+
+def render_scenario_results(
+    *,
+    summary: Mapping[str, object],
+    comparison_table: pd.DataFrame,
+    top_deltas: pd.DataFrame,
+    figure: object | None = None,
+) -> None:
+    """Display scenario summaries, tables, and optional chart."""
+
+    baseline_summary = summary["baseline"]
+    delta_summary = cast(Mapping[str, float | None], summary["delta"])
+
+    metric_cols_primary = st.columns(3)
+
+    def _metric(
+        column, label: str, baseline_value: float | None, delta_value: float | None
+    ) -> None:
+        baseline_display = f"{baseline_value:,.2f}" if baseline_value is not None else "—"
+        delta_display = f"{delta_value:+,.2f}" if delta_value is not None else None
+        column.metric(label, baseline_display, delta_display)
+
+    _metric(
+        metric_cols_primary[0],
+        "Gross output total",
+        getattr(baseline_summary, "gross_output_total", None),
+        delta_summary.get("gross_output_total"),
+    )
+    _metric(
+        metric_cols_primary[1],
+        "Value added total",
+        getattr(baseline_summary, "value_added_total", None),
+        delta_summary.get("value_added_total"),
+    )
+    _metric(
+        metric_cols_primary[2],
+        "Average resilience score",
+        getattr(baseline_summary, "resilience_score_avg", None),
+        delta_summary.get("resilience_score_avg"),
+    )
+
+    metric_cols_secondary = st.columns(3)
+    _metric(
+        metric_cols_secondary[0],
+        "Average Idiot Index",
+        getattr(baseline_summary, "idiot_index_avg", None),
+        delta_summary.get("idiot_index_avg"),
+    )
+    _metric(
+        metric_cols_secondary[1],
+        "Materials dependency ratio",
+        getattr(baseline_summary, "materials_dependency_ratio_avg", None),
+        delta_summary.get("materials_dependency_ratio_avg"),
+    )
+    _metric(
+        metric_cols_secondary[2],
+        "Shock sensitivity index",
+        getattr(baseline_summary, "shock_sensitivity_index_avg", None),
+        delta_summary.get("shock_sensitivity_index_avg"),
+    )
+
+    st.markdown("### Scenario comparison table")
+    st.dataframe(comparison_table, use_container_width=True)
+
+    if figure is not None:
+        st.plotly_chart(figure, use_container_width=True)
+
+    st.markdown("### Leading changes")
+    st.dataframe(top_deltas, use_container_width=True)
 
 
 def render_download_panel(artifacts: Sequence[DownloadArtifact]) -> None:
@@ -454,9 +603,7 @@ def build_data_story(
         )
 
     story_parts.append(
-        "The dataset is streaming from **{mode}**, keeping the analysis grounded in the latest available structures.".format(
-            mode=data_mode
-        )
+        f"The dataset is streaming from **{data_mode}**, keeping the analysis grounded in the latest available structures."
     )
 
     materials_share = row.get("materials_share_pct")
@@ -470,8 +617,6 @@ def build_data_story(
                 "Materials are a lighter share of costs, signaling room to leverage process or talent advantages."
             )
         else:
-            story_parts.append(
-                "A balanced materials share hints at a stable operational rhythm."
-            )
+            story_parts.append("A balanced materials share hints at a stable operational rhythm.")
 
     return " ".join(story_parts)

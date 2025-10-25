@@ -4,16 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 
 from src.adapters.bea import (
     BEAClientError,
-    fetch_go_ii_by_industry,
-    select_bea_endpoint,
     _ensure_years,
     _merge_metadata_notes,
+    fetch_go_ii_by_industry,
+    select_bea_endpoint,
 )
-from src.core import Cache, AppConfig, CacheConfig, Environment, RateLimitConfig
+from src.core import AppConfig, Cache, CacheConfig, Environment, RateLimitConfig
 
 
 @patch("src.adapters.bea.get_api_cache", return_value=None)

@@ -1,9 +1,6 @@
 import os
 import tempfile
 
-import os
-import tempfile
-
 import pandas as pd
 
 from src.core import FilePolicy, SecurityUtils
@@ -25,9 +22,7 @@ def test_validate_file_upload_with_real_path() -> None:
 
 def test_validate_file_upload_metadata() -> None:
     policy = FilePolicy(max_size_mb=1)
-    result = SecurityUtils.validate_file_upload(
-        "uploaded.csv", policy=policy, file_size_bytes=256
-    )
+    result = SecurityUtils.validate_file_upload("uploaded.csv", policy=policy, file_size_bytes=256)
     assert result.ok is True
 
 
@@ -47,22 +42,26 @@ def test_sanitize_filename_removes_dangerous_sequences() -> None:
 
 
 def test_validate_csv_content_checks_limits() -> None:
-    df = pd.DataFrame({
-        "industry_code": ["311"],
-        "industry_name": ["Food"],
-        "year": [2021],
-        "gross_output": [1000],
-    })
+    df = pd.DataFrame(
+        {
+            "industry_code": ["311"],
+            "industry_name": ["Food"],
+            "year": [2021],
+            "gross_output": [1000],
+        }
+    )
     result = SecurityUtils.validate_csv_content(df)
     assert result.ok is True
 
 
 def test_validate_csv_content_detects_dangerous_value() -> None:
-    df = pd.DataFrame({
-        "industry_code": ["311"],
-        "industry_name": ["<script>alert('xss')</script>"],
-        "year": [2021],
-    })
+    df = pd.DataFrame(
+        {
+            "industry_code": ["311"],
+            "industry_name": ["<script>alert('xss')</script>"],
+            "year": [2021],
+        }
+    )
     result = SecurityUtils.validate_csv_content(df)
     assert result.ok is False
     assert "dangerous" in result.message.lower()

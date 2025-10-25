@@ -15,6 +15,7 @@ This isn’t an academic metric; it’s a blunt heuristic popularized in enginee
   - Idiot Index (Output ÷ Materials / Intermediate Inputs)
   - Value‑Added %
   - Gross‑margin analogs
+  - Resilience score, materials dependency ratio, and shock sensitivity index
 - Lets you:
   - Compare sectors via sortable tables
   - Build multi-industry comparison sets with historical trend charts
@@ -23,6 +24,7 @@ This isn’t an academic metric; it’s a blunt heuristic popularized in enginee
   - Upload your own CSVs with automatic schema validation
   - Export results in CSV, JSON, or Excel, including the current filtered view
   - Explore data with interactive Plotly charts
+  - Stress test industries with the Scenario Lab to model cost/output shocks
 - Works **offline** out of the box via a bundled sample dataset.
 - **Robust error handling** with graceful degradation and clear user feedback
 - **Input validation** for all user inputs and data sources
@@ -68,6 +70,14 @@ Open the local URL it prints (usually http://localhost:8501). The app will load 
 3. The upload validator confirms schema alignment; successful loads render instantly with local-only messaging so you know nothing leaves your machine.
 4. Combine the CSV data with BEA or ASM metrics by switching data sources and comparing Idiot Index narratives side-by-side.
 
+### Model a shock scenario
+
+1. Scroll to the **Scenario Lab** section after configuring your dataset.
+2. Select one or more industries (leave blank to apply the shock to the entire view).
+3. Adjust the sliders to reflect changes in gross output, materials cost, value added, or intermediate inputs.
+4. Review the comparison table, resilience metrics, and delta chart to understand how the shock shifts the Idiot Index.
+5. Copy the shareable link or export the scenario-adjusted dataset using the existing download panel.
+
 ## Docker Deployment
 
 ## Docker Deployment
@@ -82,6 +92,18 @@ docker build -t idiot-index-app .
 docker run -p 8501:8501 idiot-index-app
 ```
 
+Set `PREFETCH_ARGS="--sources sample --years 2019 2020"` when starting the container to warm caches before Streamlit boots. The runtime entrypoint invokes `scripts/prefetch_data.py` whenever the variable is non-empty.
+
+### Run the headless API
+
+Set `APP_MODE=api` (and optionally `API_PORT`) to launch the headless API service instead of Streamlit:
+
+```bash
+docker run -e APP_MODE=api -p 9000:9000 idiot-index-app
+```
+
+The image shares the same cache prefetch hook regardless of mode. Health checks probe `/health` when `APP_MODE=api` and the Streamlit endpoint otherwise.
+
 ## Development
 
 Install development and tooling dependencies plus git hooks with a single command:
@@ -95,10 +117,10 @@ make setup
 Every change should pass the repository quality gate before you push:
 
 ```bash
-make check
+make quality-gate
 ```
 
-`make check` runs all configured pre-commit hooks (Black, Ruff, codespell, detect-secrets, mypy, commitlint) across the repository, executes the security gate (`pip-audit` + `detect-secrets` baseline diff), and then runs `pytest` with coverage reporting. If the `pre-commit` binary is unavailable, the Makefile falls back to the same checks via `scripts/run_quality_checks.py` so the workflow still works offline.
+`make quality-gate` executes linting (Black in check mode + Ruff), mypy, full pytest with coverage enforcement, and the security scans (`pip-audit` + `detect-secrets`). The target mirrors the CI pipeline to keep local and remote checks aligned.
 
 Targeted commands are also available:
 
@@ -109,10 +131,33 @@ make typecheck     # mypy static analysis
 make test          # pytest without coverage
 make security      # pip-audit + detect-secrets baseline validation
 make sbom          # Generate CycloneDX SBOM at build/sbom/cyclonedx.json
+make scenario      # Run the scenario planner CLI (pass ARGS="--adjust codes=311,gross=5")
+make prefetch-cache # Warm caches using the prefetch utility
+make api             # Launch the headless API service (pass ARGS="--port 9100" for custom ports)
 make docs          # List key documentation links in the terminal
+python -m trace --count --coverdir build/coverage scripts/run_pytest_trace.py  # Generate offline coverage without pytest-cov
 ```
 
 Commit messages must follow the Conventional Commits spec; the provided hooks will prevent non-conforming messages.
+
+## Headless API usage
+
+Launch the API locally with:
+
+```bash
+make api
+```
+
+This invokes `scripts/run_api.py`, which serves the lightweight FastAPI-compatible app using Python's built-in WSGI server at `http://localhost:9000` by default. Key endpoints:
+
+- `GET /health` – readiness probe returning service metadata.
+- `GET /healthz` – Kubernetes-style alias that also exposes trace correlation IDs.
+- `GET /meta/sources` – list of supported data sources.
+- `POST /evaluate` – compute Idiot Index metrics for a dataset or remote source.
+- `POST /scenario` – run Scenario Lab adjustments on a supplied dataset.
+- `GET /metrics` – Prometheus text exposition with counters, histograms, and gauges.
+
+See [docs/API_HEADLESS.md](docs/API_HEADLESS.md) for payload schemas and sample `curl` invocations.
 
 ## Architecture
 
@@ -126,6 +171,11 @@ Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + m
                                                         ├──▶ interfaces/streamlit (app.py)
                                                         └──▶ agents (toolkit + schemas)
 ```
+
+### Observability & Extensions
+
+- The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics` and propagating trace IDs to `/healthz` and response metadata. Logs include `trace=<id>` for every request, simplifying incident correlation.
+- Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance.
 
 Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
 
@@ -233,7 +283,7 @@ At minimum, provide: `industry_code`, `industry_name`, `year`, and either:
 
 ## Testing & quality gates
 
-- `make check` (or `pytest` + `ruff` + `mypy` individually) should pass before merging.
+- `make quality-gate` (or `pytest` + `ruff` + `mypy` individually) should pass before merging.
 - Agents rely on type hints; run `mypy` to ensure interface compatibility when editing dataclasses or adapters.
 - Streamlit helpers have unit tests in `tests/interfaces/streamlit`; add coverage there when altering UI-facing utilities.
 
@@ -404,6 +454,8 @@ idiot-index-app/
 ├── requirements.txt    # Production dependencies
 └── requirements-dev.txt # Development tooling
 ```
+
+Scenario modelling lives in `src/application/scenario_planner.py`, which powers both the Streamlit Scenario Lab and the `scripts/run_scenario.py` CLI. It reuses the normalization and metric pipeline to recompute Idiot Index derivatives after applying percentage shocks to baseline datasets.
 
 ### Data Flow Pipeline
 

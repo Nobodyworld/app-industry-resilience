@@ -1,5 +1,6 @@
 """Core domain modules for the Idiot Index application."""
 
+from .cache import Cache, CacheStats, get_api_cache, get_computation_cache
 from .config import (
     AppConfig,
     CacheConfig,
@@ -11,7 +12,6 @@ from .config import (
     load_config,
     validate_config,
 )
-from .cache import Cache, CacheStats, get_api_cache, get_computation_cache
 from .metrics import MetricConfig, compute_metrics, format_for_display
 from .normalize import DEFAULT_COLUMN_ALIASES, normalize_columns
 from .security import FilePolicy, SecurityUtils

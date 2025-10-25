@@ -126,11 +126,7 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
             raise BEAClientError(result.message)
         if result.value not in config.supported_years_bea:
             raise BEAClientError(
-                "Year {year} is outside supported BEA range {start}-{end}.".format(
-                    year=result.value,
-                    start=config.supported_years_bea.start,
-                    end=config.supported_years_bea.stop - 1,
-                )
+                f"Year {result.value} is outside supported BEA range {config.supported_years_bea.start}-{config.supported_years_bea.stop - 1}."
             )
         years_clean.append(result.value)
 
@@ -169,12 +165,8 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
             try:
                 year_frame, year_meta = future.result()
             except Exception as exc:  # pragma: no cover - defensive logging
-                logger.error(
-                    "Failed to fetch BEA data for %s: %s", year_value, exc, exc_info=exc
-                )
-                raise BEAClientError(
-                    f"Failed to fetch BEA data for {year_value}: {exc}"
-                ) from exc
+                logger.error("Failed to fetch BEA data for %s: %s", year_value, exc, exc_info=exc)
+                raise BEAClientError(f"Failed to fetch BEA data for {year_value}: {exc}") from exc
             else:
                 data_frames.append(year_frame)
                 metadata_notes.extend(year_meta.get("notes", []))
@@ -231,7 +223,10 @@ def select_bea_endpoint(config: AppConfig) -> str:
         try:
             _ = safe_get_json(
                 base_url,
-                params={**_HEALTH_PARAMS, **({"v": config.bea_api_version} if config.bea_api_version else {})},
+                params={
+                    **_HEALTH_PARAMS,
+                    **({"v": config.bea_api_version} if config.bea_api_version else {}),
+                },
                 headers=_HEADERS,
                 timeout=10.0,
             )
@@ -328,7 +323,9 @@ def _fetch_table(
                 retry_policy=retry_policy,
             )
         except Exception as exc:  # pragma: no cover - network exceptions mocked in tests
-            raise BEAClientError(f"Failed to fetch BEA data for params {page_params}: {exc}") from exc
+            raise BEAClientError(
+                f"Failed to fetch BEA data for params {page_params}: {exc}"
+            ) from exc
         chunk_rows, chunk_notes, next_page = _parse_bea_response(payload)
         rows.extend(chunk_rows)
         notes.extend(chunk_notes)
@@ -339,7 +336,9 @@ def _fetch_table(
     return rows, {"notes": notes}
 
 
-def _parse_bea_response(payload: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[str], str | None]:
+def _parse_bea_response(
+    payload: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[str], str | None]:
     """Parse a BEA API payload returning rows, notes, and next page token.
 
     Args:
@@ -468,6 +467,7 @@ def _ensure_years(year: int | Iterable[int]) -> tuple[int, ...]:
         BEAClientError: If values are missing, duplicated, or invalid.
     """
 
+    years: tuple[int, ...]
     if isinstance(year, int):
         years = (year,)
     else:

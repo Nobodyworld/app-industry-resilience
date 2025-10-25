@@ -32,6 +32,7 @@ This guide explains how to refresh the Idiot Index datasets, rotate API keys, an
    - **BEA:** Sidebar fetch indicator should progress from info to success with fresh data.
    - **Census ASM:** Should display success messaging and updated metrics for the selected year.
 3. Capture screenshots for regression history if UI changes accompany the refresh.
+4. Optionally launch the headless API (`make api`) and call `POST /evaluate` with the refreshed dataset to verify automation clients observe the same metrics.
 
 ## 5. Update documentation & changelog
 

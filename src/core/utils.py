@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 
 import requests  # type: ignore[import-untyped]
 
@@ -55,24 +56,18 @@ def safe_get_json(
             except requests.exceptions.Timeout as exc:
                 last_error = HTTPRequestError(f"Request to {url} timed out: {exc}")
             except requests.exceptions.ConnectionError as exc:
-                last_error = HTTPRequestError(
-                    f"Connection error while requesting {url}: {exc}"
-                )
+                last_error = HTTPRequestError(f"Connection error while requesting {url}: {exc}")
             except requests.exceptions.HTTPError as exc:
                 raise HTTPRequestError(
                     f"HTTP {response.status_code} error for {url}: {response.text[:200]}"
                 ) from exc
             except requests.exceptions.RequestException as exc:
-                last_error = HTTPRequestError(
-                    f"Request error while contacting {url}: {exc}"
-                )
+                last_error = HTTPRequestError(f"Request error while contacting {url}: {exc}")
             else:
                 try:
                     return response.json()
                 except ValueError as exc:
-                    raise InvalidJSONError(
-                        f"Invalid JSON response from {url}: {exc}"
-                    ) from exc
+                    raise InvalidJSONError(f"Invalid JSON response from {url}: {exc}") from exc
 
             if attempt >= policy.max_attempts:
                 break
@@ -91,4 +86,3 @@ def safe_get_json(
 
 
 __all__ = ["HTTPRequestError", "InvalidJSONError", "RetryPolicy", "safe_get_json"]
-

@@ -11,6 +11,7 @@ Holds pure domain logic and reusable utilities:
 - `config` parses environment variables into an `AppConfig` dataclass and captures validation results through `ConfigValidationResult`.
 - `cache` provides filesystem-backed caching primitives used by adapters to avoid redundant network calls.
 - `metrics` and `normalize` turn raw industry data into consistent schema with Idiot Index, value-added %, materials share %, and friendly column names.
+- `scenario_planner` reuses normalization and metrics to simulate percentage shocks and recompute resilience metrics for scenarios.
 - `security` validates API keys, file uploads, and user-provided search strings.
 - `types` and `utils` expose shared dataclasses and HTTP helpers (with retry policies) that stay free of Streamlit dependencies.
 
@@ -25,7 +26,9 @@ computes metrics, and builds leaderboards before returning immutable summaries.
 The module re-exports a convenience `evaluate_idiot_index` function backed by
 the same service so existing callers stay stable. Logger hooks allow
 instrumentation without coupling directly to the infrastructure layer. Both the
-UI and agent surfaces consume this package.
+UI and agent surfaces consume this package, and the `ScenarioPlanner` extends
+the layer with percentage-based adjustments and delta summaries used by the
+Scenario Lab and CLI.
 
 ### Adapters (`src/adapters/`)
 

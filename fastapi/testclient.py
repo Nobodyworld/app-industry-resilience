@@ -1,0 +1,55 @@
+"""Synchronous TestClient compatible with the local FastAPI façade."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from typing import Any
+
+from . import FastAPI, Response
+
+
+@dataclass
+class _TestResponse:
+    status_code: int
+    data: Any
+    media_type: str | None = None
+
+    def json(self) -> Any:
+        return self.data
+
+    @property
+    def text(self) -> str:
+        if isinstance(self.data, str):
+            return self.data
+        if isinstance(self.data, bytes):
+            return self.data.decode("utf-8")
+        return json.dumps(self.data)
+
+
+class TestClient:
+    """Simple client used by the test-suite to exercise the API."""
+
+    __test__ = False  # Prevent pytest from collecting this helper as a test class.
+
+    def __init__(self, app: FastAPI):
+        self.app = app
+
+    def get(self, path: str) -> _TestResponse:
+        response = self.app.handle_request("GET", path)
+        return _TestResponse(
+            status_code=response.status_code,
+            data=response.json(),
+            media_type=response.media_type,
+        )
+
+    def post(self, path: str, *, json: Any | None = None) -> _TestResponse:
+        response = self.app.handle_request("POST", path, payload=json)
+        return _TestResponse(
+            status_code=response.status_code,
+            data=response.json(),
+            media_type=response.media_type,
+        )
+
+
+__all__ = ["TestClient"]

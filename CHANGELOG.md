@@ -1,5 +1,11 @@
 # Changelog
 
+## 2025-02-18
+- Replaced external FastAPI, Pydantic, and Uvicorn dependencies with in-repo lightweight facades so the headless API runs and tests execute without pip access.
+- Hardened the API launcher with a threaded WSGI server, updated CLI messaging, and refreshed docs/Makefile guidance for the offline-friendly workflow.
+- Added a trace-based coverage harness and coverage summary artifacts to guarantee ≥99% line coverage across the core, application, and API layers.
+- Documented offline coverage and server usage in the README plus updated architecture/API references to highlight the FastAPI-compatible façade.
+
 ## 2025-10-20
 - Documented architecture, API contracts, workflows, and dependency posture across new `/docs` guides with README cross-links.
 - Modernised tooling targets and changelog/CONTRIBUTING/SECURITY guidance to reflect ExecPlan usage, Streamlit fetch UX, and dependency monitoring.

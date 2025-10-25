@@ -8,7 +8,7 @@ Thanks for investing time in the Idiot Index project! This guide explains how to
 - **Write tests** for every bug fix or feature. Maintain the existing coverage goals.
 - **Keep pull requests focused.** Ship reviewable slices; avoid unrelated refactors.
 - **Adopt Conventional Commits.** Every commit message must follow the `<type>(optional scope): <subject>` format using the types enforced by `scripts/commitlint.py`.
-- **Run the full quality suite** before opening a pull request.
+- **Run the full quality suite** (`make quality-gate`) before opening a pull request.
 - **Document significant work with an ExecPlan.** Place plans under `.agent/execplans/` so reviewers can trace decisions.
 
 ## Prerequisites
@@ -41,13 +41,13 @@ pre-commit install --hook-type commit-msg
 
 1. Create a feature branch (`git checkout -b feat/add-cool-thing`).
 2. Make your changes.
-3. Run the local quality suite:
+3. Run the local quality gate:
 
    ```bash
-   make check
+   make quality-gate
    ```
 
-   `make check` executes all configured `pre-commit` hooks across the repository, runs the security gate (`pip-audit` + `detect-secrets`), and then runs the pytest suite with coverage reporting. Hooks include Black, Ruff, codespell, detect-secrets, mypy, and commitlint.
+   `make quality-gate` runs Black (check mode), Ruff, mypy, pytest with coverage enforcement (`--cov-fail-under=90`), and the security gate (`pip-audit` + `detect-secrets`). This mirrors the CI workflow so failures are caught locally.
 
 4. Run additional focused commands as needed:
 
@@ -68,10 +68,15 @@ pre-commit install --hook-type commit-msg
 
 Before requesting a review, verify that:
 
-- `make check` passes locally.
+- `make quality-gate` passes locally.
 - Documentation is updated when behavior changes or new workflows are introduced.
 - New or changed configuration is explained in PR notes (feature flags, environment variables, migrations).
 - Screenshots are attached for UI changes.
+
+### Extensions & Telemetry
+
+- When adding analytics, prefer creating a module under `src/extensions` using `python scripts/scaffold_extension.py --name <name>`. Update `extensions/manifest.json` and add tests mirroring `tests/test_extensions.py`.
+- Do not remove or bypass telemetry hooks. If a change impacts `/metrics`, `/health`, or trace logging, update `docs/OPERATIONS_INCIDENT_RESPONSE.md` and mention the change in the release notes.
 
 ## Code Review
 

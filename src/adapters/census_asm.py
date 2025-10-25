@@ -54,9 +54,7 @@ def fetch_asm_manufacturing(api_key: str, year: int) -> pd.DataFrame:
 
     header, *rows = data
     if not rows:
-        raise RuntimeError(
-            f"No Census ASM data available for {year_result.value}."
-        )
+        raise RuntimeError(f"No Census ASM data available for {year_result.value}.")
 
     df = pd.DataFrame(rows, columns=header)
     normalized = normalize_columns(
