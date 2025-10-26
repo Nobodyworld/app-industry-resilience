@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 import pytest
 
@@ -128,3 +130,23 @@ def test_scenario_extension_enriches_metadata() -> None:
 
     assert "manufacturing_cost_driver" in contributions.metadata
     assert any("manufacturing_cost_driver" in note for note in contributions.notes)
+
+
+def test_extension_catalog_includes_data_quality() -> None:
+    manager = load_extensions(ExtensionManager())
+    catalog = manager.catalog()
+    names = {entry.name for entry in catalog}
+    assert "data_quality" in names
+    instrumentation_entries = [entry for entry in catalog if entry.kind == "instrumentation"]
+    assert any(entry.module.endswith("data_quality") for entry in instrumentation_entries)
+
+
+def test_extensions_catalog_cli_json(capsys) -> None:
+    from scripts import extensions_catalog
+
+    exit_code = extensions_catalog.main(["--json", "--kind", "instrumentation"])
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+
+    assert exit_code == 0
+    assert any(entry["name"] == "data_quality" for entry in payload)

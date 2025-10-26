@@ -7,6 +7,7 @@ custom environments without mutating global state."""
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
@@ -59,12 +60,43 @@ class Environment(str, Enum):
 
 
 @dataclass(frozen=True)
+class DistributedRateLimitConfig:
+    """Configuration for Redis-backed rate limiting."""
+
+    enabled: bool
+    host: str | None
+    port: int
+    db: int
+    username: str | None
+    password: str | None
+    ssl: bool
+    socket_timeout: float | None
+    key_prefix: str
+    window_seconds: float
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "host": self.host,
+            "port": self.port,
+            "db": self.db,
+            "ssl": self.ssl,
+            "socket_timeout": self.socket_timeout,
+            "key_prefix": self.key_prefix,
+            "window_seconds": self.window_seconds,
+            "username": bool(self.username),
+            "password": bool(self.password),
+        }
+
+
+@dataclass(frozen=True)
 class RateLimitConfig:
     """Rate limit information for outbound API calls."""
 
     bea: int
     census: int
     default: int
+    distributed: DistributedRateLimitConfig | None = None
 
     def as_dict(self) -> dict[str, int]:
         return {"bea": self.bea, "census": self.census, "default": self.default}
@@ -102,6 +134,7 @@ class AppConfig:
     max_csv_size_mb: int
     supported_years_bea: range
     supported_years_census: range
+    normalization_dtype_overrides: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def is_production(self) -> bool:
@@ -169,6 +202,63 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
         values.get("CACHE_TTL_COMPUTATION", "1800"), "CACHE_TTL_COMPUTATION"
     )
 
+    backend_mode = values.get("RATE_LIMIT_BACKEND", "memory").strip().lower()
+    distributed_cfg: DistributedRateLimitConfig | None = None
+
+    if backend_mode in {"redis", "distributed"}:
+        redis_host = values.get("RATE_LIMIT_REDIS_HOST", "localhost").strip() or "localhost"
+        redis_port = _parse_int(
+            values.get("RATE_LIMIT_REDIS_PORT", "6379"), "RATE_LIMIT_REDIS_PORT"
+        )
+        redis_db = _parse_int(values.get("RATE_LIMIT_REDIS_DB", "0"), "RATE_LIMIT_REDIS_DB")
+        redis_username = _clean_secret(values.get("RATE_LIMIT_REDIS_USERNAME"))
+        redis_password = _clean_secret(values.get("RATE_LIMIT_REDIS_PASSWORD"))
+        redis_ssl = _parse_bool(values.get("RATE_LIMIT_REDIS_SSL"))
+        timeout_raw = values.get("RATE_LIMIT_REDIS_TIMEOUT_SECONDS")
+        socket_timeout = (
+            _parse_float(timeout_raw, "RATE_LIMIT_REDIS_TIMEOUT_SECONDS") if timeout_raw else None
+        )
+        key_prefix = (
+            values.get("RATE_LIMIT_REDIS_KEY_PREFIX", "idiot-index").strip() or "idiot-index"
+        )
+        ttl_seconds = _parse_float(
+            values.get("RATE_LIMIT_REDIS_TTL_SECONDS", "300"), "RATE_LIMIT_REDIS_TTL_SECONDS"
+        )
+
+        redis_url = _clean_secret(values.get("RATE_LIMIT_REDIS_URL"))
+        if redis_url:
+            parsed = urlparse(redis_url)
+            if parsed.hostname:
+                redis_host = parsed.hostname
+            if parsed.port:
+                redis_port = parsed.port
+            if parsed.username:
+                redis_username = parsed.username
+            if parsed.password:
+                redis_password = parsed.password
+            if parsed.path and parsed.path != "/":
+                try:
+                    redis_db = int(parsed.path.lstrip("/"))
+                except ValueError as exc:  # pragma: no cover - defensive
+                    raise ConfigError(
+                        f"RATE_LIMIT_REDIS_URL contains invalid database segment: '{parsed.path}'."
+                    ) from exc
+            if parsed.scheme.lower() in {"rediss", "redis+tls"}:
+                redis_ssl = True
+
+        distributed_cfg = DistributedRateLimitConfig(
+            enabled=True,
+            host=redis_host,
+            port=redis_port,
+            db=redis_db,
+            username=redis_username,
+            password=redis_password,
+            ssl=redis_ssl,
+            socket_timeout=socket_timeout,
+            key_prefix=key_prefix,
+            window_seconds=ttl_seconds,
+        )
+
     rate_limits = RateLimitConfig(
         bea=_parse_int(
             values.get("BEA_RATE_LIMIT", "10" if environment.is_production else "30"),
@@ -182,6 +272,7 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
             values.get("DEFAULT_RATE_LIMIT", "5" if environment.is_production else "20"),
             "DEFAULT_RATE_LIMIT",
         ),
+        distributed=distributed_cfg,
     )
 
     supported_years_bea = _parse_year_range(
@@ -190,6 +281,23 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
     supported_years_census = _parse_year_range(
         values.get("SUPPORTED_YEARS_CENSUS", "1997-2024"), "SUPPORTED_YEARS_CENSUS"
     )
+
+    normalization_overrides: dict[str, str] = {}
+    overrides_raw = values.get("NORMALIZE_DTYPE_OVERRIDES")
+    if overrides_raw:
+        try:
+            parsed = json.loads(overrides_raw)
+        except json.JSONDecodeError as exc:  # pragma: no cover - defensive
+            raise ConfigError(
+                "NORMALIZE_DTYPE_OVERRIDES must be a JSON object mapping column names to pandas dtypes."
+            ) from exc
+        if not isinstance(parsed, Mapping):
+            raise ConfigError(
+                "NORMALIZE_DTYPE_OVERRIDES must be a JSON object mapping column names to pandas dtypes."
+            )
+        normalization_overrides = {
+            str(key).strip().lower(): str(value).strip() for key, value in parsed.items()
+        }
 
     return AppConfig(
         environment=environment,
@@ -209,6 +317,7 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
         max_csv_size_mb=max_csv_size,
         supported_years_bea=supported_years_bea,
         supported_years_census=supported_years_census,
+        normalization_dtype_overrides=normalization_overrides,
     )
 
 
@@ -246,6 +355,19 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
         if value <= 0:
             errors.append(f"Rate limit for {name} must be a positive integer.")
 
+    if config.rate_limits.distributed and config.rate_limits.distributed.enabled:
+        dist = config.rate_limits.distributed
+        if dist.port <= 0:
+            errors.append("RATE_LIMIT_REDIS_PORT must be a positive integer.")
+        if dist.window_seconds <= 0:
+            errors.append("RATE_LIMIT_REDIS_TTL_SECONDS must be positive.")
+        if not dist.key_prefix:
+            errors.append("RATE_LIMIT_REDIS_KEY_PREFIX must not be empty.")
+        if dist.socket_timeout is not None and dist.socket_timeout <= 0:
+            errors.append("RATE_LIMIT_REDIS_TIMEOUT_SECONDS must be positive when provided.")
+        if dist.host is None and not dist.ssl:
+            warnings.append("Redis host not specified; defaulting to localhost.")
+
     if config.environment.is_production:
         if not config.bea_api_key:
             errors.append("BEA_API_KEY is required when ENVIRONMENT is production.")
@@ -256,6 +378,12 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
             warnings.append("BEA_API_KEY is not set – production data will be unavailable.")
         if not config.census_api_key:
             warnings.append("CENSUS_API_KEY is not set – Census data will be unavailable.")
+
+    for column, dtype in config.normalization_dtype_overrides.items():
+        if not column:
+            errors.append("NORMALIZE_DTYPE_OVERRIDES keys must be non-empty strings.")
+        if not dtype:
+            errors.append("NORMALIZE_DTYPE_OVERRIDES values must be non-empty strings.")
 
     return ConfigValidationResult(errors=tuple(errors), warnings=tuple(warnings))
 
@@ -275,6 +403,19 @@ def get_config_summary(config: AppConfig | None = None) -> dict[str, object]:
             "computation": config.cache.computation_ttl_seconds,
         },
         "rate_limits": config.rate_limits.as_dict(),
+        "rate_limit_backend": {
+            "mode": (
+                "redis"
+                if config.rate_limits.distributed and config.rate_limits.distributed.enabled
+                else "memory"
+            ),
+            "config": (
+                config.rate_limits.distributed.as_dict()
+                if config.rate_limits.distributed and config.rate_limits.distributed.enabled
+                else None
+            ),
+        },
+        "normalization_dtype_overrides": dict(config.normalization_dtype_overrides),
         "max_csv_size_mb": config.max_csv_size_mb,
         "supported_years_bea": _range_to_tuple(config.supported_years_bea),
         "supported_years_census": _range_to_tuple(config.supported_years_census),
@@ -292,6 +433,15 @@ def _parse_int(value: str, name: str) -> int:
         return int(value)
     except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
         raise ConfigError(f"{name} must be an integer, received '{value}'.") from exc
+
+
+def _parse_float(value: str, name: str) -> float:
+    """Return ``value`` as a float or raise :class:`ConfigError`."""
+
+    try:
+        return float(value)
+    except (TypeError, ValueError) as exc:  # pragma: no cover - defensive
+        raise ConfigError(f"{name} must be numeric, received '{value}'.") from exc
 
 
 def _parse_bool(value: str | None) -> bool:
@@ -356,6 +506,7 @@ __all__ = [
     "ConfigError",
     "ConfigValidationResult",
     "Environment",
+    "DistributedRateLimitConfig",
     "RateLimitConfig",
     "get_config_summary",
     "load_config",

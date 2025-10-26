@@ -31,6 +31,9 @@ from src.interfaces.api.schemas import (
     HealthAnalyticsResponse,
     HealthResponse,
     MetaSourcesResponse,
+    ObservabilityDigestResponse,
+    ObservabilityEventsSummaryModel,
+    ObservabilityMetricsModel,
     ObservabilityStatusResponse,
     ObservationEventModel,
     ScenarioRequest,
@@ -164,12 +167,43 @@ def metrics() -> Response:
 def observability_status() -> ObservabilityStatusResponse:
     """Return a snapshot of metrics, traces, and recent observation events."""
 
-    snapshot = _observability_registry.health_overview()
+    digest = _observability_registry.digest()
+    events = digest["events"]
     return ObservabilityStatusResponse(
-        metrics=snapshot["metrics"],
-        traces=snapshot["traces"],
-        recent_events=[ObservationEventModel(**event) for event in snapshot["recent_events"]],
-        health_checks=snapshot["registered_health_checks"],
+        metrics=ObservabilityMetricsModel(**digest["metrics"]),
+        traces=digest["traces"],
+        recent_events=[ObservationEventModel(**event) for event in events["recent"]],
+        health_checks=digest["health_checks"],
+        event_counters=events["counts"],
+        last_error=(
+            ObservationEventModel(**events["last_error"]) if events.get("last_error") else None
+        ),
+    )
+
+
+@app.get(
+    "/observability/digest",
+    response_model=ObservabilityDigestResponse,
+    tags=["system"],
+)
+def observability_digest() -> ObservabilityDigestResponse:
+    """Return an enriched observability digest for automation and dashboards."""
+
+    digest = _observability_registry.digest()
+    events = digest["events"]
+    last_error = events.get("last_error")
+    event_payload = ObservabilityEventsSummaryModel(
+        counts=events["counts"],
+        total=events["total"],
+        recent=[ObservationEventModel(**event) for event in events["recent"]],
+        last_error=ObservationEventModel(**last_error) if last_error else None,
+    )
+    return ObservabilityDigestResponse(
+        metrics=ObservabilityMetricsModel(**digest["metrics"]),
+        traces=digest["traces"],
+        health_checks=digest["health_checks"],
+        events=event_payload,
+        subscriptions=digest["subscriptions"],
     )
 
 

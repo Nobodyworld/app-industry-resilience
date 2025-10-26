@@ -23,6 +23,7 @@ import pandas as pd
 
 from ..core import (
     AppConfig,
+    NormalizationOptions,
     RetryPolicy,
     SecurityUtils,
     get_api_cache,
@@ -95,7 +96,12 @@ BEA_TABLES: tuple[BEATable, ...] = (
 )
 
 
-def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataFrame:
+def fetch_go_ii_by_industry(
+    api_key: str,
+    year: int | Iterable[int],
+    *,
+    normalization: NormalizationOptions | None = None,
+) -> pd.DataFrame:
     """Fetch Gross Output and Intermediate Inputs for one or more years.
 
     Args:
@@ -132,7 +138,8 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
 
     years_tuple = tuple(years_clean)
 
-    cache = get_api_cache(config.cache)
+    options = normalization or NormalizationOptions()
+    cache = get_api_cache(config.cache) if not options.dtype_overrides else None
     cache_key = _cache_key(years_tuple, config.bea_api_version)
     if cache:
         cached_payload = cache.get(cache_key)
@@ -176,9 +183,13 @@ def fetch_go_ii_by_industry(api_key: str, year: int | Iterable[int]) -> pd.DataF
 
     combined = pd.concat(data_frames, ignore_index=True)
     combined = _enrich_with_naics_map(combined)
-    combined = normalize_columns(combined)
     combined["materials_cost"] = pd.NA
     combined["value_added"] = pd.NA
+    combined = normalize_columns(
+        combined,
+        column_aliases=options.column_aliases,
+        dtype_overrides=options.dtype_overrides,
+    )
 
     combined.attrs["bea_metadata"] = {
         "years": years_tuple,

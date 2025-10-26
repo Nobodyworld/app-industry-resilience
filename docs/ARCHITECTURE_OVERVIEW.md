@@ -41,7 +41,7 @@ The Idiot Index application follows a layered Python architecture designed for t
 ### Infrastructure
 - **Location:** `src/infrastructure`
 - **Purpose:** Cross-cutting concerns like logging, throttling (`api_limiter`), observability, and caching. These modules are shared across adapters and services to keep instrumentation consistent.
-- **Highlights:** `src/infrastructure/observability` now centralises metrics, tracing, and health integration through the `ObservabilityRegistry`. Application services wrap key operations with `registry.operation(...)` so spans, Prometheus counters, and health snapshots stay in sync. Logs automatically include the active `trace_id`.
+- **Highlights:** `src/infrastructure/observability` now centralises metrics, tracing, and health integration through the `ObservabilityRegistry`. Application services wrap key operations with `registry.operation(...)` so spans, Prometheus counters, and health snapshots stay in sync, and emit post-run signals with `registry.record_event(...)` for lightweight dataset/scenario profiling. Logs automatically include the active `trace_id`.
 
 ### Agents
 - **Location:** `agents`
@@ -64,7 +64,8 @@ The Idiot Index application follows a layered Python architecture designed for t
 
 - The BEA adapter caches merged responses using the configured cache backend (`src.core.cache`).
 - NAICS lookup tables load once per process (`functools.lru_cache`).
-- Thread pools fetch multiple years concurrently while respecting rate limits through `src.infrastructure.api_limiter`.
+- Thread pools fetch multiple years concurrently while respecting rate limits through `src.infrastructure.rate_limiter`. When `RATE_LIMIT_BACKEND=redis`, token state is shared across processes via a Lua-driven Redis backend with in-memory fallback and health reporting.
+- CSV and API results only persist to cache when dtype overrides are not active, preventing loss of pandas-specific dtypes when operators customise schemas.
 
 ## Security boundaries
 
@@ -75,15 +76,16 @@ The Idiot Index application follows a layered Python architecture designed for t
 ## Observability
 
 - Structured logging is handled through `src.infrastructure.logging_config` which attaches trace IDs and redacts sensitive data.
-- The `ObservabilityRegistry` (in `src/infrastructure/observability/instrumentation.py`) provides a single surface for Prometheus metrics, trace spans, health probe contributions, and recent event capture. Both `IdiotIndexService` and `ScenarioPlanner` wrap their core pipelines with registry operations so successes and failures emit structured telemetry.
-- Instrumentation extensions (see `src/extensions/builtins/core_instrumentation.py`) subscribe to those events and expose counters (`idiot_index_pipeline_runs_total`) and latency histograms. Additional extensions can subscribe to custom event names without touching core services.
-- The headless API records request metrics via `src/interfaces/api/telemetry`, exposes Prometheus text at `/metrics`, and publishes a holistic snapshot at `/observability/status` for dashboards and air-gapped audits. The same payload is available offline via `python scripts/observability_snapshot.py --pretty`.
+- The `ObservabilityRegistry` (in `src/infrastructure/observability/instrumentation.py`) provides a single surface for Prometheus metrics, trace spans, health probe contributions, and recent event capture. Both `IdiotIndexService` and `ScenarioPlanner` wrap their core pipelines with registry operations so successes and failures emit structured telemetry, and then call `registry.record_event(...)` to publish derived dataset/scenario quality signals without opening empty context managers.
+- Instrumentation extensions (see `src/extensions/builtins/core_instrumentation.py`) subscribe to those events and expose counters (`idiot_index_pipeline_runs_total`) and latency histograms. The new `data_quality` extension listens for dataset/scenario profiling events, publishes gauges (`idiot_index_dataset_rows`, `idiot_index_dataset_missing_ratio`), and contributes a health check that warns on zero-row or high-missing-ratio outputs. Additional extensions can subscribe to custom event names without touching core services.
+- The built-in `rate_limiting` instrumentation extension wires rate-limit counters/histograms, adds a health check, and records HTTP retry events emitted by `src.core.utils.safe_get_json` so operators can spot flaky upstreams.
+- The headless API records request metrics via `src/interfaces/api/telemetry`, exposes Prometheus text at `/metrics`, publishes `/observability/status`, and now ships `/observability/digest` with event counters, last-error context, and subscriber inventories ready for dashboards. Offline operators can run `python scripts/observability_snapshot.py --pretty` or tail new events with `python scripts/observability_tail.py --follow`.
 - `src/infrastructure/observability/health.py` provides the reusable `HealthProbe`, powering both HTTP health endpoints and the `scripts/check_health.py` CLI. The registry binds into the probe so instrumentation extensions can ship bespoke health signals.
 - Incident response procedures are documented in `docs/OPERATIONS_INCIDENT_RESPONSE.md`, now referencing the observability CLI for triage and recovery.
 
 ## Future-proofing & Migration Notes
 
-- **Plugin boundaries:** New automation, analytics, or monitoring capabilities should ship as extensions. Instrumentation plugins keep metrics decoupled from business logic, while summary/scenario plugins extend payloads. Use `python scripts/scaffold_extension.py --name <id> --instrumentation` to bootstrap both code and manifest entries.
+- **Plugin boundaries:** New automation, analytics, or monitoring capabilities should ship as extensions. Instrumentation plugins keep metrics decoupled from business logic, while summary/scenario plugins extend payloads. Use `python scripts/scaffold_extension.py --name <id> --instrumentation` to bootstrap both code and manifest entries. Inspect the active catalogue with `python scripts/extensions_catalog.py --json --pretty` to confirm registration and documentation coverage.
 - **Service scaffolds:** `python scripts/scaffold_service.py --name <service>` generates an observability-aware service shell under `src/application/services/` so future modules inherit tracing, metrics, and extension wiring.
 - **Scaling considerations:** The observability registry is intentionally lightweight; for distributed deployments swap the tracer implementation or plug an OTLP exporter behind the same interface. Health checks already expose registry counts, simplifying readiness probes behind load balancers.
 - **Next major upgrade path:** To support multi-tenant or async workloads, isolate data adapters behind explicit interfaces and let instrumentation extensions register tenant IDs as metric labels. The registry API is stable so callers can evolve without changing existing hooks.

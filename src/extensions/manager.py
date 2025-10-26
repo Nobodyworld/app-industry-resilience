@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import importlib
+import inspect
 import json
 import logging
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from .contracts import (
     ExtensionContributions,
@@ -24,6 +25,16 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 LOGGER = logging.getLogger(__name__)
 MANIFEST_PATH = Path("extensions/manifest.json")
 ENV_VAR = "IDIOT_INDEX_EXTENSIONS"
+
+
+@dataclass(frozen=True)
+class ExtensionDescriptor:
+    """Describes a registered extension for catalog or CLI tooling."""
+
+    name: str
+    kind: Literal["summary", "scenario", "instrumentation"]
+    module: str
+    description: str | None = None
 
 
 @dataclass
@@ -51,6 +62,30 @@ class ExtensionManager:
             "Registering instrumentation extension", extra={"extension": extension.name}
         )
         self.instrumentation_extensions.append(extension)
+
+    def catalog(self) -> list[ExtensionDescriptor]:
+        """Return metadata describing registered extensions."""
+
+        descriptors: list[ExtensionDescriptor] = []
+        for summary_extension in self.summary_extensions:
+            descriptors.append(self._describe_extension(summary_extension, "summary"))
+        for scenario_extension in self.scenario_extensions:
+            descriptors.append(self._describe_extension(scenario_extension, "scenario"))
+        for instrumentation_extension in self.instrumentation_extensions:
+            descriptors.append(
+                self._describe_extension(instrumentation_extension, "instrumentation")
+            )
+        return sorted(descriptors, key=lambda item: (item.kind, item.name))
+
+    @staticmethod
+    def _describe_extension(
+        extension: object, kind: Literal["summary", "scenario", "instrumentation"]
+    ) -> ExtensionDescriptor:
+        name = getattr(extension, "name", extension.__class__.__name__)
+        module = extension.__class__.__module__
+        raw_doc = inspect.getdoc(extension) or inspect.getdoc(extension.__class__)
+        description = raw_doc.strip() if raw_doc else None
+        return ExtensionDescriptor(name=name, kind=kind, module=module, description=description)
 
     def apply_summary_extensions(self, summary) -> ExtensionContributions:
         notes: list[str] = []

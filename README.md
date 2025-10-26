@@ -134,11 +134,15 @@ make scenario      # Run the scenario planner CLI (pass ARGS="--adjust codes=311
 make prefetch-cache # Warm caches using the prefetch utility
 make analytics     # Emit health analytics JSON from a CSV dataset
 make observability # Print a JSON observability snapshot (pass ARGS="--pretty")
+make observability-tail # Follow observability events in real time (pass ARGS="--limit 5 --follow")
+make extensions-catalog # List registered extensions (pass ARGS="--json --pretty")
 make audit         # Capture stewardship metrics and write build/reports/audit-metrics.json
 make api             # Launch the headless API service (pass ARGS="--port 9100" for custom ports)
 make docs          # List key documentation links in the terminal
 python scripts/check_health.py --pretty  # Run the consolidated health probe without the HTTP API
 python scripts/observability_snapshot.py --pretty  # Same observability payload as /observability/status
+python scripts/observability_tail.py --follow --limit 10  # Stream recent observability events for triage
+python scripts/extensions_catalog.py --json --pretty  # Inspect registered summary/scenario/instrumentation extensions
 python scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for analytics/API critical paths (override with --paths)
 python scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
 ```
@@ -161,6 +165,7 @@ This invokes `scripts/run_api.py`, which serves the lightweight FastAPI-compatib
 - `GET /health` – readiness probe returning service metadata, component-level status, and telemetry counts.
 - `GET /healthz` – Kubernetes-style alias that also exposes trace correlation IDs.
 - `GET /observability/status` – Prometheus/OpenTelemetry summary (metrics, traces, recent operation events).
+- `GET /observability/digest` – enriched observability payload with event counters, last-error context, and subscriber counts.
 - `GET /meta/sources` – list of supported data sources.
 - `POST /evaluate` – compute Idiot Index metrics for a dataset or remote source.
 - `POST /scenario` – run Scenario Lab adjustments on a supplied dataset.
@@ -194,8 +199,8 @@ Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + m
 
 ### Observability & Extensions
 
-- The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics` and propagating trace IDs to `/healthz` and response metadata. Logs include `trace=<id>` for every request, simplifying incident correlation.
-- Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance.
+- The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics`, `/observability/status`, and the richer `/observability/digest` endpoint that aggregates event counters, health registrations, and subscriber counts for dashboards.
+- Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance. The built-in `data_quality` instrumentation extension demonstrates how to subscribe to dataset/scenario profile events, emit gauges, and contribute health checks.
 
 Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
 
@@ -508,6 +513,18 @@ CACHE_TTL_COMPUTATION=1800  # Computation cache TTL
 BEA_RATE_LIMIT=10       # Production: 10, Development: 30
 CENSUS_RATE_LIMIT=20    # Production: 20, Development: 50
 
+# Distributed Rate Limiting
+RATE_LIMIT_BACKEND=redis              # memory | redis
+RATE_LIMIT_REDIS_HOST=redis           # Hostname or IP for Redis
+RATE_LIMIT_REDIS_PORT=6379            # Port number
+RATE_LIMIT_REDIS_DB=0                 # Logical database index
+RATE_LIMIT_REDIS_KEY_PREFIX=idiot-index
+RATE_LIMIT_REDIS_TIMEOUT_SECONDS=2.5  # Optional socket timeout
+RATE_LIMIT_REDIS_TTL_SECONDS=300      # State expiry horizon in seconds
+
+# Normalisation Overrides
+NORMALIZE_DTYPE_OVERRIDES='{"materials_cost": "Int64"}'
+
 # Logging
 LOG_LEVEL=INFO          # DEBUG | INFO | WARNING | ERROR | CRITICAL
 
@@ -515,6 +532,8 @@ LOG_LEVEL=INFO          # DEBUG | INFO | WARNING | ERROR | CRITICAL
 MAX_CSV_SIZE_MB=50
 DEFAULT_YEAR=2021
 ```
+
+Enable multi-instance coordination by setting `RATE_LIMIT_BACKEND=redis`; the service will fall back to in-process memory when Redis is unavailable and surface the current mode in the Streamlit sidebar and `/observability/status` (look for `mode: redis-fallback` when Redis is unhealthy). You can also customise dataframe dtypes by supplying a JSON object via `NORMALIZE_DTYPE_OVERRIDES`—use canonical column names (after normalisation) and pandas dtype strings such as `"Int64"` or `"string"`.
 
 ---
 

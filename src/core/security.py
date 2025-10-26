@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import math
 import re
+import threading
+import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from typing import Protocol, cast
 
 import pandas as pd
 
@@ -51,6 +55,14 @@ class SecurityUtils:
 
     default_file_policy = FilePolicy()
     default_csv_policy = CsvPolicy()
+    _rate_limit_backend: str = "memory"
+
+    class RateLimitHandler(Protocol):
+        def __call__(
+            self, identifier: str, max_requests: int, window_seconds: int
+        ) -> RateLimitDecision: ...
+
+    _rate_limit_handler: RateLimitHandler | None = None
 
     @staticmethod
     def validate_file_upload(
@@ -224,9 +236,52 @@ class SecurityUtils:
 
         if max_requests <= 0 or window_seconds <= 0:
             return ValidationResult.failure("Rate limit parameters must be positive.")
-        # TODO-P1(12h): Integrate with a shared store (Redis) to enforce limits
-        # across multiple application instances instead of relying on in-process state.
-        return ValidationResult.success(None, "Rate limit check passed.")
+
+        handler = SecurityUtils._rate_limit_handler or _DEFAULT_MEMORY_LIMITER.consume
+        decision = handler(identifier, max_requests, window_seconds)
+        if decision.allowed:
+            return ValidationResult.success(None, "Rate limit check passed.")
+
+        message = "Rate limit exceeded."
+        if decision.retry_after_seconds is not None:
+            message = (
+                f"Rate limit exceeded. Retry after " f"{decision.retry_after_seconds:.1f} seconds."
+            )
+        return ValidationResult.failure(message)
+
+    @staticmethod
+    def register_rate_limit_handler(handler: RateLimitHandler, *, backend_name: str) -> None:
+        """Register a backend-aware handler used to enforce rate limits."""
+
+        SecurityUtils._rate_limit_handler = handler
+        SecurityUtils._rate_limit_backend = backend_name
+
+    @staticmethod
+    def rate_limit_handler_summary() -> dict[str, object]:
+        """Return diagnostics about the active rate limit handler."""
+
+        base: dict[str, object] = {"backend": SecurityUtils._rate_limit_backend}
+        handler = SecurityUtils._rate_limit_handler
+        if handler is None:
+            base["mode"] = "memory"
+            return base
+
+        summary_fn: Callable[[], Mapping[str, object]] | None
+        try:
+            summary_fn = cast(Callable[[], Mapping[str, object]], handler.summary)  # type: ignore[attr-defined]
+        except AttributeError:
+            summary_fn = None
+
+        if summary_fn is not None:
+            try:
+                summary = summary_fn()
+            except Exception:
+                base["mode"] = "unknown"
+            else:
+                base.update(dict(summary))
+        else:
+            base["mode"] = "memory"
+        return base
 
 
 def _contains_dangerous_patterns(text: str) -> bool:
@@ -239,5 +294,48 @@ def _contains_dangerous_patterns(text: str) -> bool:
 __all__ = [
     "CsvPolicy",
     "FilePolicy",
+    "RateLimitDecision",
     "SecurityUtils",
 ]
+
+
+@dataclass(frozen=True)
+class RateLimitDecision:
+    """Outcome returned by rate limit handlers."""
+
+    allowed: bool
+    remaining_tokens: float | None = None
+    retry_after_seconds: float | None = None
+    backend: str = "memory"
+
+
+class _MemoryLimiter:
+    """Simple token bucket limiter scoped by identifier."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._state: dict[str, tuple[float, float]] = {}
+
+    def consume(self, identifier: str, max_requests: int, window_seconds: int) -> RateLimitDecision:
+        refill_rate = max_requests / float(window_seconds)
+        with self._lock:
+            tokens, last_ts = self._state.get(identifier, (float(max_requests), time.time()))
+            now = time.time()
+            elapsed = max(0.0, now - last_ts)
+            tokens = min(float(max_requests), tokens + elapsed * refill_rate)
+            allowed = tokens >= 1.0
+            if allowed:
+                tokens -= 1.0
+                retry_after: float | None = 0.0
+            else:
+                retry_after = (1.0 - tokens) / refill_rate if refill_rate else None
+            self._state[identifier] = (tokens, now)
+        return RateLimitDecision(
+            allowed=allowed,
+            remaining_tokens=tokens,
+            retry_after_seconds=retry_after,
+            backend="memory",
+        )
+
+
+_DEFAULT_MEMORY_LIMITER = _MemoryLimiter()

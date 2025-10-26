@@ -33,13 +33,14 @@ The observability layer exposes a reusable `HealthProbe` that aggregates compone
 - **Extensions** – confirms registered extensions loaded successfully.
 - **Telemetry snapshot** – surfaces counts of registered metrics and exported spans.
 
-The registry powers a richer `/observability/status` endpoint on the API surface and can be queried offline:
+The registry powers `/observability/status` and the enriched `/observability/digest` endpoint on the API surface and can be queried offline:
 
 ```bash
 python scripts/observability_snapshot.py --pretty
+python scripts/observability_tail.py --follow --limit 20
 ```
 
-The payload mirrors the HTTP endpoint and includes recent operation events, metric counts, and registered health checks. Use it alongside the health probe for incident reviews.
+The snapshot mirrors the HTTP payload and includes recent operation events, metric counts, registered health checks, and event counters. Use it alongside the health probe for incident reviews, and reach for `observability_tail.py` when you need a streaming view without hitting the HTTP API.
 
 ### CLI Usage
 
@@ -86,7 +87,8 @@ Automation-focused contributors (including AI agents) must:
 - Produce or update ExecPlans under `docs/execplans/` when delivering non-trivial changes.
 - Use the health CLI or `/health` endpoint to verify readiness after deployments.
 - Refresh stewardship metrics with `make audit` whenever architecture or coverage changes.
-- Update `EXTENSION_GUIDE.md` and `CHANGELOG.md` when new extensions or observability hooks are introduced.
+- Update `EXTENSION_GUIDE.md` and `CHANGELOG.md` when new extensions or observability hooks are introduced. Verify registration with `make extensions-catalog` (or `python scripts/extensions_catalog.py --json`).
+- Capture live telemetry during incident response by running `make observability-tail ARGS="--follow --limit 50"` and archiving the stream alongside `/observability/digest` snapshots.
 
 Following these patterns keeps local and remote automation aligned, reduces deployment surprises, and provides a
 single source of truth for operational status.

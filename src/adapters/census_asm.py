@@ -4,6 +4,7 @@ import pandas as pd
 
 from ..core import (
     DEFAULT_COLUMN_ALIASES,
+    NormalizationOptions,
     SecurityUtils,
     get_api_cache,
     load_config,
@@ -15,7 +16,12 @@ from ..infrastructure import api_limiter
 ASM_BASE = "https://api.census.gov/data/2021/asm"
 
 
-def fetch_asm_manufacturing(api_key: str, year: int) -> pd.DataFrame:
+def fetch_asm_manufacturing(
+    api_key: str,
+    year: int,
+    *,
+    normalization: NormalizationOptions | None = None,
+) -> pd.DataFrame:
     config = load_config()
     key_result = SecurityUtils.validate_api_key(api_key, "Census")
     if not key_result.ok:
@@ -32,7 +38,8 @@ def fetch_asm_manufacturing(api_key: str, year: int) -> pd.DataFrame:
             f"{config.supported_years_census.stop - 1}."
         )
 
-    cache = get_api_cache(config.cache)
+    options = normalization or NormalizationOptions()
+    cache = get_api_cache(config.cache) if not options.dtype_overrides else None
     cache_key = f"census_asm_{year_result.value}"
     if cache:
         cached_result = cache.get(cache_key)
@@ -57,9 +64,11 @@ def fetch_asm_manufacturing(api_key: str, year: int) -> pd.DataFrame:
         raise RuntimeError(f"No Census ASM data available for {year_result.value}.")
 
     df = pd.DataFrame(rows, columns=header)
+    merged_aliases = {**DEFAULT_COLUMN_ALIASES, **(options.column_aliases or {})}
     normalized = normalize_columns(
         df.assign(year=year_result.value, source="Census ASM"),
-        column_aliases=DEFAULT_COLUMN_ALIASES,
+        column_aliases=merged_aliases,
+        dtype_overrides=options.dtype_overrides,
     )
     normalized["intermediate_inputs"] = pd.NA
 

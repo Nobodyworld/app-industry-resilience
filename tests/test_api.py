@@ -103,6 +103,17 @@ def test_observability_status_reports_metrics() -> None:
     assert data["metrics"]["counters"] >= 1
     assert isinstance(data["recent_events"], list)
     assert "instrumentation_core" in data["health_checks"]
+    assert data["event_counters"]["success"] >= 1
+    assert data["last_error"] is None
+
+
+def test_observability_digest_exposes_subscriptions() -> None:
+    response = client.get("/observability/digest")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["events"]["total"] >= 0
+    assert isinstance(payload["subscriptions"], dict)
 
 
 def test_evaluate_rejects_invalid_top_n() -> None:

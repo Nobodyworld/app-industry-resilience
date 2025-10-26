@@ -3,7 +3,12 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.application import DataSource, IdiotIndexSummary, evaluate_idiot_index
+from src.application import (
+    DataSource,
+    IdiotIndexSummary,
+    NormalizationOptions,
+    evaluate_idiot_index,
+)
 from src.application.idiot_index_service import (
     IdiotIndexService,
     LoggerHooks,
@@ -81,7 +86,7 @@ def test_bea_requires_api_key() -> None:
             year=2021,
             source=DataSource.BEA,
             config=config,
-            fetch_bea=lambda api_key, year: _sample_frame(),
+            fetch_bea=lambda api_key, year, normalization=None: _sample_frame(),
         )
 
 
@@ -107,6 +112,18 @@ def test_logger_hooks_invoked() -> None:
 
     assert performance_events and performance_events[0][0] == "evaluate_idiot_index"
     assert processing_events and processing_events[0][0] == "idiot_index_records"
+
+
+def test_normalization_options_applied() -> None:
+    summary = evaluate_idiot_index(
+        year=2021,
+        source=DataSource.SAMPLE,
+        sample_loader=_sample_frame,
+        normalization_options=NormalizationOptions(dtype_overrides={"materials_cost": "Int64"}),
+    )
+
+    dtype = str(summary.dataframe_full.dtypes["materials_cost"])
+    assert dtype == "Int64"
 
 
 def test_service_uses_injected_config_loader() -> None:

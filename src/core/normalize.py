@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 import pandas as pd
 
@@ -44,8 +46,20 @@ DEFAULT_COLUMN_ALIASES: Mapping[str, str] = {
 _NUMERIC_CLEANER = re.compile(r"[\s,_]")
 
 
+@dataclass(frozen=True)
+class NormalizationOptions:
+    """Additional parameters controlling dataframe normalisation."""
+
+    column_aliases: Mapping[str, str] | None = None
+    dtype_overrides: Mapping[str, Any] | None = None
+
+
 def normalize_columns(
-    df: pd.DataFrame, column_aliases: Mapping[str, str] | None = None
+    df: pd.DataFrame,
+    column_aliases: Mapping[str, str] | None = None,
+    *,
+    dtype_overrides: Mapping[str, Any] | None = None,
+    options: NormalizationOptions | None = None,
 ) -> pd.DataFrame:
     """Return a canonical view of the provided DataFrame.
 
@@ -56,9 +70,13 @@ def normalize_columns(
     if df.empty:
         raise ValueError("Input dataframe is empty; cannot normalise columns.")
 
+    opts = options or NormalizationOptions()
+    alias_input = column_aliases if column_aliases is not None else opts.column_aliases
+    dtype_input = dtype_overrides if dtype_overrides is not None else opts.dtype_overrides
+
     alias_map = {
         key.lower(): value
-        for key, value in {**DEFAULT_COLUMN_ALIASES, **(column_aliases or {})}.items()
+        for key, value in {**DEFAULT_COLUMN_ALIASES, **(alias_input or {})}.items()
     }
 
     normalized = df.copy()
@@ -72,8 +90,6 @@ def normalize_columns(
     for optional in OPTIONAL_COLS:
         if optional not in normalized.columns:
             normalized[optional] = pd.NA
-    # TODO-P2(8h): Allow callers to provide dtype overrides instead of
-    # assuming all optional columns are nullable floats.
 
     normalized["industry_code"] = normalized["industry_code"].astype(str).str.strip().str.upper()
     normalized["industry_name"] = normalized["industry_name"].astype(str).str.strip()
@@ -83,7 +99,25 @@ def normalize_columns(
     for column in ("gross_output", "materials_cost", "intermediate_inputs", "value_added"):
         normalized[column] = normalized[column].apply(_coerce_numeric)
 
+    if dtype_input:
+        apply_dtype_overrides(normalized, dtype_input)
+
     return normalized
+
+
+def apply_dtype_overrides(df: pd.DataFrame, overrides: Mapping[str, Any]) -> None:
+    """Apply dtype overrides, raising descriptive errors on failure."""
+
+    for column, dtype in overrides.items():
+        column_normalised = column.strip().lower()
+        if column_normalised not in df.columns:
+            raise ValueError(f"dtype override references unknown column: {column}")
+        try:
+            df[column_normalised] = df[column_normalised].astype(dtype)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Failed to apply dtype override for column '{column_normalised}': {exc}"
+            ) from exc
 
 
 def _coerce_year(value: object) -> int:
@@ -127,5 +161,7 @@ __all__ = [
     "DEFAULT_COLUMN_ALIASES",
     "OPTIONAL_COLS",
     "REQUIRED_COLS",
+    "NormalizationOptions",
+    "apply_dtype_overrides",
     "normalize_columns",
 ]

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +27,28 @@ class RetryPolicy:
     base_delay: float = 1.0
     backoff_factor: float = 2.0
     jitter: bool = True
+
+
+@dataclass(frozen=True)
+class RetryEvent:
+    """Structured payload emitted for HTTP retry instrumentation."""
+
+    url: str
+    attempt: int
+    max_attempts: int
+    delay_seconds: float
+    status: str
+    error: str | None = None
+
+
+_RETRY_OBSERVER: Callable[[RetryEvent], None] | None = None
+
+
+def register_retry_observer(observer: Callable[[RetryEvent], None]) -> None:
+    """Register a callback receiving retry telemetry."""
+
+    global _RETRY_OBSERVER
+    _RETRY_OBSERVER = observer
 
 
 def safe_get_json(
@@ -65,9 +87,20 @@ def safe_get_json(
                 last_error = HTTPRequestError(f"Request error while contacting {url}: {exc}")
             else:
                 try:
-                    return response.json()
+                    payload = response.json()
                 except ValueError as exc:
                     raise InvalidJSONError(f"Invalid JSON response from {url}: {exc}") from exc
+                _emit_retry_event(
+                    RetryEvent(
+                        url=url,
+                        attempt=attempt,
+                        max_attempts=policy.max_attempts,
+                        delay_seconds=0.0,
+                        status="success",
+                        error=None,
+                    )
+                )
+                return payload
 
             if attempt >= policy.max_attempts:
                 break
@@ -75,14 +108,48 @@ def safe_get_json(
             delay = policy.base_delay * (policy.backoff_factor ** (attempt - 1))
             if policy.jitter:
                 delay *= random.uniform(0.8, 1.2)
-            # TODO-P2(6h): Emit structured retry metrics so upstream callers can
-            # diagnose flaky network dependencies more easily.
+            _emit_retry_event(
+                RetryEvent(
+                    url=url,
+                    attempt=attempt,
+                    max_attempts=policy.max_attempts,
+                    delay_seconds=delay,
+                    status="retrying",
+                    error=str(last_error) if last_error else None,
+                )
+            )
             time.sleep(delay)
 
     finally:
         session.close()
 
+    _emit_retry_event(
+        RetryEvent(
+            url=url,
+            attempt=policy.max_attempts,
+            max_attempts=policy.max_attempts,
+            delay_seconds=0.0,
+            status="failed",
+            error=str(last_error) if last_error else None,
+        )
+    )
     raise last_error or HTTPRequestError(f"Failed to fetch JSON from {url}")
 
 
-__all__ = ["HTTPRequestError", "InvalidJSONError", "RetryPolicy", "safe_get_json"]
+def _emit_retry_event(event: RetryEvent) -> None:
+    observer = _RETRY_OBSERVER
+    if observer is not None:
+        try:
+            observer(event)
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+
+__all__ = [
+    "HTTPRequestError",
+    "InvalidJSONError",
+    "RetryEvent",
+    "RetryPolicy",
+    "register_retry_observer",
+    "safe_get_json",
+]

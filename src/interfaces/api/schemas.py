@@ -86,6 +86,9 @@ class ObservationEventModel(BaseModel):
     attributes: dict[str, Any] = Field(default_factory=dict)
     trace_id: str | None = None
     error: str | None = None
+    timestamp: datetime = Field(
+        ..., description="ISO8601 timestamp when the event was emitted (UTC)."
+    )
 
 
 class ObservabilityMetricsModel(BaseModel):
@@ -100,6 +103,42 @@ class ObservabilityStatusResponse(BaseModel):
     traces: dict[str, Any]
     recent_events: list[ObservationEventModel] = Field(default_factory=list)
     health_checks: list[str] = Field(default_factory=list)
+    event_counters: dict[str, int] = Field(
+        default_factory=dict,
+        description="Counts of recent observation events grouped by status.",
+    )
+    last_error: ObservationEventModel | None = Field(
+        default=None, description="Most recent error observation event if present."
+    )
+
+
+class ObservabilityEventsSummaryModel(BaseModel):
+    counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Counts of observation events grouped by status.",
+    )
+    total: int = Field(
+        default=0,
+        description="Total number of observation events tracked in the digest window.",
+    )
+    recent: list[ObservationEventModel] = Field(
+        default_factory=list,
+        description="Recently observed telemetry events (same payload as status endpoint).",
+    )
+    last_error: ObservationEventModel | None = Field(
+        default=None, description="Most recent error observation event if present."
+    )
+
+
+class ObservabilityDigestResponse(BaseModel):
+    metrics: ObservabilityMetricsModel
+    traces: dict[str, Any]
+    health_checks: list[str] = Field(default_factory=list)
+    events: ObservabilityEventsSummaryModel
+    subscriptions: dict[str, int] = Field(
+        default_factory=dict,
+        description="Number of subscribers registered for each event name.",
+    )
 
 
 class EvaluateFilters(BaseModel):

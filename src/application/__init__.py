@@ -5,6 +5,7 @@ from .idiot_index_service import (
     IdiotIndexService,
     IdiotIndexSummary,
     IndustryMetrics,
+    NormalizationOptions,
     evaluate_idiot_index,
     sanitize_search,
 )
@@ -21,6 +22,7 @@ __all__ = [
     "IdiotIndexService",
     "IdiotIndexSummary",
     "IndustryMetrics",
+    "NormalizationOptions",
     "evaluate_idiot_index",
     "sanitize_search",
     "ScenarioAdjustment",

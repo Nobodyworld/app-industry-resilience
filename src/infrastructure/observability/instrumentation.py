@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import logging
 import time
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any
 
 from .health import HealthComponent, HealthProbe
-from .metrics import Counter, Gauge, Histogram, MetricRegistry
+from .metrics import Counter as MetricCounter
+from .metrics import Gauge, Histogram, MetricRegistry
 from .tracing import Tracer
 
 LOGGER = logging.getLogger(__name__)
@@ -28,12 +30,14 @@ class ObservationEvent:
     status: str
     trace_id: str | None
     error: str | None = None
+    emitted_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def as_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "name": self.name,
             "duration": self.duration,
             "status": self.status,
+            "timestamp": self.emitted_at.isoformat(),
         }
         if self.attributes:
             payload["attributes"] = dict(self.attributes)
@@ -60,6 +64,8 @@ class ObservabilityRegistry:
     _recent_events: deque[ObservationEvent] = field(
         default_factory=lambda: deque(maxlen=_RECENT_EVENTS_LIMIT), init=False, repr=False
     )
+    _event_counters: Counter[str] = field(default_factory=Counter, init=False, repr=False)
+    _last_error_event: ObservationEvent | None = field(default=None, init=False, repr=False)
 
     def counter(
         self,
@@ -67,7 +73,7 @@ class ObservabilityRegistry:
         description: str,
         *,
         label_names: Iterable[str] | None = None,
-    ) -> Counter:
+    ) -> MetricCounter:
         """Create or retrieve a counter metric managed by the registry."""
 
         return self.metrics.counter(name, description, label_names=label_names)
@@ -108,6 +114,29 @@ class ObservabilityRegistry:
         """
 
         self._subscriptions.setdefault(event_name, []).append(handler)
+
+    def record_event(
+        self,
+        name: str,
+        *,
+        attributes: Mapping[str, Any] | None = None,
+        status: str = "success",
+        duration: float = 0.0,
+        error: str | None = None,
+    ) -> None:
+        """Emit an observation event without wrapping a context manager."""
+
+        attrs = dict(attributes or {})
+        with self.tracer.start_span(name, attributes=attrs) as span:
+            trace_id = span.trace_id
+        self._emit(
+            name,
+            attrs,
+            max(0.0, float(duration)),
+            status=status,
+            trace_id=trace_id,
+            error=error,
+        )
 
     def register_health_check(self, name: str, supplier: Callable[[], HealthComponent]) -> None:
         """Register a lazy health check contribution.
@@ -186,12 +215,45 @@ class ObservabilityRegistry:
     def health_overview(self) -> dict[str, Any]:
         """Return an aggregated view of observability state for diagnostics."""
 
+        digest = self.digest()
+        return {
+            "metrics": digest["metrics"],
+            "recent_events": digest["events"]["recent"],
+            "registered_health_checks": digest["health_checks"],
+            "traces": digest["traces"],
+            "event_counters": digest["events"]["counts"],
+            "last_error": digest["events"].get("last_error"),
+            "subscriptions": digest["subscriptions"],
+        }
+
+    def digest(self) -> dict[str, Any]:
+        """Return a comprehensive observability snapshot for automation."""
+
+        recent = self.recent_events()
+        counters = dict(self._event_counters)
+        total = sum(counters.values())
+        last_error = (
+            self._last_error_event.as_dict() if self._last_error_event is not None else None
+        )
         return {
             "metrics": self.metrics_summary(),
-            "recent_events": self.recent_events(),
-            "registered_health_checks": sorted(self._health_checks),
             "traces": {"exported_spans": self.tracer.span_count()},
+            "health_checks": sorted(self._health_checks),
+            "events": {
+                "counts": counters,
+                "total": total,
+                "recent": recent,
+                "last_error": last_error,
+            },
+            "subscriptions": {
+                name: len(handlers) for name, handlers in self._subscriptions.items()
+            },
         }
+
+    def iter_recent_events(self) -> Iterator[ObservationEvent]:
+        """Yield recently emitted observation events in chronological order."""
+
+        yield from tuple(self._recent_events)
 
     def _emit(
         self,
@@ -212,6 +274,9 @@ class ObservabilityRegistry:
             error=error,
         )
         self._recent_events.append(event)
+        self._event_counters[event.status] += 1
+        if status.lower() == "error":
+            self._last_error_event = event
 
         for handler in self._subscriptions.get(name, []):
             self._safe_invoke(handler, event)

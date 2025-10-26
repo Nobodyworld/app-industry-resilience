@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-from typing import cast
+from typing import Any, cast
 
 import pandas as pd
 
@@ -153,6 +153,16 @@ class ScenarioPlanner:
                     notes.extend(contributions.notes)
                     result.baseline.attrs["extension_notes"] = notes
 
+            if self.observability is not None:
+                scenario_attributes = _build_scenario_profile(
+                    result,
+                    adjustments=len(adjustments),
+                    source=str(raw_base.attrs.get("source", "unknown")),
+                )
+                self.observability.record_event(
+                    "service.scenario.profile", attributes=scenario_attributes
+                )
+
             return result
 
 
@@ -204,6 +214,37 @@ def _apply_adjustment(df: pd.DataFrame, adjustment: ScenarioAdjustment) -> None:
     _scale("materials_cost", adjustment.materials_cost_delta_pct)
     _scale("value_added", adjustment.value_added_delta_pct)
     _scale("intermediate_inputs", adjustment.intermediate_inputs_delta_pct)
+
+
+def _frame_profile(df: pd.DataFrame) -> dict[str, Any]:
+    rows = int(df.shape[0])
+    missing_series = df.isna().sum()
+    missing_cells = int(missing_series.sum())
+    total_cells = int(df.size)
+    missing_ratio = float(missing_cells / total_cells) if total_cells else 0.0
+    return {
+        "rows": rows,
+        "missing_cells": missing_cells,
+        "missing_ratio": missing_ratio,
+    }
+
+
+def _build_scenario_profile(
+    result: ScenarioResult, *, adjustments: int, source: str
+) -> dict[str, Any]:
+    baseline_profile = _frame_profile(result.baseline)
+    scenario_profile = _frame_profile(result.scenario)
+    delta_profile = _frame_profile(result.deltas)
+    return {
+        "source": source,
+        "adjustments": int(adjustments),
+        "baseline_rows": baseline_profile["rows"],
+        "scenario_rows": scenario_profile["rows"],
+        "delta_rows": delta_profile["rows"],
+        "baseline_missing_ratio": baseline_profile["missing_ratio"],
+        "scenario_missing_ratio": scenario_profile["missing_ratio"],
+        "delta_missing_ratio": delta_profile["missing_ratio"],
+    }
 
 
 def _compute(df: pd.DataFrame, metric_config: MetricConfig) -> pd.DataFrame:

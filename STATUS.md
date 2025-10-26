@@ -1,8 +1,16 @@
+# 2025-10-31T09:10Z – chore: stewardship simplification & observability polish
+- **Summary:** Added `ObservabilityRegistry.record_event(...)` so services and extensions can emit telemetry without empty context managers, refreshed dataset/scenario instrumentation to use the helper, and taught `scripts/audit_metrics.py` to read `coverage.xml` when trace JSON is absent. Documentation (architecture, extension guide) and tests now reflect the streamlined API.
+- **Next:** Backfill streaming digest support and persist observability snapshots so automation can diff state across deploys.
+
 # Modernization Status
 
 ## 2025-10-19T10:30Z – docs: add repo intelligence report and modernization plan
 - **Summary:** Established baseline documentation via `REPORT.md` and `PLAN.md`, capturing the current architecture, risks, and a prioritized modernization roadmap.
 - **Next:** Stand up governance files, CI/CD scaffolding, and local developer tooling so follow-on tasks can build on a consistent foundation.
+
+## 2025-10-26T11:45Z – feat: observability digest & extension catalog
+- **Summary:** Added `/observability/digest`, the streaming `observability_tail.py` CLI, and the `extensions_catalog.py` inventory tool; introduced the `data_quality` instrumentation extension with gauges/health checks; refreshed docs (README, AUTOMATION, EXTENSION_GUIDE, OPERATIONS) and Make targets so operators can inspect telemetry and extensions without code changes.
+- **Next:** Explore persistent storage for observability digests and automate extension manifest validation prior to activation.
 
 ## 2025-10-19T13:55Z – chore: bootstrap governance and automation
 - **Summary:** Added governance policies (CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, SUPPORT, CODEOWNERS), standardized formatting/linting via offline-friendly pre-commit scripts, introduced Makefile + pyproject configuration, refreshed CI to run the consolidated `make check`, and documented the workflow in README/CONTRIBUTING. Implemented local commit linting and quality gates resilient to missing npm/pip connectivity.

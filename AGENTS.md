@@ -14,6 +14,7 @@ This repository welcomes code-writing agents as long as they follow the guardrai
 
 - Run all commands from the repository root (`/workspace/idiot-index-app`).
 - Prefer the provided Make targets for setup and validation (`make setup`, `make quality-gate`, `make api`).
+- Use `make observability-tail` and `make extensions-catalog` for read-only diagnostics instead of modifying core services when triaging instrumentation issues.
 - When creating new extensions or automation scripts, update `extensions/manifest.json` and the relevant docs (`EXTENSION_GUIDE.md`) so that humans can audit the change.
 - For data-fetching tasks, avoid hitting production APIs in tests; use the bundled sample dataset instead.
 
