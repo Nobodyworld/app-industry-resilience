@@ -2,7 +2,7 @@
 black>=24.8.0,<26
 ruff>=0.6.9,<1
 mypy>=1.11.2,<2
-pytest-cov>=5.0.0,<6
+pytest-cov>=5.0.0,<8
 pre-commit>=3.7.0,<5
 codespell>=2.3.0,<3
 commitizen>=3.27.0,<5
