@@ -1,6 +1,8 @@
 {
   "modules": [
     "src.extensions.builtins.core_instrumentation",
-    "src.extensions.builtins.manufacturing_cost_driver"
+    "src.extensions.builtins.rate_limiting",
+    "src.extensions.builtins.manufacturing_cost_driver",
+    "src.extensions.builtins.data_quality"
   ]
 }

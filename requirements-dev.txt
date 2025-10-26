@@ -11,3 +11,4 @@ pip-audit>=2.7.3,<3
 
 # Type stubs
 types-requests>=2.32.0,<3
+fakeredis>=2.23.2,<3

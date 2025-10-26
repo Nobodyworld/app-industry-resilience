@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts import audit_metrics as audit_script
 from scripts import bump_version as bump_module
 from scripts import observability_snapshot as observability_script
@@ -47,6 +49,17 @@ def test_load_coverage_reads_value(tmp_path) -> None:
     value = audit_script.load_coverage(report_path)
 
     assert value == 93.21
+
+
+def test_load_coverage_falls_back_to_xml(monkeypatch, tmp_path) -> None:
+    xml_report = tmp_path / "coverage.xml"
+    xml_report.write_text('<coverage line-rate="0.8765" />', encoding="utf-8")
+
+    monkeypatch.setattr(audit_script, "REPO_ROOT", tmp_path)
+
+    value = audit_script.load_coverage(tmp_path / "missing.json")
+
+    assert value == pytest.approx(87.65, rel=1e-6)
 
 
 def test_generate_report_aggregates_helpers(monkeypatch) -> None:

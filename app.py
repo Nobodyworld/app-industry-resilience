@@ -19,6 +19,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 
 from src.application import (
     DataSource,
+    NormalizationOptions,
     ScenarioAdjustment,
     ScenarioPlanner,
     evaluate_idiot_index,
@@ -131,11 +132,29 @@ except BootstrapError as exc:
     st.sidebar.error(str(exc))
     st.stop()
 
+APP_NORMALIZATION = NormalizationOptions(
+    dtype_overrides=dict(APP_CONFIG.normalization_dtype_overrides)
+)
+
 for warning in bootstrap_state.warnings:
     st.sidebar.warning(warning)
 
 with st.sidebar.expander("Configuration summary", expanded=False):
-    st.json(get_config_summary(APP_CONFIG))
+    config_summary = get_config_summary(APP_CONFIG)
+    handler_summary = SecurityUtils.rate_limit_handler_summary()
+    config_summary.setdefault("rate_limit_backend", {})["handler"] = handler_summary
+    st.json(config_summary)
+
+rate_backend = handler_summary.get("backend", "memory")
+if rate_backend == "redis":
+    if handler_summary.get("last_error"):
+        st.sidebar.warning(
+            "Redis rate limiter is active but reported recent errors; falling back to in-memory tokens."
+        )
+    else:
+        st.sidebar.success("Redis-backed rate limiting active across instances.")
+else:
+    st.sidebar.info("Rate limiting is running in in-process memory mode.")
 
 query_params_initial = decode_query_params(st.experimental_get_query_params())
 
@@ -261,6 +280,7 @@ try:
             config=service_config,
             sample_loader=load_sample,
             top_n=50,
+            normalization_options=APP_NORMALIZATION,
         )
     if data_mode == "Census ASM (Manufacturing)":
         fetch_status.success(f"Census ASM ready for {year_clean}.")

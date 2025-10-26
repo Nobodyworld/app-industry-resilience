@@ -15,6 +15,7 @@ from src.core import (
     compute_metrics,
     format_for_display,
     normalize_columns,
+    register_retry_observer,
     safe_get_json,
 )
 
@@ -39,6 +40,26 @@ def test_normalize_columns_handles_aliases() -> None:
     ]
     assert normalized.loc[0, "gross_output"] == 1000.0
     assert normalized.loc[0, "materials_cost"] == 600.0
+
+
+def test_normalize_columns_respects_dtype_overrides() -> None:
+    frame = pd.DataFrame(
+        {
+            "industry_code": ["001"],
+            "industry_name": ["Widgets"],
+            "year": ["2021"],
+            "gross_output": ["1_000"],
+            "materials_cost": ["500"],
+        }
+    )
+
+    normalized = normalize_columns(
+        frame,
+        dtype_overrides={"materials_cost": "Int64", "industry_code": "string"},
+    )
+
+    assert str(normalized.dtypes["materials_cost"]) == "Int64"
+    assert str(normalized.dtypes["industry_code"]).startswith("string")
 
 
 def test_normalize_columns_rejects_fractional_years() -> None:
@@ -154,6 +175,47 @@ def test_safe_get_json_retries_and_raises(monkeypatch) -> None:
         safe_get_json("https://example.com", retry_policy=RetryPolicy(max_attempts=2, base_delay=0))
 
     assert call_count["count"] == 2
+
+
+def test_safe_get_json_emits_retry_events(monkeypatch) -> None:
+    events: list[str] = []
+
+    def observer(event) -> None:
+        events.append(event.status)
+
+    register_retry_observer(observer)
+
+    responses = {"count": 0}
+
+    class FakeResponse:
+        status_code = 200
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return {"ok": "yes"}
+
+    def fake_get(*args, **kwargs):
+        responses["count"] += 1
+        if responses["count"] == 1:
+            raise requests.exceptions.Timeout("boom")
+        return FakeResponse()
+
+    session = MagicMock()
+    session.get.side_effect = fake_get
+    monkeypatch.setattr("requests.Session", lambda: session)
+
+    payload = safe_get_json(
+        "https://example.com",
+        retry_policy=RetryPolicy(max_attempts=2, base_delay=0),
+    )
+
+    assert payload == {"ok": "yes"}
+    assert events[0] == "retrying"
+    assert events[-1] == "success"
+
+    register_retry_observer(lambda event: None)
 
 
 @patch("src.adapters.census_asm.get_api_cache", return_value=None)

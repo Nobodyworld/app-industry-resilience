@@ -16,7 +16,7 @@ import argparse
 import logging
 from typing import Iterable, Sequence
 
-from src.application import DataSource, evaluate_idiot_index
+from src.application import DataSource, NormalizationOptions, evaluate_idiot_index
 from src.core import AppConfig, load_config
 from src.logging_config import setup_logging
 
@@ -60,7 +60,15 @@ def warm_cache(config: AppConfig, *, sources: Sequence[DataSource], years: Seque
         for year in years:
             try:
                 LOGGER.info("Prefetching source=%s year=%s", source.value, year)
-                evaluate_idiot_index(year=year, source=source, config=config, top_n=1)
+                evaluate_idiot_index(
+                    year=year,
+                    source=source,
+                    config=config,
+                    top_n=1,
+                    normalization_options=NormalizationOptions(
+                        dtype_overrides=dict(config.normalization_dtype_overrides)
+                    ),
+                )
             except Exception as exc:  # pragma: no cover - defensive logging
                 LOGGER.warning("Prefetch failed for source=%s year=%s: %s", source.value, year, exc)
             else:

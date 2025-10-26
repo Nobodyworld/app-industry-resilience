@@ -12,6 +12,7 @@ This document records the vetted runtime and development dependencies for the Id
 | `requests` | >=2.32.3,<3 | Apache-2.0 | HTTP client for BEA and Census APIs with retry support. | Quarterly |
 | `plotly` | >=6.3.1,<7 | MIT | Interactive charting components embedded in Streamlit views. | Semi-annual |
 | `pytest` | >=8.4.2,<9 | MIT | Bundled for lightweight runtime smoke tests and integration with Streamlit cloud deployments. | Quarterly |
+| `redis` | >=5.0.1,<6 | BSD-3-Clause | Optional distributed rate limiting backend used when `RATE_LIMIT_BACKEND=redis`. | Quarterly |
 
 ## Development dependencies
 
@@ -27,6 +28,7 @@ This document records the vetted runtime and development dependencies for the Id
 | `detect-secrets` | >=1.5.0,<2 | Apache-2.0 | Secret scanning for commits and CI. | Quarterly |
 | `pip-audit` | >=2.7.3,<3 | Apache-2.0 | CVE scanning of Python dependency graphs. | Monthly |
 | `types-requests` | >=2.32.0,<3 | Apache-2.0 | Type hints for the `requests` library used by mypy. | Semi-annual |
+| `fakeredis` | >=2.23.2,<3 | MIT | Redis emulator for unit tests covering distributed rate limiting. | Quarterly |
 
 ## Review process
 

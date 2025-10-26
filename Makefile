@@ -28,6 +28,8 @@ help:
 	@echo "  prefetch-cache     Warm caches using the prefetch utility (pass extra args via ARGS=...)"
 	@echo "  analytics          Generate health analytics JSON (pass extra args via ARGS=...)"
 	@echo "  observability      Print observability registry snapshot (pass extra args via ARGS=...)"
+	@echo "  observability-tail Follow observability events from the registry (pass extra args via ARGS=...)"
+	@echo "  extensions-catalog List registered extensions (pass extra args via ARGS=...)"
 	@echo "  audit              Compute stewardship audit metrics (pass extra args via ARGS=...)"
 	@echo "  api                Launch the headless API service (pass extra args via ARGS=...)"
 
@@ -139,6 +141,14 @@ analytics:
 # agent-safe-task: produces observability metrics for agents and operators
 observability:
 	${PYTHON} scripts/observability_snapshot.py ${ARGS}
+
+# agent-safe-task: streams observability events for incident response
+observability-tail:
+	${PYTHON} scripts/observability_tail.py ${ARGS}
+
+# agent-safe-task: inventories extension metadata for automation
+extensions-catalog:
+	${PYTHON} scripts/extensions_catalog.py ${ARGS}
 
 # agent-safe-task: generates stewardship metrics for automated audits
 audit:

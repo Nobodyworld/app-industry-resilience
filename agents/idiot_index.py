@@ -12,9 +12,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Sequence
 
-from src.application import DataSource, evaluate_idiot_index
+from src.application import DataSource, NormalizationOptions, evaluate_idiot_index
 from src.application.idiot_index_service import IndustryMetrics, LoggerHooks
-from src.core import HealthSummary, SecurityUtils
+from src.core import HealthSummary, SecurityUtils, load_config
 from src.infrastructure import log_data_processing, log_performance
 
 from .toolkit import tool
@@ -140,6 +140,7 @@ def compute_idiot_index_summary(payload: IdiotIndexRequest) -> IdiotIndexRespons
                 operation, count
             ),
         ),
+        normalization_options=AGENT_NORMALIZATION,
     )
 
     top_industries = [_to_snapshot(entry) for entry in summary.leaderboard]
@@ -162,3 +163,7 @@ __all__ = [
     "IndustrySnapshot",
     "compute_idiot_index_summary",
 ]
+AGENT_NORMALIZATION = NormalizationOptions(
+    dtype_overrides=dict(load_config().normalization_dtype_overrides)
+)
+

@@ -16,6 +16,7 @@ from .config import (
     CacheConfig,
     ConfigError,
     ConfigValidationResult,
+    DistributedRateLimitConfig,
     Environment,
     RateLimitConfig,
     get_config_summary,
@@ -23,10 +24,22 @@ from .config import (
     validate_config,
 )
 from .metrics import MetricConfig, compute_metrics, format_for_display
-from .normalize import DEFAULT_COLUMN_ALIASES, normalize_columns
+from .normalize import (
+    DEFAULT_COLUMN_ALIASES,
+    NormalizationOptions,
+    apply_dtype_overrides,
+    normalize_columns,
+)
 from .security import FilePolicy, SecurityUtils
 from .types import ValidationResult
-from .utils import HTTPRequestError, InvalidJSONError, RetryPolicy, safe_get_json
+from .utils import (
+    HTTPRequestError,
+    InvalidJSONError,
+    RetryEvent,
+    RetryPolicy,
+    register_retry_observer,
+    safe_get_json,
+)
 
 __all__ = [
     "AppConfig",
@@ -42,13 +55,18 @@ __all__ = [
     "ConfigError",
     "ConfigValidationResult",
     "DEFAULT_COLUMN_ALIASES",
+    "NormalizationOptions",
+    "apply_dtype_overrides",
+    "DistributedRateLimitConfig",
     "Environment",
     "FilePolicy",
     "HTTPRequestError",
     "InvalidJSONError",
     "MetricConfig",
+    "RetryEvent",
     "RateLimitConfig",
     "RetryPolicy",
+    "register_retry_observer",
     "SecurityUtils",
     "ValidationResult",
     "compute_health_scores",

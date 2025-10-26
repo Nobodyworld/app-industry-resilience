@@ -83,6 +83,7 @@ Before requesting a review, verify that:
   - `python scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary/scenario/instrumentation hooks and updates `extensions/manifest.json`.
   - `python scripts/scaffold_service.py --name <service>` creates an observability-aware service skeleton under `src/application/services/`.
 - Instrumentation extensions should subscribe to events on the shared `ObservabilityRegistry` instead of mutating core services. The reference implementation lives in `src/extensions/builtins/core_instrumentation.py`.
+- Use `src/extensions/builtins/data_quality.py` as a second example of instrumentation that listens for dataset/scenario profile events, emits gauges, and registers health checks. Run `make extensions-catalog` to confirm your module appears with the expected metadata before publishing.
 - When adding analytics, prefer creating a module under `src/extensions` using the scaffold above. Add tests mirroring `tests/test_extensions.py`.
 - Do not remove or bypass telemetry hooks. If a change impacts `/metrics`, `/observability/status`, `/health`, or trace logging, update `docs/OPERATIONS_INCIDENT_RESPONSE.md` and mention the change in the release notes.
 

@@ -14,6 +14,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct execution fallback
 import argparse
 import json
 import time
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
@@ -167,14 +168,23 @@ def summarise_dependencies() -> DependencyReport:
 
 
 def load_coverage(report_path: Path) -> float:
-    """Load overall coverage percentage from a trace report."""
+    """Load overall coverage percentage, falling back to coverage XML when needed."""
 
-    if not report_path.exists():
-        raise FileNotFoundError(
-            f"Coverage report missing at {report_path}; run scripts/run_tests_with_trace.py first."
-        )
-    payload = json.loads(report_path.read_text(encoding="utf-8"))
-    return float(payload.get("overall", 0.0))
+    if report_path.exists():
+        payload = json.loads(report_path.read_text(encoding="utf-8"))
+        return float(payload.get("overall", 0.0))
+
+    xml_report = REPO_ROOT / "coverage.xml"
+    if xml_report.exists():
+        root = ET.parse(xml_report).getroot()
+        rate = root.get("line-rate")
+        if rate is not None:
+            return float(rate) * 100.0
+
+    raise FileNotFoundError(
+        "Coverage report missing: expected trace JSON or coverage.xml. Run "
+        "scripts/run_tests_with_trace.py or pytest with --cov to generate reports."
+    )
 
 
 def measure_service_latency(runs: int = 5) -> float:

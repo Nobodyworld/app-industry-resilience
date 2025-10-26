@@ -8,7 +8,7 @@ This reference captures the primary Python entrypoints intended for reuse across
 
 | Member | Description |
 | --- | --- |
-| `IdiotIndexService.evaluate(year, source, dataframe=None, top_n=50, metric_config=None, ...)` | Orchestrates dataset loading, normalisation, metric calculation, and leaderboard summarisation. Accepts a `DataSource` enum (`SAMPLE`, `CENSUS`, `BEA`), an optional pre-loaded dataframe (used for uploads/tests), and an optional `MetricConfig` to control caching. Returns an `IdiotIndexSummary` dataclass with `dataframe_full`, `leaderboard`, averages, and metadata. |
+| `IdiotIndexService.evaluate(year, source, dataframe=None, top_n=50, metric_config=None, normalization_options=None, ...)` | Orchestrates dataset loading, normalisation, metric calculation, and leaderboard summarisation. Accepts a `DataSource` enum (`SAMPLE`, `CENSUS`, `BEA`), an optional pre-loaded dataframe (used for uploads/tests), an optional `MetricConfig` to control caching, and an optional `NormalizationOptions` instance to override column aliases or pandas dtypes. Returns an `IdiotIndexSummary` dataclass with `dataframe_full`, `leaderboard`, averages, and metadata. |
 
 ### `src.application.evaluate_idiot_index`
 Convenience wrapper delegating to the shared `IdiotIndexService` singleton. Accepts the same parameters as `.evaluate` for easy reuse in CLI tools and automation.
@@ -19,7 +19,7 @@ Convenience wrapper delegating to the shared `IdiotIndexService` singleton. Acce
 
 | Member | Description |
 | --- | --- |
-| `fetch_go_ii_by_industry(api_key, year)` | Fetches Gross Output and Intermediate Inputs tables for one or more years, validates inputs, merges NAICS metadata, and returns a pandas `DataFrame` with BEA metadata attached in `df.attrs`. Raises `BEAClientError` when validation fails or endpoints are unavailable. |
+| `fetch_go_ii_by_industry(api_key, year, normalization=None)` | Fetches Gross Output and Intermediate Inputs tables for one or more years, validates inputs, merges NAICS metadata, and returns a pandas `DataFrame` with BEA metadata attached in `df.attrs`. The optional `normalization` parameter accepts a `NormalizationOptions` to override column aliases or dtypes. Raises `BEAClientError` when validation fails or endpoints are unavailable. |
 | `select_bea_endpoint(config)` | Iterates through configured BEA base URLs, returning the first healthy endpoint that responds to a `GetParameterValues` health check. |
 | `BEA_TABLES` | Tuple of table descriptors fetched per year. Useful if you need to inspect or extend coverage. |
 
@@ -32,7 +32,7 @@ Contains `load_sample_csv` for offline demo data and `load_csv` for arbitrary CS
 ## Core utilities
 
 ### `src.core.config`
-- `load_config()` reads environment variables, `.env`, and defaults into an `AppConfig` dataclass.
+- `load_config()` reads environment variables, `.env`, and defaults into an `AppConfig` dataclass. Distributed rate limiting is controlled via `RATE_LIMIT_BACKEND`/`RATE_LIMIT_REDIS_*` flags; dtype overrides can be configured with `NORMALIZE_DTYPE_OVERRIDES`.
 - `AppConfig.supported_years_bea` / `supported_years_census` expose `range` objects for validation.
 
 ### `src.core.metrics`
@@ -43,8 +43,12 @@ Contains `load_sample_csv` for offline demo data and `load_csv` for arbitrary CS
 - `compute_health_scores(dataframe, config=HealthScoreConfig())` appends `health_score` and `health_band` columns using weighted composites of resilience metrics.
 - `summarise_health(dataframe, group_by="all", top_risk_limit=5)` aggregates cohort health summaries, band distribution, and the highest-risk industries.
 
+### `src.core.utils`
+- `safe_get_json(url, retry_policy=None)` fetches JSON payloads with retry/backoff. When a retry observer is registered the function emits structured events containing attempt, delay, and status information.
+- `register_retry_observer(callback)` subscribes to retry events for instrumentation extensions or diagnostics.
+
 ### `src.core.security.SecurityUtils`
-Collection of static methods for validating API keys, CSV uploads, and general string sanitisation. All UI entrypoints call these utilities before processing user-supplied data.
+Collection of static methods for validating API keys, CSV uploads, and general string sanitisation. All UI entrypoints call these utilities before processing user-supplied data. Rate limiting delegates to a pluggable backend registered by infrastructure (`src.infrastructure.rate_limiter`).
 
 ## Streamlit helpers
 
@@ -67,7 +71,7 @@ Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
 ## Headless API
 
 ### `src.interfaces.api.app`
-- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/evaluate`, `/scenario`, `/analytics/health`, `/metrics`, and `/observability/status` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
+- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/evaluate`, `/scenario`, `/analytics/health`, `/metrics`, `/observability/status`, and `/observability/digest` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
 - `ObservabilityRegistry` – Singleton registry (see `src/infrastructure/observability/instrumentation.py`) aggregating metrics, traces, and health checks. Extensions register instrumentation hooks through it instead of modifying services directly.
 
 ### `src.interfaces.api.schemas`

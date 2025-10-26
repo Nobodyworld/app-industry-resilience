@@ -7,7 +7,7 @@ The Idiot Index platform exposes a formal extension layer so new analytics, conn
 - **ExtensionManager** – runtime registry that loads modules declared in `extensions/manifest.json` and via the `IDIOT_INDEX_EXTENSIONS` environment variable. It fans out to three hook types:
   - `SummaryExtension` operates on `IdiotIndexSummary` objects and can emit additional notes or metadata.
   - `ScenarioExtension` operates on `ScenarioResult` payloads to enrich scenario planning outputs.
-  - `InstrumentationExtension` registers metrics, tracing hooks, and health checks against the shared `ObservabilityRegistry`.
+  - `InstrumentationExtension` registers metrics, tracing hooks, and health checks against the shared `ObservabilityRegistry`. Use the registry's `operation(...)` context manager for long-running work and `record_event(...)` for fire-and-forget signals that should still generate spans and counters.
 - **ExtensionContributions** – normalized payload returned by each extension. Notes are appended to existing domain notes with the pattern `[extension_name] <message>`, while metadata is stored under `metadata["extensions"][<extension_name>]`.
 
 ## Creating an Extension
@@ -46,7 +46,8 @@ The Idiot Index platform exposes a formal extension layer so new analytics, conn
   }
   ```
 - Notes appear in the response body (for APIs) or Streamlit UI as additional bullet points.
-- Prometheus metrics expose overall request counts, allowing operators to correlate extension issues with `idiot_index_api_errors_total` labels. Instrumentation extensions can subscribe to the same registry and publish dedicated metrics (see `src/extensions/builtins/core_instrumentation.py` for a reference implementation).
+- Prometheus metrics expose overall request counts, allowing operators to correlate extension issues with `idiot_index_api_errors_total` labels. Instrumentation extensions can subscribe to the same registry and publish dedicated metrics (see `src/extensions/builtins/core_instrumentation.py` and `src/extensions/builtins/data_quality.py` for reference implementations). The latter listens for dataset/scenario profile events and emits gauges (`idiot_index_dataset_rows`, `idiot_index_dataset_missing_ratio`) together with a health check that warns about empty or sparse datasets; extensions can also call `registry.record_event(...)` to publish derived signals of their own.
+- Run `python scripts/extensions_catalog.py --json --pretty` (or `make extensions-catalog`) to confirm registration details, descriptions, and hook types before shipping a new module.
 
 ## Safe Deployment Checklist
 

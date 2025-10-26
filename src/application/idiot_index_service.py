@@ -16,7 +16,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from functools import lru_cache
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import pandas as pd
 
@@ -24,7 +24,9 @@ from src.core import (
     AppConfig,
     HealthSummary,
     MetricConfig,
+    NormalizationOptions,
     SecurityUtils,
+    apply_dtype_overrides,
     compute_health_scores,
     compute_metrics,
     format_for_display,
@@ -121,6 +123,7 @@ class IdiotIndexService:
         sample_loader: SampleLoader | None = None,
         logger_hooks: LoggerHooks | None = None,
         metric_config: MetricConfig | None = None,
+        normalization_options: NormalizationOptions | None = None,
     ) -> IdiotIndexSummary:
         hooks = logger_hooks or LoggerHooks()
         active_config = config or self.config_loader()
@@ -135,6 +138,10 @@ class IdiotIndexService:
             self.observability.operation("service.idiot_index.evaluate", attributes=attributes)
             if self.observability is not None
             else nullcontext()
+        )
+
+        options = normalization_options or NormalizationOptions(
+            dtype_overrides=dict(active_config.normalization_dtype_overrides)
         )
 
         with observability_cm:
@@ -152,6 +159,7 @@ class IdiotIndexService:
                 timer_start=start,
                 timer=self.timer,
                 metric_config=metric_config,
+                normalization_options=options,
             )
 
         if self.extension_manager is not None:
@@ -163,19 +171,37 @@ class IdiotIndexService:
                     extensions_meta = frame.attrs.setdefault("extensions", {})
                     extensions_meta.update(contributions.metadata)
 
+        if self.observability is not None:
+            dataset_attributes = _build_dataset_profile(summary, source=source, year=year)
+            self.observability.record_event(
+                "service.dataset.profile", attributes=dataset_attributes
+            )
+
         return summary
 
 
 class BEAFetcher(Protocol):
     """Protocol describing BEA data fetchers."""
 
-    def __call__(self, api_key: str, year: int | Iterable[int]) -> pd.DataFrame: ...
+    def __call__(
+        self,
+        api_key: str,
+        year: int | Iterable[int],
+        *,
+        normalization: NormalizationOptions | None = None,
+    ) -> pd.DataFrame: ...
 
 
 class CensusFetcher(Protocol):
     """Protocol describing Census ASM data fetchers."""
 
-    def __call__(self, api_key: str, year: int) -> pd.DataFrame: ...
+    def __call__(
+        self,
+        api_key: str,
+        year: int,
+        *,
+        normalization: NormalizationOptions | None = None,
+    ) -> pd.DataFrame: ...
 
 
 class SampleLoader(Protocol):
@@ -206,6 +232,7 @@ def evaluate_idiot_index(
     sample_loader: SampleLoader | None = None,
     logger_hooks: LoggerHooks | None = None,
     metric_config: MetricConfig | None = None,
+    normalization_options: NormalizationOptions | None = None,
 ) -> IdiotIndexSummary:
     """Return Idiot Index metrics for the requested configuration."""
 
@@ -222,6 +249,7 @@ def evaluate_idiot_index(
         sample_loader=sample_loader,
         logger_hooks=logger_hooks,
         metric_config=metric_config,
+        normalization_options=normalization_options,
     )
 
 
@@ -240,6 +268,7 @@ def _evaluate_idiot_index(
     timer_start: float,
     timer: Callable[[], float],
     metric_config: MetricConfig | None,
+    normalization_options: NormalizationOptions | None,
 ) -> IdiotIndexSummary:
     if top_n <= 0:
         raise ValueError("top_n must be greater than zero.")
@@ -253,11 +282,21 @@ def _evaluate_idiot_index(
         fetch_bea=fetch_bea,
         fetch_census=fetch_census,
         sample_loader=sample_loader,
+        normalization_options=normalization_options,
     )
 
-    normalized = normalize_columns(dataset)
+    normalized = normalize_columns(
+        dataset,
+        column_aliases=(normalization_options.column_aliases if normalization_options else None),
+        dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
+    )
     metrics = compute_metrics(normalized, config=metric_config)
-    display = format_for_display(metrics)
+    display = format_for_display(
+        metrics,
+        dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
+    )
+    if normalization_options and normalization_options.dtype_overrides:
+        apply_dtype_overrides(display, normalization_options.dtype_overrides)
     display = compute_health_scores(display)
 
     filtered = _filter_dataframe(display, sanitized_search)
@@ -294,6 +333,7 @@ def _resolve_dataset(
     fetch_bea: BEAFetcher | None,
     fetch_census: CensusFetcher | None,
     sample_loader: SampleLoader | None,
+    normalization_options: NormalizationOptions | None,
 ) -> pd.DataFrame:
     if dataframe is not None:
         return dataframe
@@ -308,13 +348,21 @@ def _resolve_dataset(
         if not config.bea_api_key:
             raise ValueError("BEA API key is required but missing from configuration.")
         bea_resolver = fetch_bea or _get_default_bea_fetcher()
-        return bea_resolver(config.bea_api_key, year)
+        return bea_resolver(
+            config.bea_api_key,
+            year,
+            normalization=normalization_options,
+        )
 
     if source is DataSource.CENSUS:
         if not config.census_api_key:
             raise ValueError("Census API key is required but missing from configuration.")
         census_resolver = fetch_census or _get_default_census_fetcher()
-        return census_resolver(config.census_api_key, year)
+        return census_resolver(
+            config.census_api_key,
+            year,
+            normalization=normalization_options,
+        )
 
     raise ValueError(f"Unsupported data source: {source}")
 
@@ -377,6 +425,50 @@ def _build_leaderboard(df: pd.DataFrame, top_n: int) -> tuple[IndustryMetrics, .
             )
         )
     return tuple(entries)
+
+
+def _frame_profile(df: pd.DataFrame) -> dict[str, Any]:
+    rows = int(df.shape[0])
+    columns = int(df.shape[1])
+    missing_series = df.isna().sum()
+    missing_cells = int(missing_series.sum())
+    missing_columns = sorted(
+        str(column) for column, count in missing_series.items() if int(count) > 0
+    )
+    total_cells = int(df.size)
+    missing_ratio = float(missing_cells / total_cells) if total_cells else 0.0
+    return {
+        "rows": rows,
+        "columns": columns,
+        "missing_cells": missing_cells,
+        "missing_ratio": missing_ratio,
+        "missing_columns": missing_columns,
+    }
+
+
+def _build_dataset_profile(
+    summary: IdiotIndexSummary, *, source: DataSource, year: int
+) -> dict[str, Any]:
+    full_profile = _frame_profile(summary.dataframe_full)
+    filtered_profile = _frame_profile(summary.dataframe_filtered)
+    extension_notes = summary.dataframe_filtered.attrs.get("extension_notes", [])
+    health_band = None
+    if summary.health_summary_filtered is not None:
+        health_band = summary.health_summary_filtered.overall.risk_band
+    return {
+        "source": source.value,
+        "year": int(year),
+        "full_rows": full_profile["rows"],
+        "filtered_rows": filtered_profile["rows"],
+        "full_missing_cells": full_profile["missing_cells"],
+        "filtered_missing_cells": filtered_profile["missing_cells"],
+        "full_missing_ratio": full_profile["missing_ratio"],
+        "filtered_missing_ratio": filtered_profile["missing_ratio"],
+        "filtered_missing_columns": filtered_profile["missing_columns"],
+        "notes": len(summary.notes),
+        "extension_notes": len(extension_notes),
+        "health_band": health_band,
+    }
 
 
 def _extract_notes(df: pd.DataFrame) -> tuple[str, ...]:

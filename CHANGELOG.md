@@ -1,5 +1,30 @@
 # Changelog
 
+## 2025-10-31 – Observability recorders & audit resiliency
+- Added `ObservabilityRegistry.record_event(...)` so services and extensions can emit telemetry without spinning up empty context managers, and refactored Idiot Index pipelines to use the helper for dataset/scenario profiling.
+- Updated observability tests, documentation, and the data-quality instrumentation workflow to cover the new API while preserving existing event subscriptions.
+- Enhanced `scripts/audit_metrics.py` with a `coverage.xml` fallback so steward audits stay functional even when the trace coverage JSON is unavailable.
+
+## 2025-10-26 – Observability digest & extension catalog
+- Introduced `/observability/digest`, the `observability_tail.py` streaming CLI, and the `extensions_catalog.py` inventory command so operators can inspect telemetry and registered extensions without code changes.
+- Instrumented dataset and scenario pipelines with profile events and shipped the `data_quality` instrumentation extension, exposing gauges for row counts/missing ratios plus a targeted health check.
+- Expanded Make targets, automation docs, and tests to cover the new tooling while updating README, EXTENSION_GUIDE, and incident response playbooks.
+
+## 2025-10-30 – Rate limiter hardening & deterministic tests
+- Removed the recursive wait loop from token buckets to prevent stack growth under heavy contention and added guard rails that
+  reject zero/blank rule definitions.
+- Tracked the active backend for Redis token buckets so fallbacks surface as `redis-fallback` in summaries, metrics, and health
+  diagnostics while preserving the configured backend label for security handlers.
+- Added self-contained tests covering wait semantics, fallback instrumentation, and configuration validation without requiring
+  `fakeredis`, using a lightweight stub to emulate Lua script execution.
+
+## 2025-10-29 – Distributed rate limiting & schema overrides
+- Added Redis-backed token bucket coordination with in-memory fallback, health reporting, and Prometheus metrics via the new `rate_limiting` instrumentation extension.
+- Replaced the stubbed security rate-limit check with a pluggable handler and surfaced backend diagnostics in the Streamlit sidebar and `/observability/status` payload.
+- Introduced `NormalizationOptions` and the `NORMALIZE_DTYPE_OVERRIDES` env var so operators can pin pandas dtypes without code changes; adapters and services honour overrides while bypassing caches to preserve metadata.
+- Emitted structured HTTP retry events from `safe_get_json` and wired them into observability metrics to highlight flaky upstream dependencies.
+- Documented the new configuration knobs, dependencies (`redis`, `fakeredis`), and added targeted tests for distributed rate limiting, dtype overrides, and retry telemetry.
+
 ## 2025-10-28 – Observability unification
 - Added the `ObservabilityRegistry` to centralise metrics, tracing, and health contributions; instrumented `IdiotIndexService`, `ScenarioPlanner`, and the API to emit structured events.
 - Introduced the `core_instrumentation` extension, `/observability/status` endpoint, and `scripts/observability_snapshot.py` CLI for unified monitoring in both online and offline environments.

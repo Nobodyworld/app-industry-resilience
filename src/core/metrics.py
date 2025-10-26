@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 import pandas as pd
 
@@ -108,10 +110,13 @@ def compute_metrics(
     return work
 
 
-def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
+def format_for_display(
+    df: pd.DataFrame, *, dtype_overrides: Mapping[str, Any] | None = None
+) -> pd.DataFrame:
     """Ensure numeric columns are cast to floats for UI presentation."""
 
     formatted = df.copy()
+    preserved = {key.strip().lower() for key in (dtype_overrides or {})}
     numeric_columns = {
         "gross_output",
         "materials_cost",
@@ -125,6 +130,8 @@ def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
         "shock_sensitivity_index",
     }
     for column in numeric_columns.intersection(formatted.columns):
+        if column in preserved:
+            continue
         formatted[column] = pd.to_numeric(formatted[column], errors="coerce").astype("float64")
     return formatted
 
