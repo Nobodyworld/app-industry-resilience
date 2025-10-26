@@ -1,5 +1,5 @@
 # Development dependencies
-black>=24.8.0,<25
+black>=24.8.0,<26
 ruff>=0.6.9,<1
 mypy>=1.11.2,<2
 pytest-cov>=5.0.0,<6
