@@ -19,6 +19,12 @@ from .metrics import (
     MetricRegistry,
     render_prometheus_text,
 )
+from .storage import (
+    ObservabilitySnapshot,
+    SnapshotStorage,
+    build_snapshot_id,
+    load_snapshot_from_file,
+)
 from .tracing import TraceContext, Tracer, current_trace_context, current_trace_id
 
 __all__ = [
@@ -35,8 +41,12 @@ __all__ = [
     "build_default_probe",
     "ObservationEvent",
     "ObservabilityRegistry",
+    "ObservabilitySnapshot",
     "bootstrap_observability",
+    "build_snapshot_id",
     "current_trace_context",
     "current_trace_id",
+    "load_snapshot_from_file",
     "render_prometheus_text",
+    "SnapshotStorage",
 ]

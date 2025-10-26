@@ -41,6 +41,7 @@ def configured_probe(tmp_path: Path):
             api_ttl_seconds=60,
             computation_ttl_seconds=120,
         ),
+        observability_snapshot_dir=tmp_path / "snapshots",
         max_csv_size_mb=25,
         supported_years_bea=range(2020, 2026),
         supported_years_census=range(2020, 2026),

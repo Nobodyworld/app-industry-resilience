@@ -35,6 +35,7 @@ from src.interfaces.streamlit.components import (
     render_deep_dive,
     render_download_panel,
     render_insight_tabs,
+    render_observability_snapshots,
     render_page_header,
     render_scenario_controls,
     render_scenario_results,
@@ -51,6 +52,7 @@ from src.interfaces.streamlit.helpers import (
     calculate_benchmark,
     decode_query_params,
     encode_query_params,
+    load_snapshot_history,
     prepare_download_artifacts,
     prepare_trend_data,
     summarise_scenario_deltas,
@@ -135,6 +137,8 @@ except BootstrapError as exc:
 APP_NORMALIZATION = NormalizationOptions(
     dtype_overrides=dict(APP_CONFIG.normalization_dtype_overrides)
 )
+
+OBSERVABILITY_HISTORY = load_snapshot_history(APP_CONFIG.observability_snapshot_dir, limit=12)
 
 for warning in bootstrap_state.warnings:
     st.sidebar.warning(warning)
@@ -345,8 +349,14 @@ else:
 if not focus_mode:
     render_signal_bar(df_filtered, health_summary=summary.health_summary_filtered)
 
-tabs = ["Pulse", "Industries", "Top Signals", "Health"]
-pulse_tab, industries_tab, signals_tab, health_tab = render_insight_tabs(tabs)
+tabs = ["Pulse", "Industries", "Top Signals", "Health", "Observability"]
+(
+    pulse_tab,
+    industries_tab,
+    signals_tab,
+    health_tab,
+    observability_tab,
+) = render_insight_tabs(tabs)
 
 with pulse_tab:
     st.subheader("Pulse overview")
@@ -441,6 +451,15 @@ with health_tab:
         st.markdown("---")
         st.markdown("**Highest risk industries**")
         st.dataframe(risk_table, use_container_width=True)
+
+with observability_tab:
+    render_observability_snapshots(
+        OBSERVABILITY_HISTORY,
+        empty_message=(
+            "Snapshots are persisted under "
+            f"`{APP_CONFIG.observability_snapshot_dir}`. Run `make observability-snapshot` to capture one."
+        ),
+    )
 
 st.subheader("Deep dive")
 code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"], strict=False))

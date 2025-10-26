@@ -14,6 +14,7 @@ from typing import Any
 from .health import HealthComponent, HealthProbe
 from .metrics import Counter as MetricCounter
 from .metrics import Gauge, Histogram, MetricRegistry
+from .storage import ObservabilitySnapshot, SnapshotStorage, build_snapshot_id
 from .tracing import Tracer
 
 LOGGER = logging.getLogger(__name__)
@@ -138,6 +139,43 @@ class ObservabilityRegistry:
             error=error,
         )
 
+    def capture_snapshot(
+        self, *, metadata: Mapping[str, Any] | None = None
+    ) -> ObservabilitySnapshot:
+        """Return a snapshot of the registry's current digest."""
+
+        captured_at = datetime.now(UTC)
+        snapshot_id = build_snapshot_id(captured_at)
+        meta = dict(metadata or {})
+        payload = self.digest()
+        return ObservabilitySnapshot(
+            snapshot_id=snapshot_id,
+            captured_at=captured_at,
+            payload=payload,
+            metadata=meta,
+        )
+
+    def persist_snapshot(
+        self,
+        storage: SnapshotStorage,
+        *,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> ObservabilitySnapshot:
+        """Capture and store a snapshot using ``storage``."""
+
+        snapshot = self.capture_snapshot(metadata=metadata)
+        storage.save(snapshot)
+        self.record_event(
+            "observability.snapshot.persisted",
+            attributes={
+                "snapshot_id": snapshot.snapshot_id,
+                "storage_dir": str(storage.base_dir),
+                "metadata_keys": sorted(map(str, snapshot.metadata.keys())),
+                "captured_at": snapshot.captured_at.isoformat(),
+            },
+        )
+        return snapshot
+
     def register_health_check(self, name: str, supplier: Callable[[], HealthComponent]) -> None:
         """Register a lazy health check contribution.
 
@@ -249,6 +287,26 @@ class ObservabilityRegistry:
                 name: len(handlers) for name, handlers in self._subscriptions.items()
             },
         }
+
+    def events(
+        self,
+        *,
+        limit: int | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return recent observation events filtered by ``status`` and ``limit``.
+
+        Events are returned in reverse chronological order so that the latest
+        telemetry appears first in API responses and CLI diagnostics.
+        """
+
+        events: list[ObservationEvent] = list(self._recent_events)
+        if status:
+            status_normalised = status.lower()
+            events = [event for event in events if event.status.lower() == status_normalised]
+        if limit is not None and limit >= 0:
+            events = events[-limit:]
+        return [event.as_dict() for event in reversed(events)]
 
     def iter_recent_events(self) -> Iterator[ObservationEvent]:
         """Yield recently emitted observation events in chronological order."""

@@ -20,6 +20,7 @@ from src.application import (
     ScenarioSummary,
 )
 from src.core import HealthSummary
+from src.infrastructure.observability.storage import ObservabilitySnapshot
 
 
 class DatasetRecord(BaseModel):
@@ -130,6 +131,28 @@ class ObservabilityEventsSummaryModel(BaseModel):
     )
 
 
+class ObservabilityEventsResponse(BaseModel):
+    """Payload describing recent observability events with applied filters."""
+
+    events: list[ObservationEventModel] = Field(
+        default_factory=list,
+        description="Recent observation events sorted from newest to oldest.",
+    )
+    total_available: int = Field(
+        default=0,
+        description="Total number of events that matched the filter criteria.",
+    )
+    applied_limit: int | None = Field(
+        default=None,
+        ge=1,
+        description="Limit applied when returning the events payload.",
+    )
+    applied_status: str | None = Field(
+        default=None,
+        description="Status filter applied to the events payload (case-insensitive).",
+    )
+
+
 class ObservabilityDigestResponse(BaseModel):
     metrics: ObservabilityMetricsModel
     traces: dict[str, Any]
@@ -139,6 +162,61 @@ class ObservabilityDigestResponse(BaseModel):
         default_factory=dict,
         description="Number of subscribers registered for each event name.",
     )
+
+
+class ObservabilitySnapshotMeta(BaseModel):
+    snapshot_id: str = Field(..., description="Stable identifier assigned to the snapshot.")
+    captured_at: datetime = Field(..., description="UTC timestamp when the snapshot was recorded.")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Arbitrary metadata describing the snapshot context.",
+    )
+
+
+class ObservabilitySnapshotResponse(ObservabilitySnapshotMeta):
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Full observability digest captured at the snapshot time.",
+    )
+
+
+def snapshot_to_meta(snapshot: ObservabilitySnapshot) -> ObservabilitySnapshotMeta:
+    """Convert a stored snapshot into API metadata."""
+
+    return ObservabilitySnapshotMeta(
+        snapshot_id=snapshot.snapshot_id,
+        captured_at=snapshot.captured_at,
+        metadata=dict(snapshot.metadata),
+    )
+
+
+def snapshot_to_response(snapshot: ObservabilitySnapshot) -> ObservabilitySnapshotResponse:
+    """Convert a stored snapshot into a detailed API payload."""
+
+    return ObservabilitySnapshotResponse(
+        snapshot_id=snapshot.snapshot_id,
+        captured_at=snapshot.captured_at,
+        metadata=dict(snapshot.metadata),
+        payload=dict(snapshot.payload),
+    )
+
+
+def snapshot_meta_to_payload(snapshot: ObservabilitySnapshot) -> dict[str, Any]:
+    """Return JSON-serialisable metadata for a snapshot."""
+
+    meta = snapshot_to_meta(snapshot)
+    data = meta.model_dump()
+    data["captured_at"] = meta.captured_at.isoformat()
+    return data
+
+
+def snapshot_response_to_payload(snapshot: ObservabilitySnapshot) -> dict[str, Any]:
+    """Return JSON-serialisable detail payload for a snapshot."""
+
+    response = snapshot_to_response(snapshot)
+    data = response.model_dump()
+    data["captured_at"] = response.captured_at.isoformat()
+    return data
 
 
 class EvaluateFilters(BaseModel):

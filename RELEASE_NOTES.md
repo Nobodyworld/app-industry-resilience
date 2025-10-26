@@ -1,5 +1,28 @@
 # Release Notes
 
+# 2025-11-05 – Observability diagnostics & snapshot guardrails
+
+### Highlights
+- Added `/observability/events` and accompanying schemas/tests so operators and automation can fetch filtered, reverse-chronological telemetry without parsing the full digest payload.
+- Introduced the `snapshot_monitor` instrumentation extension plus new `observability.snapshot.persisted` events to surface snapshot counts, latest-age gauges, and a dedicated health component that warns when archives go stale.
+- Delivered `scripts/diagnostics_bundle.py` alongside documentation updates, enabling one-command capture of config summaries, health probe output, observability digests/events, and snapshot metadata.
+
+### Upgrade / Migration Notes
+- Dashboards and runbooks should incorporate `/observability/events` for quick incident timelines; the endpoint honours optional `status` and `limit` filters.
+- Prometheus collectors can scrape the new `idiot_index_observability_snapshots_*` gauges; `/health` and `/observability/status` now include an `observability_snapshots` component that warns on missing or stale archives.
+- Automation relying on snapshot history can consume `build/reports/diagnostics.json` produced by the new diagnostics bundle script for archival or ticket attachments.
+
+## 2025-11-02 – Snapshot validation & operational hardening
+
+### Highlights
+- Hardened observability snapshot handling by validating identifiers in storage, the CLI, and API detail endpoint, closing the door on traversal attempts and returning explicit 400 errors for malformed IDs.
+- Added a supported `SnapshotStorage.path_for` helper with regression tests so automation and tooling can resolve stored snapshot paths without bypassing validation.
+- Expanded docs and API tests to document the stricter identifier rules while ensuring snapshot list/detail flows remain unchanged for valid IDs.
+
+### Upgrade / Migration Notes
+- Snapshot identifiers now must match `^[A-Za-z0-9_-]+$`. Existing stored IDs already conform, but any automation constructing IDs manually should treat them as opaque tokens and avoid path separators or dots.
+- CLI users comparing snapshots by ID should continue to supply the bare identifier; external filesystem paths remain supported for explicit comparisons.
+
 ## 2025-10-31 – Observability recorders & audit resiliency
 
 ### Highlights

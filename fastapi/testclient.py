@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Mapping
+from urllib.parse import urlencode
 
 from . import FastAPI, Response
 
@@ -35,7 +36,12 @@ class TestClient:
     def __init__(self, app: FastAPI):
         self.app = app
 
-    def get(self, path: str) -> _TestResponse:
+    def get(self, path: str, params: Mapping[str, Any] | None = None) -> _TestResponse:
+        if params:
+            query = urlencode([(key, value) for key, value in params.items() if value is not None])
+            if query:
+                separator = "&" if "?" in path else "?"
+                path = f"{path}{separator}{query}"
         response = self.app.handle_request("GET", path)
         return _TestResponse(
             status_code=response.status_code,

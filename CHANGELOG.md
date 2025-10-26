@@ -1,5 +1,15 @@
 # Changelog
 
+# 2025-11-05 – Observability diagnostics & snapshot guardrails
+- Added `/observability/events` to expose filtered, reverse-chronological telemetry along with unit tests and schema updates so automation can replay recent incidents without parsing full digests.
+- Introduced the `snapshot_monitor` instrumentation extension plus `observability.snapshot.persisted` events, publishing gauges/health checks for snapshot freshness and tightening documentation around archival workflows.
+- Shipped `scripts/diagnostics_bundle.py` and refreshed README, architecture, and automation guides so operators (and agents) can capture one-shot JSON bundles combining health probes, digests, events, and snapshot metadata.
+
+## 2025-11-02 – Snapshot validation & operational hardening
+- Sanitised observability snapshot identifiers across storage, the CLI, and API detail endpoint to reject path traversal attempts and return clear 400 responses for malformed IDs.
+- Added a `SnapshotStorage.path_for` helper and associated unit tests, ensuring automation can safely resolve stored snapshot paths without bypassing validation.
+- Tightened docs and analytics API tests to cover the new security guardrails while preserving snapshot list/detail behaviour for well-formed identifiers.
+
 ## 2025-10-31 – Observability recorders & audit resiliency
 - Added `ObservabilityRegistry.record_event(...)` so services and extensions can emit telemetry without spinning up empty context managers, and refactored Idiot Index pipelines to use the helper for dataset/scenario profiling.
 - Updated observability tests, documentation, and the data-quality instrumentation workflow to cover the new API while preserving existing event subscriptions.

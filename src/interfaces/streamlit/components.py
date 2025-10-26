@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import cast
+from typing import TypeAlias, cast
 
 import pandas as pd
 
@@ -12,7 +12,12 @@ import streamlit as st
 from src.core import HealthSummary
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from .helpers import DownloadArtifact, extract_health_badge
+from .helpers import (
+    DownloadArtifact,
+    extract_health_badge,
+    snapshot_history_table,
+    snapshot_timeline_frame,
+)
 
 
 @dataclass
@@ -596,6 +601,61 @@ def render_download_panel(artifacts: Sequence[DownloadArtifact]) -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
 
+def render_observability_snapshots(
+    history: Sequence[Mapping[str, object]], *, empty_message: str | None = None
+) -> None:
+    """Render snapshot history and trend visualisations."""
+
+    st.subheader("Observability snapshots")
+    if not history:
+        st.info(
+            empty_message
+            or "No snapshots recorded yet. Run `make observability-snapshot` after key deployments to capture state."
+        )
+        return
+
+    latest: Mapping[str, object] = history[0]
+    events_raw = latest.get("events", {})
+    latest_events: Mapping[str, object]
+    if isinstance(events_raw, Mapping):
+        latest_events = events_raw
+    else:
+        latest_events = {}
+    cols = st.columns(3)
+    captured_at = latest.get("captured_at")
+    captured_label = (
+        captured_at.strftime("%Y-%m-%d %H:%M:%SZ")
+        if hasattr(captured_at, "strftime")
+        else str(captured_at)
+    )
+    with cols[0]:
+        st.metric("Most recent", captured_label)
+        metadata_raw = latest.get("metadata", {})
+        label = metadata_raw.get("label") if isinstance(metadata_raw, Mapping) else None
+        if label:
+            st.caption(f"Labelled: {label}")
+    with cols[1]:
+        events_captured = latest.get("event_total", 0)
+        st.metric("Events captured", cast(MetricValue, events_captured))
+    with cols[2]:
+        errors_observed = latest_events.get("error", 0)
+        st.metric("Errors observed", cast(MetricValue, errors_observed))
+
+    timeline = snapshot_timeline_frame(history)
+    if not timeline.empty:
+        timeline_chart = timeline.set_index("captured_at")[["event_total", "errors", "success"]]
+        st.line_chart(timeline_chart)
+
+    table = snapshot_history_table(history)
+    if not table.empty:
+        st.dataframe(table, use_container_width=True, hide_index=True)
+
+    last_error = latest.get("last_error")
+    if last_error:
+        st.markdown("#### Most recent error event")
+        st.json(last_error)
+
+
 def build_data_story(
     *,
     row: pd.Series,
@@ -646,3 +706,6 @@ def build_data_story(
             story_parts.append("A balanced materials share hints at a stable operational rhythm.")
 
     return " ".join(story_parts)
+
+
+MetricValue: TypeAlias = int | float | str | None

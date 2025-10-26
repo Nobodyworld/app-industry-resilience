@@ -134,14 +134,16 @@ make scenario      # Run the scenario planner CLI (pass ARGS="--adjust codes=311
 make prefetch-cache # Warm caches using the prefetch utility
 make analytics     # Emit health analytics JSON from a CSV dataset
 make observability # Print a JSON observability snapshot (pass ARGS="--pretty")
+make observability-snapshot # Persist an observability snapshot to disk (pass ARGS="--label nightly")
 make observability-tail # Follow observability events in real time (pass ARGS="--limit 5 --follow")
 make extensions-catalog # List registered extensions (pass ARGS="--json --pretty")
 make audit         # Capture stewardship metrics and write build/reports/audit-metrics.json
 make api             # Launch the headless API service (pass ARGS="--port 9100" for custom ports)
 make docs          # List key documentation links in the terminal
 python scripts/check_health.py --pretty  # Run the consolidated health probe without the HTTP API
-python scripts/observability_snapshot.py --pretty  # Same observability payload as /observability/status
+python scripts/observability_snapshot.py --store --pretty  # Persist + print a snapshot (use --list/--compare for history)
 python scripts/observability_tail.py --follow --limit 10  # Stream recent observability events for triage
+python scripts/diagnostics_bundle.py --pretty --output build/reports/diagnostics.json  # Capture config, health, events, and metrics in one bundle
 python scripts/extensions_catalog.py --json --pretty  # Inspect registered summary/scenario/instrumentation extensions
 python scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for analytics/API critical paths (override with --paths)
 python scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
@@ -166,6 +168,9 @@ This invokes `scripts/run_api.py`, which serves the lightweight FastAPI-compatib
 - `GET /healthz` – Kubernetes-style alias that also exposes trace correlation IDs.
 - `GET /observability/status` – Prometheus/OpenTelemetry summary (metrics, traces, recent operation events).
 - `GET /observability/digest` – enriched observability payload with event counters, last-error context, and subscriber counts.
+- `GET /observability/events` – recent observation events with optional status filters for automated incident triage.
+- `GET /observability/snapshots` – list of stored observability snapshots (metadata + capture timestamps).
+- `GET /observability/snapshots/{snapshot_id}` – full persisted snapshot payload including event counters and last-error context.
 - `GET /meta/sources` – list of supported data sources.
 - `POST /evaluate` – compute Idiot Index metrics for a dataset or remote source.
 - `POST /scenario` – run Scenario Lab adjustments on a supplied dataset.
@@ -199,7 +204,8 @@ Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + m
 
 ### Observability & Extensions
 
-- The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics`, `/observability/status`, and the richer `/observability/digest` endpoint that aggregates event counters, health registrations, and subscriber counts for dashboards.
+- The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics`, `/observability/status`, the richer `/observability/digest`, and the snapshot catalogue endpoints under `/observability/snapshots` for historical exports.
+- Streamlit's dashboard includes an Observability tab that visualises stored snapshots (event totals, error trends, and last-error payloads). Snapshots persist under `build/observability_snapshots` by default and respect the `OBSERVABILITY_SNAPSHOT_DIR` environment variable.
 - Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance. The built-in `data_quality` instrumentation extension demonstrates how to subscribe to dataset/scenario profile events, emit gauges, and contribute health checks.
 
 Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
@@ -271,6 +277,7 @@ The app validates configuration at startup before rendering the UI. Key environm
 - `DEFAULT_YEAR`: Initial year selection when the sidebar loads.
 - `CACHE_ENABLED`: Enable/disable filesystem caches (`true`/`false`).
 - `CACHE_DIR`: Base directory for cache files (defaults to `.cache`).
+- `OBSERVABILITY_SNAPSHOT_DIR`: Directory where observability snapshots are persisted (defaults to `build/observability_snapshots`).
 - `BEA_API_KEY`, `CENSUS_API_KEY`: Required when `ENVIRONMENT=production`.
 
 Launch the app and open the “Configuration summary” expander in the sidebar to review resolved values and warnings.

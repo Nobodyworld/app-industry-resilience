@@ -42,6 +42,8 @@ python scripts/observability_tail.py --follow --limit 20
 
 The snapshot mirrors the HTTP payload and includes recent operation events, metric counts, registered health checks, and event counters. Use it alongside the health probe for incident reviews, and reach for `observability_tail.py` when you need a streaming view without hitting the HTTP API.
 
+When you need a single artefact for ticket attachments, run `python scripts/diagnostics_bundle.py --pretty --include-metrics --output build/reports/diagnostics.json`. The bundle combines the health probe output, observability digest, filtered recent events, and snapshot metadata so you can archive the exact system state during an incident.
+
 ### CLI Usage
 
 Run the probe from the command line without hitting the HTTP API:

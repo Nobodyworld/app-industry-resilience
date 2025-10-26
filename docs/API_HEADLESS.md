@@ -187,6 +187,94 @@ Returns a JSON snapshot of the observability registry, including metric counts, 
 }
 ```
 
+### `GET /observability/digest`
+Provides the same observability snapshot as `/observability/status` but enriches it with aggregate event counters, subscription counts, and the last error payload.
+
+```json
+{
+  "metrics": {"counters": 6, "gauges": 1, "histograms": 2, "subscriptions": {"service.idiot_index.evaluate": 2}},
+  "traces": {"exported_spans": 24},
+  "health_checks": ["configuration", "cache", "extensions", "instrumentation_core"],
+  "events": {
+    "counts": {"success": 20, "error": 1},
+    "total": 21,
+    "recent": [...],
+    "last_error": {
+      "name": "service.scenario.plan",
+      "status": "error",
+      "error": "ValueError('invalid adjustment')",
+      "timestamp": "2025-11-05T13:58:01.000000+00:00"
+    }
+  },
+  "subscriptions": {"service.dataset.profile": 1, "service.scenario.profile": 1}
+}
+```
+
+### `GET /observability/events`
+Returns the most recent observation events emitted by the registry in reverse chronological order. Optional query parameters allow filtering by status (`success`, `error`, etc.) and limiting the number of events returned (default `25`, maximum `100`).
+
+```json
+{
+  "events": [
+    {
+      "name": "service.idiot_index.evaluate",
+      "status": "success",
+      "duration": 0.241,
+      "timestamp": "2025-11-05T14:11:03.123456+00:00",
+      "attributes": {"source": "sample", "year": 2021},
+      "trace_id": "f1d2315f7bd34ea5"
+    }
+  ],
+  "total_available": 12,
+  "applied_limit": 25,
+  "applied_status": null
+}
+```
+
+### `GET /observability/snapshots`
+Returns metadata for every persisted snapshot in capture order (newest first). Use this catalogue to discover snapshot identifiers before fetching the full payload.
+
+```json
+[
+  {
+    "snapshot_id": "20251031T120512345Z-nightly01",
+    "captured_at": "2025-10-31T12:05:12.345000+00:00",
+    "metadata": {"label": "nightly"}
+  },
+  {
+    "snapshot_id": "20251030T235959000Z-cli42a7",
+    "captured_at": "2025-10-30T23:59:59+00:00",
+    "metadata": {"source": "cli"}
+  }
+]
+```
+
+### `GET /observability/snapshots/{snapshot_id}`
+Returns the full snapshot payload (matching the structure of `/observability/digest`) alongside metadata for the supplied identifier. Snapshots are stored on disk and can be captured via `make observability-snapshot` or `python scripts/observability_snapshot.py --store`.
+
+```json
+{
+  "snapshot_id": "20251031T120512345Z-nightly01",
+  "captured_at": "2025-10-31T12:05:12.345000+00:00",
+  "metadata": {"label": "nightly"},
+  "payload": {
+    "metrics": {"counters": 6, "gauges": 1, "histograms": 2},
+    "traces": {"exported_spans": 28},
+    "health_checks": ["configuration", "cache", "extensions", "instrumentation_core"],
+    "events": {
+      "total": 17,
+      "counts": {"success": 16, "error": 1},
+      "recent": [
+        {"name": "service.dataset.profile", "status": "success", "duration": 0.08},
+        {"name": "service.idiot_index.evaluate", "status": "error", "duration": 0.31}
+      ],
+      "last_error": {"name": "service.idiot_index.evaluate", "status": "error", "error": "ValueError('no data')"}
+    },
+    "subscriptions": {"service.idiot_index.evaluate": 2}
+  }
+}
+```
+
 ## Error handling
 
 - Validation errors (missing required fields, invalid enums) return HTTP 422 with structured details from the lightweight validator.

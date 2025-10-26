@@ -131,6 +131,7 @@ class AppConfig:
     bea_api_base_urls: tuple[str, ...]
     rate_limits: RateLimitConfig
     cache: CacheConfig
+    observability_snapshot_dir: Path
     max_csv_size_mb: int
     supported_years_bea: range
     supported_years_census: range
@@ -196,7 +197,12 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
         "BEA_API_BASE_URLS",
     )
 
-    cache_dir = Path(values.get("CACHE_DIR", ".cache")).resolve()
+    cache_dir = Path(values.get("CACHE_DIR", ".cache")).expanduser().resolve()
+    snapshot_dir_raw = values.get("OBSERVABILITY_SNAPSHOT_DIR")
+    if snapshot_dir_raw and snapshot_dir_raw.strip():
+        snapshot_dir = Path(snapshot_dir_raw).expanduser().resolve()
+    else:
+        snapshot_dir = Path("build/observability_snapshots").resolve()
     api_ttl = _parse_int(values.get("CACHE_TTL_API", "3600"), "CACHE_TTL_API")
     computation_ttl = _parse_int(
         values.get("CACHE_TTL_COMPUTATION", "1800"), "CACHE_TTL_COMPUTATION"
@@ -314,6 +320,7 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
             api_ttl_seconds=api_ttl,
             computation_ttl_seconds=computation_ttl,
         ),
+        observability_snapshot_dir=snapshot_dir,
         max_csv_size_mb=max_csv_size,
         supported_years_bea=supported_years_bea,
         supported_years_census=supported_years_census,
@@ -350,6 +357,12 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
 
     if config.max_csv_size_mb <= 0:
         errors.append("MAX_CSV_SIZE_MB must be a positive integer.")
+
+    if (
+        config.observability_snapshot_dir.exists()
+        and not config.observability_snapshot_dir.is_dir()
+    ):
+        errors.append("OBSERVABILITY_SNAPSHOT_DIR must reference a directory path.")
 
     for name, value in config.rate_limits.as_dict().items():
         if value <= 0:
@@ -398,6 +411,7 @@ def get_config_summary(config: AppConfig | None = None) -> dict[str, object]:
         "default_year": config.default_year,
         "cache_enabled": config.cache.enabled,
         "cache_dir": str(config.cache.base_dir),
+        "observability_snapshot_dir": str(config.observability_snapshot_dir),
         "cache_ttl": {
             "api": config.cache.api_ttl_seconds,
             "computation": config.cache.computation_ttl_seconds,

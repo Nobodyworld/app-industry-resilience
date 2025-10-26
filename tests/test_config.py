@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from src.core import (
@@ -24,9 +26,11 @@ def test_load_config_from_mapping(tmp_path) -> None:
 
     assert config.environment is Environment.PRODUCTION
     assert config.cache.base_dir == tmp_path.resolve()
+    assert config.observability_snapshot_dir == Path("build/observability_snapshots").resolve()
     assert config.default_year == 2020
     summary = get_config_summary(config)
     assert summary["bea_key_set"] is True
+    assert summary["observability_snapshot_dir"].endswith("build/observability_snapshots")
 
 
 def test_load_config_invalid_environment() -> None:
@@ -40,6 +44,17 @@ def test_validate_config_warnings_for_missing_keys(monkeypatch) -> None:
     result = validate_config(config)
     assert result.errors == ()
     assert any("BEA_API_KEY" in warning for warning in result.warnings)
+
+
+def test_validate_config_rejects_snapshot_file(tmp_path: Path) -> None:
+    snapshot_file = tmp_path / "snapshot.json"
+    snapshot_file.write_text("{}", encoding="utf-8")
+    env = {"OBSERVABILITY_SNAPSHOT_DIR": str(snapshot_file)}
+
+    config = load_config(env)
+    result = validate_config(config)
+
+    assert any("OBSERVABILITY_SNAPSHOT_DIR" in error for error in result.errors)
 
 
 def test_load_config_rejects_non_http_urls() -> None:
