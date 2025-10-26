@@ -6,11 +6,17 @@ import io
 import json
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
 from src.application.scenario_planner import ScenarioResult
 from src.core import HealthSummary
+from src.infrastructure.observability.storage import (
+    ObservabilitySnapshot,
+    SnapshotStorage,
+)
 
 
 @dataclass(frozen=True)
@@ -324,6 +330,77 @@ def build_scenario_comparison_table(
         rows.append(data)
 
     return pd.DataFrame(rows)
+
+
+def summarise_observability_snapshot(snapshot: ObservabilitySnapshot) -> dict[str, Any]:
+    """Return structured summary data for a stored observability snapshot."""
+
+    events = snapshot.payload.get("events", {})
+    counts = events.get("counts", {})
+    metrics = snapshot.payload.get("metrics", {})
+    numeric_metrics = {
+        key: int(value) for key, value in metrics.items() if isinstance(value, int | float)
+    }
+    return {
+        "snapshot_id": snapshot.snapshot_id,
+        "captured_at": snapshot.captured_at,
+        "event_total": int(events.get("total") or 0),
+        "events": {key: int(counts.get(key, 0) or 0) for key in counts},
+        "metadata": dict(snapshot.metadata),
+        "metrics": numeric_metrics,
+        "last_error": events.get("last_error"),
+    }
+
+
+def load_snapshot_history(base_dir: Path, limit: int = 10) -> list[dict[str, Any]]:
+    """Load at most ``limit`` snapshot summaries from the given directory."""
+
+    storage = SnapshotStorage(base_dir)
+    snapshots = storage.list()
+    if not snapshots:
+        return []
+    selected = snapshots[-limit:]
+    selected.reverse()
+    return [summarise_observability_snapshot(snapshot) for snapshot in selected]
+
+
+def snapshot_history_table(summaries: Sequence[Mapping[str, Any]]) -> pd.DataFrame:
+    """Transform snapshot summaries into a tabular dataframe for Streamlit."""
+
+    rows: list[dict[str, Any]] = []
+    for summary in summaries:
+        events = summary.get("events", {})
+        metadata = summary.get("metadata", {})
+        rows.append(
+            {
+                "Snapshot": summary.get("snapshot_id"),
+                "Captured": pd.to_datetime(summary.get("captured_at")),
+                "Events": summary.get("event_total", 0),
+                "Errors": events.get("error", 0),
+                "Success": events.get("success", 0),
+                "Label": metadata.get("label"),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def snapshot_timeline_frame(summaries: Sequence[Mapping[str, Any]]) -> pd.DataFrame:
+    """Return a tidy dataframe charting event totals and error counts over time."""
+
+    timeline: list[dict[str, Any]] = []
+    for summary in summaries:
+        captured_at = pd.to_datetime(summary.get("captured_at"))
+        events = summary.get("events", {})
+        timeline.append(
+            {
+                "captured_at": captured_at,
+                "event_total": summary.get("event_total", 0),
+                "errors": events.get("error", 0),
+                "success": events.get("success", 0),
+                "snapshot_id": summary.get("snapshot_id"),
+            }
+        )
+    return pd.DataFrame(timeline)
 
 
 def decode_query_params(params: Mapping[str, list[str]]) -> MutableMapping[str, list[str]]:

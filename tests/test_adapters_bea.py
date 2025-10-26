@@ -165,6 +165,7 @@ def test_select_bea_endpoint_success(mock_get_json, tmp_path: Path) -> None:
             api_ttl_seconds=0,
             computation_ttl_seconds=0,
         ),
+        observability_snapshot_dir=tmp_path / "snapshots",
         max_csv_size_mb=50,
         supported_years_bea=range(1997, 2025),
         supported_years_census=range(1997, 2024),

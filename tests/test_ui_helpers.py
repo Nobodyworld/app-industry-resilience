@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pandas as pd
 
 from src.application.scenario_planner import ScenarioAdjustment, ScenarioPlanner
 from src.core import compute_health_scores, summarise_health
+from src.infrastructure.observability.storage import ObservabilitySnapshot, SnapshotStorage
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
     build_health_band_distribution,
@@ -13,8 +16,11 @@ from src.interfaces.streamlit.helpers import (
     calculate_benchmark,
     decode_query_params,
     encode_query_params,
+    load_snapshot_history,
     prepare_download_artifacts,
     prepare_trend_data,
+    snapshot_history_table,
+    snapshot_timeline_frame,
     summarise_scenario_deltas,
 )
 
@@ -104,3 +110,28 @@ def test_health_helpers_transform_summary() -> None:
     assert "band" in distribution.columns
     risks = build_health_risk_table(summary)
     assert "health_score" in risks.columns
+
+
+def test_snapshot_helpers_build_views(tmp_path) -> None:
+    payload = {
+        "events": {"total": 5, "counts": {"success": 4, "error": 1}},
+        "metrics": {"counters": 2, "gauges": 1},
+    }
+    snapshot = ObservabilitySnapshot(
+        snapshot_id="snap-1",
+        captured_at=datetime.now(UTC),
+        payload=payload,
+        metadata={"label": "nightly"},
+    )
+    storage = SnapshotStorage(tmp_path)
+    storage.save(snapshot)
+
+    history = load_snapshot_history(tmp_path)
+    assert history and history[0]["metadata"]["label"] == "nightly"
+
+    table = snapshot_history_table(history)
+    assert list(table.columns) == ["Snapshot", "Captured", "Events", "Errors", "Success", "Label"]
+    timeline = snapshot_timeline_frame(history)
+    assert set(["captured_at", "event_total", "errors", "success", "snapshot_id"]).issubset(
+        timeline.columns
+    )

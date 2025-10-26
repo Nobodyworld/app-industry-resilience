@@ -4,8 +4,11 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from fastapi.testclient import TestClient
+from src.infrastructure.observability import bootstrap_observability
+from src.interfaces.api import dependencies as api_dependencies
 from src.interfaces.api.app import app
 
 client = TestClient(app)
@@ -114,6 +117,56 @@ def test_observability_digest_exposes_subscriptions() -> None:
     assert response.status_code == 200
     assert payload["events"]["total"] >= 0
     assert isinstance(payload["subscriptions"], dict)
+
+
+def test_observability_events_endpoint_filters() -> None:
+    registry = bootstrap_observability()
+    registry.record_event("service.dataset.profile", attributes={"source": "api-test"})
+    with pytest.raises(RuntimeError):
+        with registry.operation("service.failure", attributes={"source": "api-test"}):
+            raise RuntimeError("boom")
+
+    response = client.get("/observability/events", params={"limit": 5})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_available"] >= 2
+    assert payload["applied_limit"] == 5
+    assert payload["applied_status"] is None
+    assert payload["events"][0]["name"] == "service.failure"
+
+    filtered = client.get("/observability/events", params={"status": "error"})
+    assert filtered.status_code == 200
+    data = filtered.json()
+    assert data["applied_status"] == "error"
+    assert data["events"] and all(event["status"] == "error" for event in data["events"])
+
+
+def test_observability_snapshot_endpoints(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
+    api_dependencies._snapshot_storage_singleton.cache_clear()
+
+    registry = bootstrap_observability()
+    storage = api_dependencies.get_snapshot_storage()
+    snapshot = registry.capture_snapshot(metadata={"label": "api-test"})
+    storage.save(snapshot)
+
+    list_response = client.get("/observability/snapshots")
+    assert list_response.status_code == 200
+    listing = list_response.json()
+    assert listing and listing[0]["snapshot_id"] == snapshot.snapshot_id
+
+    detail_response = client.get(f"/observability/snapshots/{snapshot.snapshot_id}")
+    assert detail_response.status_code == 200
+    detail = detail_response.json()
+    assert detail["metadata"].get("label") == "api-test"
+    assert detail["payload"]["events"]["total"] >= 0
+
+    missing_response = client.get("/observability/snapshots/not-found")
+    assert missing_response.status_code == 404
+
+    traversal_response = client.get("/observability/snapshots/bad.id")
+    assert traversal_response.status_code == 400
+    assert "Snapshot identifiers" in traversal_response.json()["detail"]
 
 
 def test_evaluate_rejects_invalid_top_n() -> None:

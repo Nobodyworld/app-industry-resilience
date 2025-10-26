@@ -1,4 +1,4 @@
-.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs scenario prefetch-cache analytics observability audit quality-gate
+.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs scenario prefetch-cache analytics observability observability-snapshot audit quality-gate diagnostics
 
 PYTHON := python
 SKIP_PIP ?= 0
@@ -28,7 +28,9 @@ help:
 	@echo "  prefetch-cache     Warm caches using the prefetch utility (pass extra args via ARGS=...)"
 	@echo "  analytics          Generate health analytics JSON (pass extra args via ARGS=...)"
 	@echo "  observability      Print observability registry snapshot (pass extra args via ARGS=...)"
+	@echo "  observability-snapshot Persist and pretty-print a stored observability snapshot"
 	@echo "  observability-tail Follow observability events from the registry (pass extra args via ARGS=...)"
+	@echo "  diagnostics        Capture a consolidated diagnostics bundle (pass extra args via ARGS=...)"
 	@echo "  extensions-catalog List registered extensions (pass extra args via ARGS=...)"
 	@echo "  audit              Compute stewardship audit metrics (pass extra args via ARGS=...)"
 	@echo "  api                Launch the headless API service (pass extra args via ARGS=...)"
@@ -142,9 +144,17 @@ analytics:
 observability:
 	${PYTHON} scripts/observability_snapshot.py ${ARGS}
 
+# agent-safe-task: persists observability snapshots to disk
+observability-snapshot:
+	${PYTHON} scripts/observability_snapshot.py --store --pretty ${ARGS}
+
 # agent-safe-task: streams observability events for incident response
 observability-tail:
 	${PYTHON} scripts/observability_tail.py ${ARGS}
+
+# agent-safe-task: captures health/digest/events/snapshot metadata in one bundle
+diagnostics:
+	${PYTHON} scripts/diagnostics_bundle.py ${ARGS}
 
 # agent-safe-task: inventories extension metadata for automation
 extensions-catalog:

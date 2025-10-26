@@ -7,6 +7,7 @@ import pytest
 
 from scripts import audit_metrics as audit_script
 from scripts import bump_version as bump_module
+from scripts import diagnostics_bundle
 from scripts import observability_snapshot as observability_script
 from scripts import run_tests_with_trace as trace_script
 from scripts import scaffold_extension as scaffold_module
@@ -105,6 +106,22 @@ def test_audit_main_writes_report(tmp_path, monkeypatch, capsys) -> None:
     assert payload["coverage_percent"] == 88.8
     printed = json.loads(capsys.readouterr().out)
     assert printed == payload
+
+
+def test_diagnostics_bundle_main(tmp_path, monkeypatch) -> None:
+    output_path = tmp_path / "diagnostics.json"
+    snapshot_dir = tmp_path / "snapshots"
+    monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(snapshot_dir))
+
+    exit_code = diagnostics_bundle.main(
+        ["--output", str(output_path), "--limit-events", "5", "--pretty"]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert "health" in payload
+    assert payload["observability"]["events"]["applied_limit"] == 5
+    assert payload["snapshots"]["directory"].endswith("snapshots")
 
 
 def test_parse_adjustment_expression() -> None:
@@ -253,6 +270,52 @@ def test_observability_snapshot_outputs_json(capsys) -> None:
     payload = json.loads(output)
     assert "metrics" in payload
     assert "traces" in payload
+
+
+def test_observability_snapshot_store_and_list(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
+
+    exit_code = observability_script.main(["--store"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    json.loads(captured.out)  # digest payload
+    assert "Stored snapshot" in captured.err
+    stored_files = list(tmp_path.glob("*.json"))
+    assert stored_files, "Expected snapshot file to be created"
+
+    list_exit = observability_script.main(["--list", "--pretty"])
+    listed = capsys.readouterr()
+
+    assert list_exit == 0
+    listing = json.loads(listed.out)
+    assert listing and "snapshot_id" in listing[0]
+    assert listing[0]["metadata"]["source"] == "cli"
+
+
+def test_observability_snapshot_compare(monkeypatch, tmp_path, capsys) -> None:
+    storage_dir = tmp_path / "store"
+    monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(storage_dir))
+
+    storage_dir.mkdir()
+    observability_script.main(["--store"])
+    capsys.readouterr()
+
+    output_file = tmp_path / "target.json"
+    exit_code = observability_script.main(["--output", str(output_file), "--label", "comparison"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert output_file.exists()
+    json.loads(captured.out)
+
+    diff_exit = observability_script.main(["--compare", str(output_file), "--pretty"])
+    diff_output = capsys.readouterr().out
+
+    assert diff_exit == 0
+    diff_payload = json.loads(diff_output)
+    assert "event_counts_delta" in diff_payload
+    assert diff_payload["metadata_changes"]["added"].get("label") == "comparison"
 
 
 def test_scaffold_service_generates_module(monkeypatch, tmp_path) -> None:

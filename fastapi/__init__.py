@@ -18,6 +18,7 @@ import json
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, Callable, Iterable
+from urllib.parse import parse_qs
 
 from pydantic import BaseModel, ValidationError
 
@@ -25,6 +26,7 @@ __all__ = [
     "Depends",
     "FastAPI",
     "HTTPException",
+    "Query",
     "Response",
     "status",
 ]
@@ -64,6 +66,32 @@ class Response:
 
     def json(self) -> Any:
         return self.data
+
+
+def _split_path(path: str) -> list[str]:
+    if path in {"", "/"}:
+        return []
+    return [segment for segment in path.strip("/").split("/") if segment]
+
+
+def _match_path(pattern: str, path: str) -> tuple[bool, dict[str, str]]:
+    """Return ``(matched, params)`` for ``pattern`` against ``path``."""
+
+    pattern_segments = _split_path(pattern)
+    path_segments = _split_path(path)
+    if len(pattern_segments) != len(path_segments):
+        return False, {}
+    params: dict[str, str] = {}
+    for pattern_part, path_part in zip(pattern_segments, path_segments, strict=False):
+        if pattern_part.startswith("{") and pattern_part.endswith("}"):
+            key = pattern_part[1:-1]
+            if not key:
+                return False, {}
+            params[key] = path_part
+            continue
+        if pattern_part != path_part:
+            return False, {}
+    return True, params
 
 
 class FastAPI:
@@ -120,14 +148,23 @@ class FastAPI:
     # Request execution
     # ------------------------------------------------------------------
     def handle_request(self, method: str, path: str, payload: Any | None = None) -> Response:
-        route = next(
-            (item for item in self._routes if item.method == method and item.path == path), None
-        )
+        route = None
+        path_params: dict[str, str] = {}
+        raw_path, _, query_string = path.partition("?")
+        for candidate in self._routes:
+            if candidate.method != method:
+                continue
+            matched, params = _match_path(candidate.path, raw_path)
+            if matched:
+                route = candidate
+                path_params = params
+                break
         if route is None:
             return Response(status_code=404, data={"detail": "Not Found"})
 
         try:
-            kwargs = _build_kwargs(route.endpoint, payload)
+            query_params = _parse_query(query_string)
+            kwargs = _build_kwargs(route.endpoint, payload, path_params, query_params)
             result = route.endpoint(**kwargs)
             if isinstance(result, Response):
                 return result
@@ -188,7 +225,12 @@ class FastAPI:
         return [body_bytes]
 
 
-def _build_kwargs(func: Callable[..., Any], payload: Any | None) -> dict[str, Any]:
+def _build_kwargs(
+    func: Callable[..., Any],
+    payload: Any | None,
+    path_params: dict[str, str],
+    query_params: dict[str, str] | None,
+) -> dict[str, Any]:
     import inspect
 
     signature = inspect.signature(func)
@@ -205,6 +247,22 @@ def _build_kwargs(func: Callable[..., Any], payload: Any | None) -> dict[str, An
     for name, parameter in signature.parameters.items():
         default = parameter.default
         annotation = type_hints.get(name, parameter.annotation)
+        if name in path_params:
+            raw_value = path_params[name]
+            if isinstance(annotation, type) and annotation is not inspect._empty:
+                try:
+                    kwargs[name] = annotation(raw_value)
+                except Exception as exc:  # pragma: no cover - defensive
+                    raise ValidationError(
+                        [{"loc": (name,), "msg": f"Invalid value: {raw_value!r}"}]
+                    ) from exc
+            else:
+                kwargs[name] = raw_value
+            continue
+        if query_params and name in query_params:
+            raw_value = query_params[name]
+            kwargs[name] = _coerce_query_value(annotation, raw_value)
+            continue
         if isinstance(default, Depends):
             kwargs[name] = default.dependency()
             continue
@@ -243,6 +301,40 @@ def _serialise_response(result: Any) -> Any:
     return result
 
 
+def _parse_query(raw: str) -> dict[str, str]:
+    if not raw:
+        return {}
+    parsed = parse_qs(raw, keep_blank_values=True)
+    return {key: (values[-1] if values else "") for key, values in parsed.items()}
+
+
+def _coerce_query_value(annotation: Any, raw_value: str | None) -> Any:
+    import inspect
+    from typing import get_args, get_origin
+
+    if raw_value is None:
+        return None
+    if annotation is inspect._empty:
+        return raw_value
+
+    origin = get_origin(annotation)
+    if origin is None:
+        candidate_types = (annotation,)
+    else:
+        candidate_types = tuple(
+            candidate for candidate in get_args(annotation) if candidate is not type(None)
+        )
+        if not candidate_types:
+            return raw_value
+
+    for candidate in candidate_types:
+        try:
+            return candidate(raw_value)
+        except Exception:  # pragma: no cover - fallback to raw string
+            continue
+    return raw_value
+
+
 status = SimpleNamespace(
     HTTP_200_OK=200,
     HTTP_201_CREATED=201,
@@ -250,3 +342,9 @@ status = SimpleNamespace(
     HTTP_404_NOT_FOUND=404,
     HTTP_422_UNPROCESSABLE_ENTITY=422,
 )
+
+
+def Query(default: Any | None = None, **_: Any) -> Any:
+    """Compatibility helper mirroring :func:`fastapi.Query` semantics."""
+
+    return default

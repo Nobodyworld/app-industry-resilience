@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Any, cast
 
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from src.application import DataSource, IdiotIndexService, ScenarioPlanner
 from src.core import summarise_health
@@ -20,6 +20,7 @@ from src.infrastructure.observability import (
 from src.interfaces.api.dependencies import (
     get_idiot_index_service,
     get_scenario_planner,
+    get_snapshot_storage,
     metric_config_from_flag,
 )
 from src.interfaces.api.schemas import (
@@ -32,8 +33,11 @@ from src.interfaces.api.schemas import (
     HealthResponse,
     MetaSourcesResponse,
     ObservabilityDigestResponse,
+    ObservabilityEventsResponse,
     ObservabilityEventsSummaryModel,
     ObservabilityMetricsModel,
+    ObservabilitySnapshotMeta,
+    ObservabilitySnapshotResponse,
     ObservabilityStatusResponse,
     ObservationEventModel,
     ScenarioRequest,
@@ -43,6 +47,8 @@ from src.interfaces.api.schemas import (
     metadata_from_summary,
     records_to_dataframe,
     scenario_to_response,
+    snapshot_meta_to_payload,
+    snapshot_response_to_payload,
     summary_to_response,
 )
 from src.interfaces.api.telemetry import DEFAULT_TELEMETRY, ApiTelemetry
@@ -205,6 +211,70 @@ def observability_digest() -> ObservabilityDigestResponse:
         events=event_payload,
         subscriptions=digest["subscriptions"],
     )
+
+
+@app.get(
+    "/observability/events",
+    response_model=ObservabilityEventsResponse,
+    tags=["system"],
+)
+def observability_events(
+    limit: int | None = Query(25, ge=1, le=100),
+    status: str | None = Query(
+        None,
+        description="Optional status filter (success, error, warn).",
+        min_length=1,
+    ),
+) -> ObservabilityEventsResponse:
+    """Expose recent observation events for debugging and automation."""
+
+    normalised_status = status.lower() if status else None
+    filtered = _observability_registry.events(status=normalised_status)
+    if limit is not None:
+        limited = filtered[:limit]
+    else:
+        limited = filtered
+    events = [ObservationEventModel(**event) for event in limited]
+    return ObservabilityEventsResponse(
+        events=events,
+        total_available=len(filtered),
+        applied_limit=limit,
+        applied_status=normalised_status,
+    )
+
+
+@app.get(
+    "/observability/snapshots",
+    response_model=list[ObservabilitySnapshotMeta],
+    tags=["system"],
+)
+def observability_snapshots(
+    storage=Depends(get_snapshot_storage),
+) -> list[dict[str, Any]]:
+    """List stored observability snapshots."""
+
+    snapshots = storage.list()
+    return [snapshot_meta_to_payload(snapshot) for snapshot in snapshots]
+
+
+@app.get(
+    "/observability/snapshots/{snapshot_id}",
+    response_model=ObservabilitySnapshotResponse,
+    tags=["system"],
+)
+def observability_snapshot_detail(
+    snapshot_id: str,
+    storage=Depends(get_snapshot_storage),
+) -> dict[str, Any]:
+    """Return a stored observability snapshot by identifier."""
+
+    try:
+        snapshot = storage.get(snapshot_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return snapshot_response_to_payload(snapshot)
 
 
 @app.get("/meta/sources", response_model=MetaSourcesResponse, tags=["meta"])
