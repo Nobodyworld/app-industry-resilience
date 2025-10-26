@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from src.application.scenario_planner import ScenarioResult
+from src.core import HealthSummary
 
 
 @dataclass(frozen=True)
@@ -176,6 +177,74 @@ def calculate_benchmark(df: pd.DataFrame, industry_code: str | None) -> Mapping[
     return benchmark
 
 
+def build_health_sector_table(summary: HealthSummary | None) -> pd.DataFrame:
+    """Return a tidy dataframe describing health scores per cohort."""
+
+    if summary is None:
+        return pd.DataFrame(
+            columns=[
+                "cohort",
+                "industries",
+                "average_health_score",
+                "risk_band",
+                "average_idiot_index",
+            ]
+        )
+
+    rows = [
+        {
+            "cohort": "Overall",
+            "industries": summary.overall.industries,
+            "average_health_score": summary.overall.average_health_score,
+            "risk_band": summary.overall.risk_band,
+            "average_idiot_index": summary.overall.average_idiot_index,
+        }
+    ]
+    for aggregate in summary.sectors:
+        rows.append(
+            {
+                "cohort": f"Sector {aggregate.label}",
+                "industries": aggregate.industries,
+                "average_health_score": aggregate.average_health_score,
+                "risk_band": aggregate.risk_band,
+                "average_idiot_index": aggregate.average_idiot_index,
+            }
+        )
+    table = pd.DataFrame(rows)
+    return table.sort_values("average_health_score", ascending=False, na_position="last")
+
+
+def build_health_band_distribution(summary: HealthSummary | None) -> pd.DataFrame:
+    """Return risk band counts for charting or tables."""
+
+    if summary is None:
+        return pd.DataFrame(columns=["band", "industries", "percentage"])
+    return pd.DataFrame([band.__dict__ for band in summary.band_breakdown])
+
+
+def build_health_risk_table(summary: HealthSummary | None, *, limit: int = 5) -> pd.DataFrame:
+    """Return highest-risk industries based on health score."""
+
+    if summary is None or not summary.top_risks:
+        return pd.DataFrame(columns=["industry_code", "industry_name", "health_score", "band"])
+    rows = [risk.__dict__ for risk in summary.top_risks[:limit]]
+    table = pd.DataFrame(rows)
+    return table.sort_values("health_score", ascending=True, na_position="last")
+
+
+def extract_health_badge(summary: HealthSummary | None) -> Mapping[str, str | None]:
+    """Return formatted values for badge display."""
+
+    if summary is None:
+        return {"score": None, "band": None}
+    score = summary.overall.average_health_score
+    band = summary.overall.risk_band
+    return {
+        "score": f"{score:.1f}" if score is not None else None,
+        "band": band,
+    }
+
+
 def prepare_trend_data(
     df: pd.DataFrame,
     selected_codes: Sequence[str],
@@ -199,6 +268,10 @@ def summarise_scenario_deltas(result: ScenarioResult, *, top_n: int = 5) -> Mapp
         "scenario": result.scenario_summary,
         "delta": result.delta_summary,
         "top": top,
+        "health": {
+            "baseline": result.baseline_health_summary,
+            "scenario": result.scenario_health_summary,
+        },
     }
     return summary
 

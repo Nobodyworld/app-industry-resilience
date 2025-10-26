@@ -345,7 +345,7 @@ def _parse_url_list(raw: str, name: str) -> tuple[str, ...]:
             raise ConfigError(f"{name} entry '{candidate}' must be an absolute http(s) URL.")
         validated[candidate] = None
 
-    # TODO - (config-cache): Cache parsed URLs on disk to avoid reparsing large lists
+    # TODO-P3(6h): Cache parsed URLs on disk to avoid reparsing large lists
     # on every process start once configuration hot-reload lands.
     return tuple(validated.keys())
 

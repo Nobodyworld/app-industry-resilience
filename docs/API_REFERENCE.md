@@ -39,6 +39,10 @@ Contains `load_sample_csv` for offline demo data and `load_csv` for arbitrary CS
 - `compute_metrics(dataframe)` calculates Idiot Index, value-added share, materials share, and guards division-by-zero.
 - `rank_industries(dataframe, metric="idiot_index", top_n=10)` surfaces leaderboard slices.
 
+### `src.core.analytics`
+- `compute_health_scores(dataframe, config=HealthScoreConfig())` appends `health_score` and `health_band` columns using weighted composites of resilience metrics.
+- `summarise_health(dataframe, group_by="all", top_risk_limit=5)` aggregates cohort health summaries, band distribution, and the highest-risk industries.
+
 ### `src.core.security.SecurityUtils`
 Collection of static methods for validating API keys, CSV uploads, and general string sanitisation. All UI entrypoints call these utilities before processing user-supplied data.
 
@@ -48,6 +52,8 @@ Collection of static methods for validating API keys, CSV uploads, and general s
 - `build_comparison_table(dataframe)` – produce a tidy summary for export tabs.
 - `calculate_benchmark(dataframe)` – compute aggregated Idiot Index benchmarks for the selected filters.
 - `prepare_download_artifacts(summary)` – bundle CSV/JSON/Excel outputs for downloads.
+- `build_health_sector_table(summary)` – tabular view of cohort health scores used in the Streamlit health tab.
+- `build_health_risk_table(summary)` / `build_health_band_distribution(summary)` – support risk tables and band distribution charts in the UI.
 
 ### `src.interfaces.streamlit.components`
 Reusable rendering helpers used by `app.py`. Components include `render_page_header`, `render_signal_bar`, `render_insight_tabs`, and `render_download_panel`.
@@ -61,7 +67,8 @@ Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
 ## Headless API
 
 ### `src.interfaces.api.app`
-- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/evaluate`, `/scenario`, and `/metrics` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics and trace IDs.
+- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/evaluate`, `/scenario`, `/analytics/health`, `/metrics`, and `/observability/status` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
+- `ObservabilityRegistry` – Singleton registry (see `src/infrastructure/observability/instrumentation.py`) aggregating metrics, traces, and health checks. Extensions register instrumentation hooks through it instead of modifying services directly.
 
 ### `src.interfaces.api.schemas`
 - Lightweight Pydantic-style models (`EvaluateRequest`, `EvaluateResponse`, `ScenarioRequest`, etc.) plus helpers to convert pandas dataframes and service summaries into JSON-safe payloads.

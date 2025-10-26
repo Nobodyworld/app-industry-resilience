@@ -9,9 +9,10 @@ from typing import cast
 import pandas as pd
 
 import streamlit as st
+from src.core import HealthSummary
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from .helpers import DownloadArtifact
+from .helpers import DownloadArtifact, extract_health_badge
 
 
 @dataclass
@@ -288,7 +289,7 @@ def render_sidebar(
     )
 
 
-def render_signal_bar(df: pd.DataFrame) -> None:
+def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None = None) -> None:
     """Show high-level dataset signals."""
 
     total_rows = len(df)
@@ -322,6 +323,16 @@ def render_signal_bar(df: pd.DataFrame) -> None:
             "hint": "gross output ÷ materials cost",
         },
     ]
+
+    badge = extract_health_badge(health_summary)
+    if badge["score"] is not None:
+        cards.append(
+            {
+                "label": "Avg health score",
+                "value": str(badge["score"]),
+                "hint": f"risk band: {badge['band']}" if badge["band"] else "composite resilience",
+            }
+        )
 
     cols = st.columns(len(cards))
     for col, card in zip(cols, cards, strict=False):
@@ -520,7 +531,7 @@ def render_scenario_results(
         delta_summary.get("resilience_score_avg"),
     )
 
-    metric_cols_secondary = st.columns(3)
+    metric_cols_secondary = st.columns(4)
     _metric(
         metric_cols_secondary[0],
         "Average Idiot Index",
@@ -539,6 +550,21 @@ def render_scenario_results(
         getattr(baseline_summary, "shock_sensitivity_index_avg", None),
         delta_summary.get("shock_sensitivity_index_avg"),
     )
+    _metric(
+        metric_cols_secondary[3],
+        "Average health score",
+        getattr(baseline_summary, "health_score_avg", None),
+        delta_summary.get("health_score_avg"),
+    )
+
+    health_meta = cast(dict[str, HealthSummary | None], summary.get("health", {}))
+    baseline_health = health_meta.get("baseline")
+    scenario_health = health_meta.get("scenario")
+    if baseline_health and scenario_health:
+        st.caption(
+            "Risk band shift: "
+            f"{baseline_health.overall.risk_band or '—'} → {scenario_health.overall.risk_band or '—'}"
+        )
 
     st.markdown("### Scenario comparison table")
     st.dataframe(comparison_table, use_container_width=True)

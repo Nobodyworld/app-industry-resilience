@@ -1,5 +1,15 @@
 """Core domain modules for the Idiot Index application."""
 
+from .analytics import (
+    HealthAggregate,
+    HealthBand,
+    HealthBandBreakdown,
+    HealthRisk,
+    HealthScoreConfig,
+    HealthSummary,
+    compute_health_scores,
+    summarise_health,
+)
 from .cache import Cache, CacheStats, get_api_cache, get_computation_cache
 from .config import (
     AppConfig,
@@ -21,6 +31,12 @@ from .utils import HTTPRequestError, InvalidJSONError, RetryPolicy, safe_get_jso
 __all__ = [
     "AppConfig",
     "Cache",
+    "HealthAggregate",
+    "HealthBand",
+    "HealthBandBreakdown",
+    "HealthRisk",
+    "HealthScoreConfig",
+    "HealthSummary",
     "CacheConfig",
     "CacheStats",
     "ConfigError",
@@ -35,6 +51,7 @@ __all__ = [
     "RetryPolicy",
     "SecurityUtils",
     "ValidationResult",
+    "compute_health_scores",
     "compute_metrics",
     "format_for_display",
     "get_api_cache",
@@ -43,5 +60,6 @@ __all__ = [
     "load_config",
     "normalize_columns",
     "safe_get_json",
+    "summarise_health",
     "validate_config",
 ]

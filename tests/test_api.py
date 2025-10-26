@@ -76,12 +76,33 @@ def test_evaluate_with_inline_dataset_returns_leaderboard() -> None:
     assert len(data["dataset"]["full"]) == len(records)
     assert any("manufacturing_cost_driver" in note for note in data["notes"])
     assert "manufacturing_cost_driver" in data["metadata"].get("extensions", {})
+    assert data["health"] is not None
+    assert data["health"]["filtered"]["overall"]["average_health_score"] is not None
 
     metrics_response = client.get("/metrics")
     assert metrics_response.status_code == 200
     assert "idiot_index_api_requests_total" in metrics_response.text
     assert metrics_response.media_type is not None
     assert metrics_response.media_type.startswith("text/plain")
+
+
+def test_observability_status_reports_metrics() -> None:
+    records = _sample_records(2)
+    payload = {
+        "source": "sample",
+        "year": records[0]["year"],
+        "records": records,
+        "top_n": 2,
+    }
+    client.post("/evaluate", json=payload)
+
+    response = client.get("/observability/status")
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["metrics"]["counters"] >= 1
+    assert isinstance(data["recent_events"], list)
+    assert "instrumentation_core" in data["health_checks"]
 
 
 def test_evaluate_rejects_invalid_top_n() -> None:
@@ -119,6 +140,8 @@ def test_scenario_endpoint_returns_delta_metrics() -> None:
     metadata = data["metadata"]
     assert "extensions" in metadata
     assert "manufacturing_cost_driver" in metadata["extensions"]
+    assert data["baseline_health"] is not None
+    assert data["scenario_health"] is not None
 
 
 def test_scenario_rejects_empty_dataset() -> None:
@@ -131,3 +154,22 @@ def test_scenario_rejects_empty_dataset() -> None:
 
     assert response.status_code == 400
     assert "dataframe" in response.json()["detail"].lower()
+
+
+def test_health_analytics_endpoint_returns_summary() -> None:
+    records = _sample_records(4)
+    payload = {
+        "source": "sample",
+        "year": records[0]["year"],
+        "records": records,
+        "group_by": "sector",
+        "top_risks": 2,
+    }
+
+    response = client.post("/analytics/health", json=payload)
+    data = response.json()
+
+    assert response.status_code == 200
+    assert data["health"]["full"]["overall"]["industries"] >= len(records)
+    assert len(data["health"]["filtered"]["sectors"]) >= 1
+    assert data["filters"]["search"] is None

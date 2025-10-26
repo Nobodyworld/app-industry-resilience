@@ -26,6 +26,7 @@ This isn’t an academic metric; it’s a blunt heuristic popularized in enginee
   - Explore data with interactive Plotly charts
   - Stress test industries with the Scenario Lab to model cost/output shocks
 - Works **offline** out of the box via a bundled sample dataset.
+- Computes a **composite health score** with risk banding so you can spot fragile industries at a glance.
 - **Robust error handling** with graceful degradation and clear user feedback
 - **Input validation** for all user inputs and data sources
 
@@ -80,8 +81,6 @@ Open the local URL it prints (usually http://localhost:8501). The app will load 
 
 ## Docker Deployment
 
-## Docker Deployment
-
 For easy deployment and development:
 
 ```bash
@@ -133,11 +132,19 @@ make security      # pip-audit + detect-secrets baseline validation
 make sbom          # Generate CycloneDX SBOM at build/sbom/cyclonedx.json
 make scenario      # Run the scenario planner CLI (pass ARGS="--adjust codes=311,gross=5")
 make prefetch-cache # Warm caches using the prefetch utility
+make analytics     # Emit health analytics JSON from a CSV dataset
+make observability # Print a JSON observability snapshot (pass ARGS="--pretty")
+make audit         # Capture stewardship metrics and write build/reports/audit-metrics.json
 make api             # Launch the headless API service (pass ARGS="--port 9100" for custom ports)
 make docs          # List key documentation links in the terminal
 python scripts/check_health.py --pretty  # Run the consolidated health probe without the HTTP API
-python -m trace --count --coverdir build/coverage scripts/run_pytest_trace.py  # Generate offline coverage without pytest-cov
+python scripts/observability_snapshot.py --pretty  # Same observability payload as /observability/status
+python scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for analytics/API critical paths (override with --paths)
+python scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
 ```
+
+All helper scripts now self-bootstrap the repository root onto `PYTHONPATH`, so running `python scripts/<name>.py` works without
+activating editable installs or manually exporting environment variables.
 
 Commit messages must follow the Conventional Commits spec; the provided hooks will prevent non-conforming messages.
 
@@ -153,10 +160,22 @@ This invokes `scripts/run_api.py`, which serves the lightweight FastAPI-compatib
 
 - `GET /health` – readiness probe returning service metadata, component-level status, and telemetry counts.
 - `GET /healthz` – Kubernetes-style alias that also exposes trace correlation IDs.
+- `GET /observability/status` – Prometheus/OpenTelemetry summary (metrics, traces, recent operation events).
 - `GET /meta/sources` – list of supported data sources.
 - `POST /evaluate` – compute Idiot Index metrics for a dataset or remote source.
 - `POST /scenario` – run Scenario Lab adjustments on a supplied dataset.
+- `POST /analytics/health` – return composite health scores, band distribution, and top-risk industries for the requested dataset.
 - `GET /metrics` – Prometheus text exposition with counters, histograms, and gauges.
+
+### Command-line health analytics
+
+Generate a JSON summary of industry health directly from a CSV without starting Streamlit:
+
+```bash
+make analytics ARGS="--input data/sample_industries.csv --group-by sector --pretty"
+```
+
+The script normalises the dataset, computes Idiot Index metrics, derives health scores, and prints cohort summaries with top-risk industries.
 
 See [docs/API_HEADLESS.md](docs/API_HEADLESS.md) for payload schemas and sample `curl` invocations.
 

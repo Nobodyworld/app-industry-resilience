@@ -14,7 +14,7 @@ from typing import List, Sequence
 
 from src.application import DataSource, evaluate_idiot_index
 from src.application.idiot_index_service import IndustryMetrics, LoggerHooks
-from src.core import SecurityUtils
+from src.core import HealthSummary, SecurityUtils
 from src.infrastructure import log_data_processing, log_performance
 
 from .toolkit import tool
@@ -96,6 +96,14 @@ class IdiotIndexResponse:
         default_factory=list,
         metadata={"description": "Metadata notes returned from upstream services when available."},
     )
+    health_score_average: float | None = field(
+        default=None,
+        metadata={"description": "Composite health score (0-100) for the filtered dataset."},
+    )
+    health_risk_band: str | None = field(
+        default=None,
+        metadata={"description": "Risk band label for the filtered dataset (excellent/healthy/watch/critical)."},
+    )
 
 
 def _to_snapshot(entry: IndustryMetrics) -> IndustrySnapshot:
@@ -106,6 +114,12 @@ def _to_snapshot(entry: IndustryMetrics) -> IndustrySnapshot:
         idiot_index=idiot_index,
         value_added_pct=entry.value_added_pct,
     )
+
+
+def _health_overview(summary: HealthSummary | None) -> tuple[float | None, str | None]:
+    if summary is None:
+        return None, None
+    return summary.overall.average_health_score, summary.overall.risk_band
 
 
 @tool(
@@ -129,12 +143,15 @@ def compute_idiot_index_summary(payload: IdiotIndexRequest) -> IdiotIndexRespons
     )
 
     top_industries = [_to_snapshot(entry) for entry in summary.leaderboard]
+    health_score, health_band = _health_overview(summary.health_summary_filtered)
 
     return IdiotIndexResponse(
         rows_evaluated=len(summary.dataframe_filtered),
         idiot_index_average=summary.average_idiot_index,
         top_industries=top_industries,
         notes=list(summary.notes),
+        health_score_average=health_score,
+        health_risk_band=health_band,
     )
 
 

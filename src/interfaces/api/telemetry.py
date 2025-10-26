@@ -11,6 +11,7 @@ from src.infrastructure.observability import (
     Gauge,
     Histogram,
     MetricRegistry,
+    ObservabilityRegistry,
     Tracer,
     current_trace_id,
     render_prometheus_text,
@@ -35,14 +36,24 @@ class RequestTelemetryContext:
 class ApiTelemetry:
     """Container storing API metrics and tracing utilities."""
 
-    registry: MetricRegistry = field(default_factory=MetricRegistry)
-    tracer: Tracer = field(default_factory=Tracer)
+    registry_override: MetricRegistry | None = None
+    tracer_override: Tracer | None = None
+    observability: ObservabilityRegistry | None = None
+    registry: MetricRegistry = field(init=False, repr=False)
+    tracer: Tracer = field(init=False, repr=False)
     _request_counter: Counter = field(init=False, repr=False)
     _latency: Histogram = field(init=False, repr=False)
     _inflight: Gauge = field(init=False, repr=False)
     _errors: Counter = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
+        registry = self.registry_override
+        tracer = self.tracer_override
+        if self.observability is not None:
+            registry = registry or self.observability.metrics
+            tracer = tracer or self.observability.tracer
+        self.registry = registry or MetricRegistry()
+        self.tracer = tracer or Tracer()
         self._request_counter = self.registry.counter(
             "idiot_index_api_requests_total",
             "Total number of API requests",
@@ -82,7 +93,6 @@ class ApiTelemetry:
         status_code: int,
         context: RequestTelemetryContext,
         *,
-        trace_id: str | None = None,
         error: BaseException | None = None,
     ) -> None:
         context.finish(type(error) if error else None, error)
@@ -96,9 +106,6 @@ class ApiTelemetry:
             self._errors.increment(labels={"path": path, "kind": "server"})
         elif status_code >= 400:
             self._errors.increment(labels={"path": path, "kind": "client"})
-        active_trace = trace_id or context.trace_id
-        if active_trace:
-            self._latency.observe(duration, labels={"method": method, "path": f"{path}#trace"})
 
     def record_exception(self, path: str, kind: str = "server") -> None:
         self._errors.increment(labels={"path": path, "kind": kind})
@@ -112,7 +119,7 @@ class ApiTelemetry:
     def health_snapshot(self) -> dict[str, Any]:
         """Return lightweight readiness metadata for health probes."""
 
-        return {
+        payload = {
             "metrics": {
                 "counters": len(self.registry.counters),
                 "gauges": len(self.registry.gauges),
@@ -122,6 +129,9 @@ class ApiTelemetry:
                 "exported_spans": self.tracer.span_count(),
             },
         }
+        if self.observability is not None:
+            payload["observability"] = self.observability.health_overview()
+        return payload
 
 
 DEFAULT_TELEMETRY = ApiTelemetry()

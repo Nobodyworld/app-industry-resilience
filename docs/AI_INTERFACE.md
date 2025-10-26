@@ -25,6 +25,8 @@ The Idiot Index app ships with a lightweight agent toolkit under `agents/`. Tool
 | `idiot_index_average` | number | Mean Idiot Index across the filtered dataset (if available). |
 | `top_industries` | array of objects | Each entry contains `code`, `name`, `idiot_index`, and optional `value_added_pct`. |
 | `notes` | array of strings | Metadata returned by upstream services (e.g., BEA notes). |
+| `health_score_average` | number | Composite health score (0–100) for the filtered dataset. |
+| `health_risk_band` | string | Risk band label (`excellent`, `healthy`, `watch`, or `critical`). |
 
 The JSON schemas for the request and response models are accessible at runtime via `agents.get_tool("compute_idiot_index_summary").input_schema` and `.output_schema`.
 

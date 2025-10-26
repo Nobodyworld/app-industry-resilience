@@ -128,6 +128,11 @@ def test_cache_respects_ttl(monkeypatch, tmp_path) -> None:
     assert not path.exists()
 
 
+def test_cache_rejects_invalid_ttl(tmp_path) -> None:
+    with pytest.raises(ValueError):
+        Cache(tmp_path, ttl_seconds=0)
+
+
 def test_format_for_display_coerces_numeric() -> None:
     frame = pd.DataFrame({"gross_output": ["100"], "materials_cost": ["50"]})
     formatted = format_for_display(frame)

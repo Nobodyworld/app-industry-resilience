@@ -1,6 +1,11 @@
 """Extension utilities for the Idiot Index platform."""
 
-from .contracts import ExtensionContributions, ScenarioExtension, SummaryExtension
+from .contracts import (
+    ExtensionContributions,
+    InstrumentationExtension,
+    ScenarioExtension,
+    SummaryExtension,
+)
 from .manager import (
     ExtensionManager,
     discover_extension_modules,
@@ -10,6 +15,7 @@ from .manager import (
 
 __all__ = [
     "ExtensionContributions",
+    "InstrumentationExtension",
     "ScenarioExtension",
     "SummaryExtension",
     "ExtensionManager",

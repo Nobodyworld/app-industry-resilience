@@ -6,7 +6,8 @@ This repository welcomes code-writing agents as long as they follow the guardrai
 
 1. **Always run the quality gate** before committing (`make quality-gate`). This ensures linting, type checks, tests, coverage enforcement, and security scans all pass locally.
 2. **Respect the extension system.** Load reusable logic via the `ExtensionManager` rather than modifying core services directly. New plugins should be created with `python scripts/scaffold_extension.py --name <snake_case_name>`.
-3. **Keep telemetry intact.** The observability layer under `src/infrastructure/observability` powers Prometheus metrics and trace correlation. Do not remove or bypass instrumentation without updating the docs and dashboards.
+3. **Keep telemetry intact.** The observability layer under `src/infrastructure/observability` powers Prometheus metrics, the `/observability/status` endpoint, and trace correlation. Do not remove or bypass instrumentation without updating the docs and dashboards.
+4. **Prefer instrumentation extensions.** When adding metrics or health checks, register an `InstrumentationExtension` through the `ExtensionManager` instead of editing core services directly.
 4. **Document deviations.** If an agent changes behaviour or relaxes a guard, explain the rationale in the pull request body and update the relevant guides (README, EXTENSION_GUIDE.md, RELEASE_NOTES.md).
 
 ## Safe Operating Checklist

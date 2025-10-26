@@ -48,6 +48,10 @@ def test_scenario_planner_applies_adjustments() -> None:
 
     assert result.delta_summary["gross_output_total"] == pytest.approx(10.0)
     assert result.delta_summary["materials_cost_total"] == pytest.approx(-2.0)
+    assert "health_score" in result.baseline.columns
+    assert result.baseline_health_summary is not None
+    assert result.scenario_health_summary is not None
+    assert "health_score_avg" in result.delta_summary
 
 
 def test_plan_scenario_defaults_to_no_cache() -> None:
@@ -55,3 +59,5 @@ def test_plan_scenario_defaults_to_no_cache() -> None:
     result = plan_scenario(base, [])
     pd.testing.assert_frame_equal(result.baseline, result.scenario)
     assert result.deltas["gross_output"].abs().sum() == 0.0
+    assert "health_score" in result.baseline.columns
+    assert result.baseline_health_summary is not None

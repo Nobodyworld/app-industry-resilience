@@ -1,6 +1,6 @@
-streamlit==1.39.0
-pandas==2.2.2
-python-dotenv==1.1.1
-requests==2.32.3
-plotly==6.3.1
-pytest==8.4.2
+streamlit>=1.39.0,<2
+pandas>=2.2.2,<3
+python-dotenv>=1.0.1,<2
+requests>=2.32.3,<3
+plotly>=6.3.1,<7
+pytest>=8.4.2,<9

@@ -27,8 +27,8 @@ The Idiot Index application follows a layered Python architecture designed for t
 
 ### Core
 - **Location:** `src/core`
-- **Purpose:** Provide reusable primitives such as configuration (`config`), caching (`cache`), metrics (`metrics`), normalisation (`normalize`), and security validation (`security`).
-- **Highlights:** Security utilities ensure API keys, uploads, and CSV content are validated before downstream processing.
+- **Purpose:** Provide reusable primitives such as configuration (`config`), caching (`cache`), metrics (`metrics`), health analytics (`analytics`), normalisation (`normalize`), and security validation (`security`).
+- **Highlights:** Security utilities ensure API keys, uploads, and CSV content are validated before downstream processing. The analytics module computes composite health scores, risk bands, and cohort summaries that are reused by both UI components and the headless API.
 
 ### Application
 - **Location:** `src/application`
@@ -40,8 +40,8 @@ The Idiot Index application follows a layered Python architecture designed for t
 
 ### Infrastructure
 - **Location:** `src/infrastructure`
-- **Purpose:** Cross-cutting concerns like logging, throttling (`api_limiter`), and telemetry. These modules are shared across adapters and services to keep observability consistent.
-- **Highlights:** `src/infrastructure/observability` provides Prometheus-compatible metrics, lightweight tracing, and helpers used by the instrumented FastAPI façade. Logs automatically include the active `trace_id`.
+- **Purpose:** Cross-cutting concerns like logging, throttling (`api_limiter`), observability, and caching. These modules are shared across adapters and services to keep instrumentation consistent.
+- **Highlights:** `src/infrastructure/observability` now centralises metrics, tracing, and health integration through the `ObservabilityRegistry`. Application services wrap key operations with `registry.operation(...)` so spans, Prometheus counters, and health snapshots stay in sync. Logs automatically include the active `trace_id`.
 
 ### Agents
 - **Location:** `agents`
@@ -49,15 +49,15 @@ The Idiot Index application follows a layered Python architecture designed for t
 
 ### Extensions
 - **Location:** `src/extensions`
-- **Purpose:** Load modular analytics via `ExtensionManager`. Summary extensions enrich `IdiotIndexSummary` objects with additional notes or metadata, while scenario extensions decorate `ScenarioResult` payloads. Modules are discovered through `extensions/manifest.json` and the `IDIOT_INDEX_EXTENSIONS` environment variable.
-- **Highlights:** The built-in `manufacturing_cost_driver` extension demonstrates how to calculate additional insights and surface them in API responses.
+- **Purpose:** Load modular analytics via `ExtensionManager`. Summary extensions enrich `IdiotIndexSummary` objects with additional notes or metadata, scenario extensions decorate `ScenarioResult` payloads, and instrumentation extensions register metrics/health hooks against the shared observability registry. Modules are discovered through `extensions/manifest.json` and the `IDIOT_INDEX_EXTENSIONS` environment variable.
+- **Highlights:** The built-in `manufacturing_cost_driver` extension demonstrates data enrichment, while `core_instrumentation` wires counters and health checks for pipeline execution.
 
 ## Data flow summary
 
 1. **Configuration bootstrap** – `app.py` loads configuration via `src.core.config.load_config()`, validating environment variables, API keys, and file policies.
 2. **Data acquisition** – `src.application.service.IdiotIndexService` requests data from adapters based on user selection (sample CSV, BEA, or Census ASM). Adapters rely on shared retry/caching utilities.
-3. **Normalisation** – `src.core.normalize` ensures consistent column naming; `src.core.metrics.compute_metrics` calculates Idiot Index, value-added %, and material share metrics.
-4. **Narrative rendering** – Streamlit components under `src.interfaces.streamlit` render hero metrics, tables, and charts while maintaining accessible structure for tests.
+3. **Normalisation** – `src.core.normalize` ensures consistent column naming; `src.core.metrics.compute_metrics` calculates Idiot Index, value-added %, and material share metrics. `src.core.analytics.compute_health_scores` then derives composite health scores and risk bands that flow into service responses.
+4. **Narrative rendering** – Streamlit components under `src.interfaces.streamlit` render hero metrics, health insights, tables, and charts while maintaining accessible structure for tests.
 5. **Automation reuse** – The `agents` package exports typed request/response contracts mirroring the application service so CLI or AI clients can trigger evaluations safely.
 
 ## Caching & performance
@@ -75,10 +75,18 @@ The Idiot Index application follows a layered Python architecture designed for t
 ## Observability
 
 - Structured logging is handled through `src.infrastructure.logging_config` which attaches trace IDs and redacts sensitive data.
-- The headless API records request metrics via `src/interfaces/api/telemetry` and serves them under `/metrics`. Latency histograms, in-flight gauges, and error counters are available for Prometheus scrapers.
-- `log_performance`, `log_api_call`, and `log_data_processing` annotate key milestones for debugging and performance monitoring.
-- `src/infrastructure/observability/health.py` provides the reusable `HealthProbe`, powering both the HTTP `/health` endpoint and the `scripts/check_health.py` CLI for consistent readiness insights.
-- Incident response procedures are documented in `docs/OPERATIONS_INCIDENT_RESPONSE.md`.
+- The `ObservabilityRegistry` (in `src/infrastructure/observability/instrumentation.py`) provides a single surface for Prometheus metrics, trace spans, health probe contributions, and recent event capture. Both `IdiotIndexService` and `ScenarioPlanner` wrap their core pipelines with registry operations so successes and failures emit structured telemetry.
+- Instrumentation extensions (see `src/extensions/builtins/core_instrumentation.py`) subscribe to those events and expose counters (`idiot_index_pipeline_runs_total`) and latency histograms. Additional extensions can subscribe to custom event names without touching core services.
+- The headless API records request metrics via `src/interfaces/api/telemetry`, exposes Prometheus text at `/metrics`, and publishes a holistic snapshot at `/observability/status` for dashboards and air-gapped audits. The same payload is available offline via `python scripts/observability_snapshot.py --pretty`.
+- `src/infrastructure/observability/health.py` provides the reusable `HealthProbe`, powering both HTTP health endpoints and the `scripts/check_health.py` CLI. The registry binds into the probe so instrumentation extensions can ship bespoke health signals.
+- Incident response procedures are documented in `docs/OPERATIONS_INCIDENT_RESPONSE.md`, now referencing the observability CLI for triage and recovery.
+
+## Future-proofing & Migration Notes
+
+- **Plugin boundaries:** New automation, analytics, or monitoring capabilities should ship as extensions. Instrumentation plugins keep metrics decoupled from business logic, while summary/scenario plugins extend payloads. Use `python scripts/scaffold_extension.py --name <id> --instrumentation` to bootstrap both code and manifest entries.
+- **Service scaffolds:** `python scripts/scaffold_service.py --name <service>` generates an observability-aware service shell under `src/application/services/` so future modules inherit tracing, metrics, and extension wiring.
+- **Scaling considerations:** The observability registry is intentionally lightweight; for distributed deployments swap the tracer implementation or plug an OTLP exporter behind the same interface. Health checks already expose registry counts, simplifying readiness probes behind load balancers.
+- **Next major upgrade path:** To support multi-tenant or async workloads, isolate data adapters behind explicit interfaces and let instrumentation extensions register tenant IDs as metric labels. The registry API is stable so callers can evolve without changing existing hooks.
 
 ---
 Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).

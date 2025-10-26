@@ -75,7 +75,7 @@ def safe_get_json(
             delay = policy.base_delay * (policy.backoff_factor ** (attempt - 1))
             if policy.jitter:
                 delay *= random.uniform(0.8, 1.2)
-            # TODO - (telemetry): Emit structured retry metrics so upstream callers can
+            # TODO-P2(6h): Emit structured retry metrics so upstream callers can
             # diagnose flaky network dependencies more easily.
             time.sleep(delay)
 

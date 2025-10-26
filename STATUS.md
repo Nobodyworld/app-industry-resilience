@@ -9,9 +9,15 @@
 - **Next:** Extend type and lint coverage into existing `src/` modules, upstream the offline-aware quality scripts into CI, and plan structured cleanups (e.g., renaming `src/types.py`) to enable strict mypy across the application.
 
 ## 2025-10-27T12:00Z – chore: steward audit and automation enablement
-- **Summary:** Produced `STEWARDS_REPORT.md` with metrics, roadmap, and agent roles; simplified API telemetry spans, tagged the
-  health CLI for agent usage, and captured offline coverage guidance in release notes/changelog.
-- **Next:** Vendor dev dependency wheels to reinstate pytest-cov locally and continue trimming high-complexity helpers.
+- **Summary:** Refreshed `STEWARDS_REPORT.md` with measured coverage, complexity, dependency depth, and latency metrics; shored
+  up CLI ergonomics by bootstrapping all scripts for direct execution; delivered `scripts/audit_metrics.py`, `make audit`, and
+  `AUTOMATION_ROLES.md` to guide agent workflows while simplifying API telemetry span bookkeeping.
+- **Next:** Vendor dev dependency wheels to reinstate pytest-cov locally, then tackle the highest-complexity modules surfaced by
+  the new audit (e.g., `src/core/security`).
+
+## 2025-10-28T14:20Z – feat: observability unification
+- **Summary:** Added the `ObservabilityRegistry`, instrumented core services and the API, delivered `/observability/status` plus the offline snapshot CLI, and extended scaffolds/docs so future extensions register instrumentation safely.
+- **Next:** Pursue distributed rate limiting (Redis-backed) and schema override support called out in TODO-P1/TODO-P2 for multi-node readiness.
 
 ## 2025-10-19T16:45Z – chore: harden security automation and supply-chain checks
 - **Summary:** Introduced `pip-audit`, `detect-secrets`, and CycloneDX SBOM generation into the Makefile, pre-commit hooks, and fallback scripts; added a dedicated `security` GitHub Actions job running gitleaks, vulnerability scans, and SBOM uploads; refreshed docs and PLAN status to reflect the new guard rails.

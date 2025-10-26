@@ -189,13 +189,17 @@ def _cache_component(loader: Callable[[], AppConfig]) -> HealthComponent:
 def _extensions_component(manager: ExtensionManager) -> HealthComponent:
     summary_extensions = [extension.name for extension in manager.summary_extensions]
     scenario_extensions = [extension.name for extension in manager.scenario_extensions]
+    instrumentation_extensions = [
+        extension.name for extension in manager.instrumentation_extensions
+    ]
 
     details = {
         "summary_extensions": summary_extensions,
         "scenario_extensions": scenario_extensions,
+        "instrumentation_extensions": instrumentation_extensions,
     }
 
-    if not summary_extensions and not scenario_extensions:
+    if not summary_extensions and not scenario_extensions and not instrumentation_extensions:
         return HealthComponent(
             name="extensions",
             status="warn",
@@ -207,8 +211,9 @@ def _extensions_component(manager: ExtensionManager) -> HealthComponent:
         name="extensions",
         status="pass",
         summary=(
-            f"{len(summary_extensions)} summary extensions, "
-            f"{len(scenario_extensions)} scenario extensions active"
+            f"{len(summary_extensions)} summary, "
+            f"{len(scenario_extensions)} scenario, "
+            f"{len(instrumentation_extensions)} instrumentation extensions active"
         ),
         details=details,
     )

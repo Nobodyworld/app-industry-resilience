@@ -9,8 +9,17 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from .contracts import ExtensionContributions, ScenarioExtension, SummaryExtension
+from .contracts import (
+    ExtensionContributions,
+    InstrumentationExtension,
+    ScenarioExtension,
+    SummaryExtension,
+)
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from src.infrastructure.observability.instrumentation import ObservabilityRegistry
 
 LOGGER = logging.getLogger(__name__)
 MANIFEST_PATH = Path("extensions/manifest.json")
@@ -23,7 +32,11 @@ class ExtensionManager:
 
     summary_extensions: list[SummaryExtension] = field(default_factory=list)
     scenario_extensions: list[ScenarioExtension] = field(default_factory=list)
+    instrumentation_extensions: list[InstrumentationExtension] = field(default_factory=list)
     logger: logging.Logger = field(default=LOGGER)
+    _instrumentation_registry_cache: dict[str, set[int]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def register_summary_extension(self, extension: SummaryExtension) -> None:
         self.logger.debug("Registering summary extension", extra={"extension": extension.name})
@@ -32,6 +45,12 @@ class ExtensionManager:
     def register_scenario_extension(self, extension: ScenarioExtension) -> None:
         self.logger.debug("Registering scenario extension", extra={"extension": extension.name})
         self.scenario_extensions.append(extension)
+
+    def register_instrumentation_extension(self, extension: InstrumentationExtension) -> None:
+        self.logger.debug(
+            "Registering instrumentation extension", extra={"extension": extension.name}
+        )
+        self.instrumentation_extensions.append(extension)
 
     def apply_summary_extensions(self, summary) -> ExtensionContributions:
         notes: list[str] = []
@@ -66,6 +85,24 @@ class ExtensionManager:
             if contribution.metadata:
                 metadata[extension.name] = dict(contribution.metadata)
         return ExtensionContributions(notes=tuple(notes), metadata=metadata)
+
+    def apply_instrumentation_extensions(
+        self, registry: ObservabilityRegistry
+    ) -> None:  # pragma: no cover - thin orchestrator
+        for extension in self.instrumentation_extensions:
+            applied = self._instrumentation_registry_cache.setdefault(extension.name, set())
+            registry_id = id(registry)
+            if registry_id in applied:
+                continue
+            try:
+                extension.register(registry)
+            except Exception:  # pragma: no cover - defensive logging
+                self.logger.exception(
+                    "Instrumentation extension failed",
+                    extra={"extension": extension.name},
+                )
+                continue
+            applied.add(registry_id)
 
 
 def _parse_manifest(path: Path) -> list[str]:

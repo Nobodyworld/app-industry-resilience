@@ -19,6 +19,7 @@ from src.application import (
     ScenarioResult,
     ScenarioSummary,
 )
+from src.core import HealthSummary
 
 
 class DatasetRecord(BaseModel):
@@ -78,6 +79,29 @@ class MetaSourcesResponse(BaseModel):
     sources: list[str]
 
 
+class ObservationEventModel(BaseModel):
+    name: str
+    duration: float = Field(..., ge=0.0)
+    status: str
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    trace_id: str | None = None
+    error: str | None = None
+
+
+class ObservabilityMetricsModel(BaseModel):
+    counters: int
+    gauges: int
+    histograms: int
+    subscriptions: dict[str, int] = Field(default_factory=dict)
+
+
+class ObservabilityStatusResponse(BaseModel):
+    metrics: ObservabilityMetricsModel
+    traces: dict[str, Any]
+    recent_events: list[ObservationEventModel] = Field(default_factory=list)
+    health_checks: list[str] = Field(default_factory=list)
+
+
 class EvaluateFilters(BaseModel):
     search: str | None = Field(default=None, description="Search filter applied to the dataset.")
     top_n: int = Field(default=5, ge=1, description="Number of leaderboard entries requested.")
@@ -98,6 +122,43 @@ class EvaluateDataset(BaseModel):
     filtered: list[dict[str, Any]]
 
 
+class HealthAggregateModel(BaseModel):
+    label: str
+    industries: int
+    average_health_score: float | None = None
+    risk_band: str | None = None
+    average_idiot_index: float | None = None
+    average_value_added_pct: float | None = None
+    average_resilience_score: float | None = None
+    average_materials_dependency_ratio: float | None = None
+    average_shock_sensitivity_index: float | None = None
+
+
+class HealthBandBreakdownModel(BaseModel):
+    band: str
+    industries: int
+    percentage: float
+
+
+class HealthRiskModel(BaseModel):
+    industry_code: str
+    industry_name: str
+    health_score: float | None = None
+    band: str | None = None
+
+
+class HealthAnalyticsSummaryModel(BaseModel):
+    overall: HealthAggregateModel
+    sectors: list[HealthAggregateModel]
+    band_breakdown: list[HealthBandBreakdownModel]
+    top_risks: list[HealthRiskModel]
+
+
+class HealthAnalyticsEnvelope(BaseModel):
+    full: HealthAnalyticsSummaryModel
+    filtered: HealthAnalyticsSummaryModel
+
+
 class EvaluateResponse(BaseModel):
     source: DataSource
     year: int
@@ -107,6 +168,7 @@ class EvaluateResponse(BaseModel):
     leaderboard: list[LeaderboardEntry]
     dataset: EvaluateDataset
     metadata: dict[str, Any] = Field(default_factory=dict)
+    health: HealthAnalyticsEnvelope | None = None
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -165,6 +227,7 @@ class ScenarioSummaryModel(BaseModel):
     resilience_score_avg: float | None
     materials_dependency_ratio_avg: float | None
     shock_sensitivity_index_avg: float | None
+    health_score_avg: float | None
 
 
 class ScenarioResponse(BaseModel):
@@ -175,6 +238,31 @@ class ScenarioResponse(BaseModel):
     scenario: list[dict[str, Any]]
     deltas: list[dict[str, Any]]
     metadata: dict[str, Any] = Field(default_factory=dict)
+    baseline_health: HealthAnalyticsSummaryModel | None = None
+    scenario_health: HealthAnalyticsSummaryModel | None = None
+
+
+class HealthAnalyticsRequest(BaseModel):
+    """Payload accepted by the health analytics endpoint."""
+
+    source: DataSource = Field(default=DataSource.SAMPLE)
+    year: int = Field(..., ge=1900)
+    search: str | None = Field(default=None)
+    records: list[DatasetRecord] | None = Field(default=None)
+    group_by: Literal["overall", "sector", "all"] = Field(default="all")
+    top_risks: int = Field(default=5, ge=0, le=25)
+
+
+class HealthAnalyticsResponse(BaseModel):
+    """Response model for health analytics summarisation."""
+
+    source: DataSource
+    year: int
+    filters: EvaluateFilters
+    health: HealthAnalyticsEnvelope
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(use_enum_values=True)
 
 
 def records_to_dataframe(records: Sequence[DatasetRecord]) -> pd.DataFrame:
@@ -221,6 +309,41 @@ def build_leaderboard(entries: Sequence[IndustryMetrics]) -> list[LeaderboardEnt
     ]
 
 
+def _aggregate_to_model(aggregate) -> HealthAggregateModel:
+    return HealthAggregateModel(**aggregate.__dict__)
+
+
+def _band_breakdown_to_models(
+    breakdown: Sequence,
+) -> list[HealthBandBreakdownModel]:
+    return [HealthBandBreakdownModel(**item.__dict__) for item in breakdown]
+
+
+def _risks_to_models(risks: Sequence) -> list[HealthRiskModel]:
+    return [HealthRiskModel(**risk.__dict__) for risk in risks]
+
+
+def health_summary_to_model(summary: HealthSummary | None) -> HealthAnalyticsSummaryModel | None:
+    if summary is None:
+        return None
+    return HealthAnalyticsSummaryModel(
+        overall=_aggregate_to_model(summary.overall),
+        sectors=[_aggregate_to_model(aggregate) for aggregate in summary.sectors],
+        band_breakdown=_band_breakdown_to_models(summary.band_breakdown),
+        top_risks=_risks_to_models(summary.top_risks),
+    )
+
+
+def build_health_envelope(summary: IdiotIndexSummary) -> HealthAnalyticsEnvelope | None:
+    if summary.health_summary_full is None and summary.health_summary_filtered is None:
+        return None
+    full_model = health_summary_to_model(summary.health_summary_full)
+    filtered_model = health_summary_to_model(summary.health_summary_filtered)
+    if full_model is None or filtered_model is None:
+        return None
+    return HealthAnalyticsEnvelope(full=full_model, filtered=filtered_model)
+
+
 def scenario_summary_to_model(summary: ScenarioSummary) -> ScenarioSummaryModel:
     return ScenarioSummaryModel(**summary.__dict__)
 
@@ -250,6 +373,7 @@ def summary_to_response(
     """Build an EvaluateResponse from the domain summary."""
 
     metadata = _sanitize_metadata(summary.dataframe_full.attrs)
+    health_envelope = build_health_envelope(summary)
     return EvaluateResponse(
         source=source,
         year=year,
@@ -262,11 +386,14 @@ def summary_to_response(
             filtered=dataframe_to_records(summary.dataframe_filtered),
         ),
         metadata=metadata,
+        health=health_envelope,
     )
 
 
 def scenario_to_response(result: ScenarioResult) -> ScenarioResponse:
     metadata = _sanitize_metadata(result.baseline.attrs)
+    baseline_health = health_summary_to_model(result.baseline_health_summary)
+    scenario_health = health_summary_to_model(result.scenario_health_summary)
     return ScenarioResponse(
         baseline_summary=scenario_summary_to_model(result.baseline_summary),
         scenario_summary=scenario_summary_to_model(result.scenario_summary),
@@ -275,6 +402,8 @@ def scenario_to_response(result: ScenarioResult) -> ScenarioResponse:
         scenario=dataframe_to_records(result.scenario),
         deltas=dataframe_to_records(result.deltas),
         metadata=metadata,
+        baseline_health=baseline_health,
+        scenario_health=scenario_health,
     )
 
 
@@ -304,3 +433,9 @@ def _coerce_json_value(value: Any) -> Any:
     if isinstance(value, bytes):
         return value.decode("utf-8", errors="replace")
     return value
+
+
+def metadata_from_summary(summary: IdiotIndexSummary) -> dict[str, Any]:
+    """Expose sanitised metadata for API consumers."""
+
+    return _sanitize_metadata(summary.dataframe_full.attrs)

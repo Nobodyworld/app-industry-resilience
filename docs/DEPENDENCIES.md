@@ -6,27 +6,27 @@ This document records the vetted runtime and development dependencies for the Id
 
 | Package | Version | License | Purpose | Review cadence |
 | --- | --- | --- | --- | --- |
-| `streamlit` | 1.39.0 | Apache-2.0 | Primary UI framework powering the interactive dashboard. | Quarterly |
-| `pandas` | 2.2.2 | BSD-3-Clause | Data wrangling, aggregation, and CSV handling. | Quarterly |
-| `python-dotenv` | 1.0.1 | BSD-3-Clause | Loads environment variables from `.env` for local development. | Semi-annual |
-| `requests` | 2.32.3 | Apache-2.0 | HTTP client for BEA and Census APIs with retry support. | Quarterly |
-| `plotly` | 5.24.1 | MIT | Interactive charting components embedded in Streamlit views. | Semi-annual |
-| `pytest` | 8.3.3 | MIT | Bundled for lightweight runtime smoke tests and integration with Streamlit cloud deployments. | Quarterly |
+| `streamlit` | >=1.39.0,<2 | Apache-2.0 | Primary UI framework powering the interactive dashboard. | Quarterly |
+| `pandas` | >=2.2.2,<3 | BSD-3-Clause | Data wrangling, aggregation, and CSV handling. | Quarterly |
+| `python-dotenv` | >=1.0.1,<2 | BSD-3-Clause | Loads environment variables from `.env` for local development. | Semi-annual |
+| `requests` | >=2.32.3,<3 | Apache-2.0 | HTTP client for BEA and Census APIs with retry support. | Quarterly |
+| `plotly` | >=6.3.1,<7 | MIT | Interactive charting components embedded in Streamlit views. | Semi-annual |
+| `pytest` | >=8.4.2,<9 | MIT | Bundled for lightweight runtime smoke tests and integration with Streamlit cloud deployments. | Quarterly |
 
 ## Development dependencies
 
 | Package | Version | License | Purpose | Review cadence |
 | --- | --- | --- | --- | --- |
-| `black` | 24.10.0 | MIT | Code formatter enforcing repository style. | Quarterly |
-| `ruff` | 0.6.9 | MIT | Fast linter covering PyFlakes, pycodestyle, and modernisation rules. | Quarterly |
-| `mypy` | 1.11.2 | MIT | Static typing checks for Python modules. | Quarterly |
-| `pytest-cov` | 5.0.0 | MIT | Coverage reporting for tests. | Quarterly |
-| `pre-commit` | 4.0.1 | MIT | Manages lint/test hooks and commit policy enforcement. | Semi-annual |
-| `codespell` | 2.3.0 | GPL-2.0 | Spell checking for docs and comments. | Semi-annual |
-| `commitizen` | 3.27.0 | MIT | Conventional Commit automation and version bumping. | Semi-annual |
-| `detect-secrets` | 1.4.0 | Apache-2.0 | Secret scanning for commits and CI. | Quarterly |
-| `pip-audit` | 2.7.3 | Apache-2.0 | CVE scanning of Python dependency graphs. | Monthly |
-| `types-requests` | 2.32.0 | Apache-2.0 | Type hints for the `requests` library used by mypy. | Semi-annual |
+| `black` | >=24.8.0,<25 | MIT | Code formatter enforcing repository style. | Quarterly |
+| `ruff` | >=0.6.9,<1 | MIT | Fast linter covering PyFlakes, pycodestyle, and modernisation rules. | Quarterly |
+| `mypy` | >=1.11.2,<2 | MIT | Static typing checks for Python modules. | Quarterly |
+| `pytest-cov` | >=5.0.0,<6 | MIT | Coverage reporting for tests. | Quarterly |
+| `pre-commit` | >=3.7.0,<4 | MIT | Manages lint/test hooks and commit policy enforcement. | Semi-annual |
+| `codespell` | >=2.3.0,<3 | GPL-2.0 | Spell checking for docs and comments. | Semi-annual |
+| `commitizen` | >=3.27.0,<4 | MIT | Conventional Commit automation and version bumping. | Semi-annual |
+| `detect-secrets` | >=1.5.0,<2 | Apache-2.0 | Secret scanning for commits and CI. | Quarterly |
+| `pip-audit` | >=2.7.3,<3 | Apache-2.0 | CVE scanning of Python dependency graphs. | Monthly |
+| `types-requests` | >=2.32.0,<3 | Apache-2.0 | Type hints for the `requests` library used by mypy. | Semi-annual |
 
 ## Review process
 
