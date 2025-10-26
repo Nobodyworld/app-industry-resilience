@@ -1,5 +1,6 @@
 {
   "modules": [
+    "src.extensions.builtins.core_instrumentation",
     "src.extensions.builtins.manufacturing_cost_driver"
   ]
 }

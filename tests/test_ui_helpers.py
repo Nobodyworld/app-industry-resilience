@@ -3,8 +3,12 @@ from __future__ import annotations
 import pandas as pd
 
 from src.application.scenario_planner import ScenarioAdjustment, ScenarioPlanner
+from src.core import compute_health_scores, summarise_health
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
+    build_health_band_distribution,
+    build_health_risk_table,
+    build_health_sector_table,
     build_scenario_comparison_table,
     calculate_benchmark,
     decode_query_params,
@@ -87,3 +91,16 @@ def test_scenario_helpers_produce_comparison_tables() -> None:
     comparison_table = build_scenario_comparison_table(result, focus_codes=["111"])
     assert "idiot_index_delta" in comparison_table.columns
     assert comparison_table.iloc[0]["idiot_index_delta"] != 0.0
+
+
+def test_health_helpers_transform_summary() -> None:
+    frame = _sample_frame()
+    scored = compute_health_scores(frame)
+    summary = summarise_health(scored)
+
+    sector_table = build_health_sector_table(summary)
+    assert not sector_table.empty
+    distribution = build_health_band_distribution(summary)
+    assert "band" in distribution.columns
+    risks = build_health_risk_table(summary)
+    assert "health_score" in risks.columns

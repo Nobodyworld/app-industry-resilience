@@ -43,6 +43,9 @@ from src.interfaces.streamlit.components import (
 )
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
+    build_health_band_distribution,
+    build_health_risk_table,
+    build_health_sector_table,
     build_scenario_comparison_table,
     calculate_benchmark,
     decode_query_params,
@@ -320,9 +323,10 @@ else:
         )
 
 if not focus_mode:
-    render_signal_bar(df_filtered)
+    render_signal_bar(df_filtered, health_summary=summary.health_summary_filtered)
 
-pulse_tab, industries_tab, signals_tab = render_insight_tabs(["Pulse", "Industries", "Top Signals"])
+tabs = ["Pulse", "Industries", "Top Signals", "Health"]
+pulse_tab, industries_tab, signals_tab, health_tab = render_insight_tabs(tabs)
 
 with pulse_tab:
     st.subheader("Pulse overview")
@@ -395,6 +399,28 @@ with signals_tab:
         height=max(400, len(chart_df) * 25),
     )
     st.plotly_chart(fig, use_container_width=True)
+
+with health_tab:
+    st.subheader("Health insights")
+    health_filtered = summary.health_summary_filtered
+    sectors_table = build_health_sector_table(health_filtered)
+    distribution_table = build_health_band_distribution(health_filtered)
+    risk_table = build_health_risk_table(health_filtered)
+
+    if sectors_table.empty:
+        st.info("Health analytics will appear once the dataset includes resilience metrics.")
+    else:
+        cols = st.columns(2)
+        with cols[0]:
+            st.markdown("**Cohort health scoreboard**")
+            st.dataframe(sectors_table, use_container_width=True)
+        with cols[1]:
+            st.markdown("**Risk band distribution**")
+            st.dataframe(distribution_table, use_container_width=True)
+
+        st.markdown("---")
+        st.markdown("**Highest risk industries**")
+        st.dataframe(risk_table, use_container_width=True)
 
 st.subheader("Deep dive")
 code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"], strict=False))

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass, replace
 from enum import Enum
 from functools import lru_cache
@@ -21,14 +22,18 @@ import pandas as pd
 
 from src.core import (
     AppConfig,
+    HealthSummary,
     MetricConfig,
     SecurityUtils,
+    compute_health_scores,
     compute_metrics,
     format_for_display,
     load_config,
     normalize_columns,
+    summarise_health,
 )
 from src.extensions.manager import ExtensionManager, get_extension_manager
+from src.infrastructure.observability import ObservabilityRegistry, bootstrap_observability
 
 
 class DataSource(str, Enum):
@@ -61,6 +66,8 @@ class IdiotIndexSummary:
     leaderboard: tuple[IndustryMetrics, ...]
     average_idiot_index: float | None
     notes: tuple[str, ...]
+    health_summary_full: HealthSummary | None = None
+    health_summary_filtered: HealthSummary | None = None
 
 
 @dataclass(frozen=True)
@@ -88,12 +95,17 @@ class IdiotIndexService:
     default_census_fetcher: CensusFetcher | None = None
     timer: Callable[[], float] = time.perf_counter
     extension_manager: ExtensionManager | None = None
+    observability: ObservabilityRegistry | None = None
 
     def __post_init__(self) -> None:
         if self.default_sample_loader is None:
             self.default_sample_loader = _default_sample_loader
         if self.extension_manager is None:
             self.extension_manager = get_extension_manager()
+        if self.observability is None:
+            self.observability = bootstrap_observability()
+        if self.extension_manager is not None and self.observability is not None:
+            self.extension_manager.apply_instrumentation_extensions(self.observability)
 
     def evaluate(
         self,
@@ -118,21 +130,29 @@ class IdiotIndexService:
 
         start = self.timer()
 
-        summary = _evaluate_idiot_index(
-            year=year,
-            source=source,
-            search=search,
-            top_n=top_n,
-            dataframe=dataframe,
-            config=active_config,
-            fetch_bea=active_fetch_bea,
-            fetch_census=active_fetch_census,
-            sample_loader=active_sample_loader,
-            logger_hooks=hooks,
-            timer_start=start,
-            timer=self.timer,
-            metric_config=metric_config,
+        attributes = {"source": source.value, "year": year, "has_search": bool(search)}
+        observability_cm = (
+            self.observability.operation("service.idiot_index.evaluate", attributes=attributes)
+            if self.observability is not None
+            else nullcontext()
         )
+
+        with observability_cm:
+            summary = _evaluate_idiot_index(
+                year=year,
+                source=source,
+                search=search,
+                top_n=top_n,
+                dataframe=dataframe,
+                config=active_config,
+                fetch_bea=active_fetch_bea,
+                fetch_census=active_fetch_census,
+                sample_loader=active_sample_loader,
+                logger_hooks=hooks,
+                timer_start=start,
+                timer=self.timer,
+                metric_config=metric_config,
+            )
 
         if self.extension_manager is not None:
             contributions = self.extension_manager.apply_summary_extensions(summary)
@@ -238,11 +258,15 @@ def _evaluate_idiot_index(
     normalized = normalize_columns(dataset)
     metrics = compute_metrics(normalized, config=metric_config)
     display = format_for_display(metrics)
+    display = compute_health_scores(display)
 
     filtered = _filter_dataframe(display, sanitized_search)
     leaderboard = _build_leaderboard(filtered, top_n)
     notes = _extract_notes(display)
     average = float(filtered["idiot_index"].mean()) if not filtered.empty else None
+
+    health_summary_full = summarise_health(display)
+    health_summary_filtered = summarise_health(filtered)
 
     duration = timer() - timer_start
     if logger_hooks.log_performance is not None:
@@ -256,6 +280,8 @@ def _evaluate_idiot_index(
         leaderboard=leaderboard,
         average_idiot_index=average,
         notes=notes,
+        health_summary_full=health_summary_full,
+        health_summary_filtered=health_summary_filtered,
     )
 
 

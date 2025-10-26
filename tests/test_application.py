@@ -54,6 +54,9 @@ def test_evaluate_sample_uses_loader() -> None:
     assert len(summary.leaderboard) == 2
     assert "demo note" in summary.notes
     assert any("manufacturing_cost_driver" in note for note in summary.notes)
+    assert "health_score" in summary.dataframe_full.columns
+    assert summary.health_summary_full is not None
+    assert summary.health_summary_filtered is not None
 
 
 def test_evaluate_with_search_filters_results() -> None:

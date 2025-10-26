@@ -29,9 +29,13 @@ class Cache:
     """
 
     def __init__(self, cache_dir: Path, ttl_seconds: int) -> None:
+        if ttl_seconds <= 0:
+            raise ValueError("Cache TTL must be greater than zero seconds.")
         self.cache_dir = cache_dir
         self.ttl_seconds = ttl_seconds
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+        if not self.cache_dir.is_dir():
+            raise ValueError(f"Cache directory is not a directory: {self.cache_dir}")
         self._lock = threading.RLock()
 
     def _path_for_key(self, key: str) -> Path:

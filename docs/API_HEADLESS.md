@@ -97,6 +97,18 @@ Successful responses include leaderboard entries, metadata, and the full/filtere
       {"industry_code": "311", "idiot_index": 1.51, "resilience_score": 0.44}
     ]
   },
+  "health": {
+    "filtered": {
+      "overall": {"average_health_score": 68.4, "risk_band": "healthy"},
+      "band_breakdown": [
+        {"band": "healthy", "industries": 3, "percentage": 60.0},
+        {"band": "watch", "industries": 2, "percentage": 40.0}
+      ],
+      "top_risks": [
+        {"industry_code": "44-45", "industry_name": "Retail", "health_score": 42.1, "band": "watch"}
+      ]
+    }
+  },
   "metadata": {
     "source": "api-inline",
     "extensions": {
@@ -127,11 +139,52 @@ curl -X POST http://localhost:9000/scenario \
 
 The response contains baseline/scenario summaries, per-industry deltas, and metadata copied from the dataset.
 
+### `POST /analytics/health`
+Returns only the health analytics envelope for the supplied dataset. Accepts the same payload as `/evaluate` plus optional `group_by` (`overall`, `sector`, or `all`) and `top_risks` parameters.
+
+```bash
+curl -X POST http://localhost:9000/analytics/health \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": "sample",
+    "year": 2021,
+    "group_by": "sector",
+    "top_risks": 3
+  }'
+```
+
+The response mirrors the `health` section embedded in `/evaluate` but omits leaderboard and dataset payloads, making it ideal for dashboards and scheduled reporting.
+
 ### `GET /metrics`
 Exposes Prometheus-formatted metrics covering request counts, latencies, and error totals. Scrape this endpoint from your monitoring system or curl it manually:
 
 ```bash
 curl http://localhost:9000/metrics
+```
+
+### `GET /observability/status`
+Returns a JSON snapshot of the observability registry, including metric counts, exported span totals, registered health checks, and the most recent operations recorded by instrumentation extensions. The response mirrors `python scripts/observability_snapshot.py --pretty` for use in air-gapped environments.
+
+```json
+{
+  "metrics": {
+    "counters": 6,
+    "gauges": 1,
+    "histograms": 2,
+    "subscriptions": {"service.idiot_index.evaluate": 2}
+  },
+  "traces": {"exported_spans": 24},
+  "recent_events": [
+    {
+      "name": "service.idiot_index.evaluate",
+      "duration": 0.183,
+      "status": "success",
+      "attributes": {"source": "sample", "year": 2021, "has_search": false},
+      "trace_id": "ff2c7f264bfb4cc2b7f0a4c947f8a85a"
+    }
+  ],
+  "health_checks": ["configuration", "cache", "extensions", "instrumentation_core"]
+}
 ```
 
 ## Error handling

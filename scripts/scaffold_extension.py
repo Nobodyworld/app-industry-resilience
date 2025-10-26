@@ -3,6 +3,15 @@
 
 from __future__ import annotations
 
+try:
+    from scripts import _bootstrap  # type: ignore  # noqa: F401
+except ModuleNotFoundError:  # pragma: no cover - allow `python scripts/scaffold_extension.py`
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from scripts import _bootstrap  # type: ignore  # noqa: F401
+
 import argparse
 import json
 import textwrap
@@ -32,7 +41,9 @@ def _update_manifest(module_path: str) -> None:
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
-def scaffold_extension(name: str, *, include_scenario: bool, force: bool) -> Path:
+def scaffold_extension(
+    name: str, *, include_scenario: bool, include_instrumentation: bool, force: bool
+) -> Path:
     safe_name = name.strip().replace(" ", "_").replace("-", "_")
     if not safe_name:
         raise ValueError("Extension name must not be empty.")
@@ -44,6 +55,12 @@ def scaffold_extension(name: str, *, include_scenario: bool, force: bool) -> Pat
             f"Extension module {module_path} already exists. Use --force to overwrite."
         )
 
+    contracts: list[str] = ["ExtensionContributions", "SummaryExtension"]
+    if include_scenario:
+        contracts.append("ScenarioExtension")
+    if include_instrumentation:
+        contracts.append("InstrumentationExtension")
+
     lines: list[str] = [
         '"""Generated extension scaffold."""',
         "",
@@ -51,11 +68,9 @@ def scaffold_extension(name: str, *, include_scenario: bool, force: bool) -> Pat
         "",
         "from dataclasses import dataclass",
         "",
-        "from src.extensions.contracts import ExtensionContributions, SummaryExtension",
+        f"from src.extensions.contracts import {', '.join(contracts)}",
         "from src.extensions.manager import ExtensionManager",
     ]
-    if include_scenario:
-        lines.insert(7, "from src.extensions.contracts import ScenarioExtension")
 
     lines.extend(
         [
@@ -88,10 +103,37 @@ def scaffold_extension(name: str, *, include_scenario: bool, force: bool) -> Pat
             ]
         )
 
+    if include_instrumentation:
+        lines.extend(
+            [
+                "",
+                "",
+                "@dataclass",
+                "class _InstrumentationExtension(InstrumentationExtension):",
+                f'    name: str = "{safe_name}"',
+                "",
+                "    def register(self, registry) -> None:  # type: ignore[override]",
+                '        """Hook into the shared observability registry."""',
+                "        counter = registry.counter(",
+                f'            "{safe_name}_events_total",',
+                '            "Total events recorded by this extension",',
+                '            label_names=("status",),',
+                "        )",
+                "",
+                "        def _record(event) -> None:",
+                '            counter.increment(labels={"status": event.status})',
+                "",
+                "        registry.subscribe(\"service.idiot_index.evaluate\", _record)",
+                "        # TODO-P3(2h): Register additional observability hooks or health checks.",
+            ]
+        )
+
     lines.extend(["", "", "def register(manager: ExtensionManager) -> None:"])
     lines.append("    manager.register_summary_extension(_SummaryExtension())")
     if include_scenario:
         lines.append("    manager.register_scenario_extension(_ScenarioExtension())")
+    if include_instrumentation:
+        lines.append("    manager.register_instrumentation_extension(_InstrumentationExtension())")
     lines.append('\n\n__all__ = ["register"]\n')
 
     content = "\n".join(lines)
@@ -113,6 +155,11 @@ def parse_args() -> argparse.Namespace:
         help="Include a scenario planning hook in addition to the summary extension.",
     )
     parser.add_argument(
+        "--instrumentation",
+        action="store_true",
+        help="Include an instrumentation extension scaffold for observability hooks.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Overwrite existing files if the target extension already exists.",
@@ -124,13 +171,17 @@ def main() -> int:
     args = parse_args()
     _ensure_package()
     module_path = scaffold_extension(
-        args.name, include_scenario=args.with_scenario, force=args.force
+        args.name,
+        include_scenario=args.with_scenario,
+        include_instrumentation=args.instrumentation,
+        force=args.force,
     )
 
     message = textwrap.dedent(
         f"""
         [idiot-index] Extension scaffold created at {module_path}.
         Remember to implement SummaryExtension.contribute (and ScenarioExtension.contribute when requested).
+        Instrumentation scaffolds emit basic counters and should be customised to capture domain events.
         The manifest at {MANIFEST_PATH} now includes the module so it loads automatically.
         """
     ).strip()

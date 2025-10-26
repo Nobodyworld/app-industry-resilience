@@ -11,8 +11,12 @@ from typing import Any, cast
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from src.application import DataSource, IdiotIndexService, ScenarioPlanner
+from src.core import summarise_health
 from src.extensions.manager import get_extension_manager
-from src.infrastructure.observability import build_default_probe
+from src.infrastructure.observability import (
+    bootstrap_observability,
+    build_default_probe,
+)
 from src.interfaces.api.dependencies import (
     get_idiot_index_service,
     get_scenario_planner,
@@ -22,11 +26,18 @@ from src.interfaces.api.schemas import (
     EvaluateFilters,
     EvaluateRequest,
     EvaluateResponse,
+    HealthAnalyticsEnvelope,
+    HealthAnalyticsRequest,
+    HealthAnalyticsResponse,
     HealthResponse,
     MetaSourcesResponse,
+    ObservabilityStatusResponse,
+    ObservationEventModel,
     ScenarioRequest,
     ScenarioResponse,
     adjustments_to_domain,
+    health_summary_to_model,
+    metadata_from_summary,
     records_to_dataframe,
     scenario_to_response,
     summary_to_response,
@@ -60,17 +71,25 @@ class InstrumentedFastAPI(FastAPI):
                 path,
                 response.status_code,
                 context,
-                trace_id=context.trace_id,
                 error=error,
             )
         return response
 
 
-app = InstrumentedFastAPI(title="Idiot Index API", version=__version__)
+_extension_manager = get_extension_manager()
+_observability_registry = bootstrap_observability()
+_extension_manager.apply_instrumentation_extensions(_observability_registry)
+
+app = InstrumentedFastAPI(
+    title="Idiot Index API",
+    version=__version__,
+    telemetry=ApiTelemetry(observability=_observability_registry),
+)
 _health_probe = build_default_probe(
     telemetry_snapshot=lambda: app.telemetry.health_snapshot(),
-    extension_manager_provider=get_extension_manager,
+    extension_manager_provider=lambda: _extension_manager,
 )
+_observability_registry.bind_probe(_health_probe)
 
 
 def _allowed_origins() -> list[str]:
@@ -134,6 +153,23 @@ def metrics() -> Response:
     payload = app.telemetry.metrics_response()
     return Response(
         status_code=status.HTTP_200_OK, data=payload, media_type="text/plain; version=0.0.4"
+    )
+
+
+@app.get(
+    "/observability/status",
+    response_model=ObservabilityStatusResponse,
+    tags=["system"],
+)
+def observability_status() -> ObservabilityStatusResponse:
+    """Return a snapshot of metrics, traces, and recent observation events."""
+
+    snapshot = _observability_registry.health_overview()
+    return ObservabilityStatusResponse(
+        metrics=snapshot["metrics"],
+        traces=snapshot["traces"],
+        recent_events=[ObservationEventModel(**event) for event in snapshot["recent_events"]],
+        health_checks=snapshot["registered_health_checks"],
     )
 
 
@@ -223,6 +259,71 @@ def run_scenario(
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     response = scenario_to_response(result)
+    trace_id = telemetry.correlation_id()
+    if trace_id:
+        response.metadata.setdefault("telemetry", {})["trace_id"] = trace_id
+    return response
+
+
+@app.post(
+    "/analytics/health",
+    response_model=HealthAnalyticsResponse,
+    tags=["analytics"],
+    status_code=status.HTTP_200_OK,
+)
+def analytics_health(
+    request: HealthAnalyticsRequest,
+    service: Any = Depends(get_idiot_index_service),  # noqa: B008
+) -> HealthAnalyticsResponse:
+    telemetry = app.telemetry
+    service = cast(IdiotIndexService, service)
+    filters = EvaluateFilters(search=request.search, top_n=5)
+
+    dataframe = None
+    if request.records:
+        try:
+            dataframe = records_to_dataframe(request.records)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        dataframe.attrs.setdefault("source", "api-inline")
+        dataframe.attrs.setdefault("source_origin", "api-health")
+
+    with telemetry.tracer.start_span(
+        "service.analytics_health", attributes={"source": request.source, "year": request.year}
+    ):
+        try:
+            summary = service.evaluate(
+                year=request.year,
+                source=request.source,
+                search=request.search,
+                top_n=filters.top_n,
+                dataframe=dataframe,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    full_summary = summarise_health(
+        summary.dataframe_full, group_by=request.group_by, top_risk_limit=request.top_risks
+    )
+    filtered_summary = summarise_health(
+        summary.dataframe_filtered,
+        group_by=request.group_by,
+        top_risk_limit=request.top_risks,
+    )
+
+    envelope = HealthAnalyticsEnvelope(
+        full=health_summary_to_model(full_summary),
+        filtered=health_summary_to_model(filtered_summary),
+    )
+    metadata = metadata_from_summary(summary)
+
+    response = HealthAnalyticsResponse(
+        source=request.source,
+        year=request.year,
+        filters=filters,
+        health=envelope,
+        metadata=metadata,
+    )
     trace_id = telemetry.correlation_id()
     if trace_id:
         response.metadata.setdefault("telemetry", {})["trace_id"] = trace_id

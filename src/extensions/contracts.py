@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:  # pragma: no cover - imported for typing only
     from src.application.idiot_index_service import IdiotIndexSummary
     from src.application.scenario_planner import ScenarioResult
+    from src.infrastructure.observability.instrumentation import ObservabilityRegistry
 
 
 @dataclass(frozen=True)
@@ -35,8 +36,17 @@ class ScenarioExtension(Protocol):
     def contribute(self, result: ScenarioResult) -> ExtensionContributions: ...
 
 
+class InstrumentationExtension(Protocol):
+    """Register observability hooks (metrics, tracing, health checks)."""
+
+    name: str
+
+    def register(self, registry: ObservabilityRegistry) -> None: ...
+
+
 __all__ = [
     "ExtensionContributions",
+    "InstrumentationExtension",
     "SummaryExtension",
     "ScenarioExtension",
 ]

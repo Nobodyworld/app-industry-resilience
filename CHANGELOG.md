@@ -1,10 +1,29 @@
 # Changelog
 
+## 2025-10-28 – Observability unification
+- Added the `ObservabilityRegistry` to centralise metrics, tracing, and health contributions; instrumented `IdiotIndexService`, `ScenarioPlanner`, and the API to emit structured events.
+- Introduced the `core_instrumentation` extension, `/observability/status` endpoint, and `scripts/observability_snapshot.py` CLI for unified monitoring in both online and offline environments.
+- Expanded developer scaffolds (`scaffold_extension.py --instrumentation`, `scaffold_service.py`) and documentation (architecture, automation, incident response) so future modules stay observability-ready.
+- Updated Dependabot configuration, Makefile targets, and contributor guidance to reinforce continuous improvement loops.
+
+## 2025-10-26 – Health analytics hardening
+- Vectorised health-band classification and tightened top-risk selection so analytics run faster and handle NaN-heavy datasets without misclassifying results.
+- Added targeted tests for health summaries (grouping modes, zero top-risk limit, missing values) and new script coverage helpers to keep quality high.
+- Introduced `scripts/run_tests_with_trace.py` plus Makefile improvements that enforce coverage thresholds even when `pytest-cov` is unavailable, defaulting to the analytics/application/API modules with overrideable paths.
+
+## 2025-10-25 – Health analytics expansion
+- Added `src/core/analytics` with composite health scoring, band distribution, and cohort aggregation reused by services, the UI, and the API.
+- Extended Idiot Index summaries, Streamlit components, and Scenario Lab to surface health insights, risk band shifts, and top-risk industries.
+- Introduced the `/analytics/health` API endpoint, updated `/evaluate`/`/scenario` payloads, and added the `scripts/analytics_health.py` CLI alongside a `make analytics` target.
+- Relaxed dependency pins to track latest compatible releases and refreshed documentation (README, architecture, API guides, new `docs/ANALYTICS_HEALTH.md`).
+
 ## 2025-10-27
-- Completed Stage 4 steward audit with `STEWARDS_REPORT.md`, capturing metrics, automation hooks, and roadmap guidance for the
-  Idiot Index ecosystem.
-- Simplified API telemetry span handling and tagged the health CLI as an agent entrypoint to clarify automation boundaries.
-- Documented offline coverage workflow and agent touchpoints for future autonomy-focused maintenance.
+- Completed Stage 4 steward audit with `STEWARDS_REPORT.md`, adding measured coverage/complexity/dependency/latency metrics and
+  a refreshed roadmap.
+- Delivered `scripts/audit_metrics.py`, the `make audit` target, and `AUTOMATION_ROLES.md` so agents can gather stewardship data
+  and coordinate responsibilities.
+- Simplified API telemetry span handling, tagged observability/audit make targets as `# agent-safe-task`, and ensured every
+  script bootstraps the repo root for direct execution.
 
 ## 2025-10-25
 - Added a reusable `HealthProbe` in `src/infrastructure/observability` powering richer `/health` responses and the new

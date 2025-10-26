@@ -24,14 +24,22 @@ The steward report documents how to parse `build/coverage/*.cover` to confirm th
 If any tool is unavailable offline, the Makefile falls back to the Python helper scripts inside `scripts/` so the
 quality gate can still run in air-gapped environments.
 
-## Health Probes
+## Health Probes & Observability
 
-The observability layer exposes a reusable `HealthProbe` that aggregates component checks:
+The observability layer exposes a reusable `HealthProbe` that aggregates component checks and binds into the shared `ObservabilityRegistry` so metrics, traces, and health stay aligned:
 
 - **Configuration** – loads and validates environment variables via the strongly-typed config loader.
 - **Cache** – ensures the configured cache directories exist and are writable.
 - **Extensions** – confirms registered extensions loaded successfully.
 - **Telemetry snapshot** – surfaces counts of registered metrics and exported spans.
+
+The registry powers a richer `/observability/status` endpoint on the API surface and can be queried offline:
+
+```bash
+python scripts/observability_snapshot.py --pretty
+```
+
+The payload mirrors the HTTP endpoint and includes recent operation events, metric counts, and registered health checks. Use it alongside the health probe for incident reviews.
 
 ### CLI Usage
 
@@ -44,7 +52,20 @@ python scripts/check_health.py --pretty
 Exit codes follow Unix conventions: `0` = healthy, `1` = warnings, `2` = failures. The JSON payload mirrors the
 `/health` endpoint response so operators can plug it into automation or GitOps workflows.
 
-## Continuous Integration
+## Stewardship Metrics
+
+Run `make audit` (or `python scripts/audit_metrics.py --runs 3`) to capture the metrics that feed the steward report:
+
+- Trace-based coverage percentage sourced from `build/reports/coverage-trace.json`.
+- Cyclomatic complexity averages plus the top five core modules by branching factor.
+- Internal dependency graph depth, cohesion ratio, and total edge counts.
+- Idiot Index service latency sampled against the bundled dataset for regression tracking.
+
+The command writes `build/reports/audit-metrics.json` and prints the JSON payload so agents can archive or diff the results.
+The script carries an `# agent-entrypoint` tag to signal safe automation use.
+
+
+## Continuous Integration & Dependency Hygiene
 
 GitHub Actions mirrors the local quality gate. The workflow performs:
 
@@ -52,6 +73,7 @@ GitHub Actions mirrors the local quality gate. The workflow performs:
 - `make quality-gate` for lint/type/test/security enforcement.
 - SBOM generation via `make sbom`.
 - Upload of pytest coverage and pip-audit artefacts for later inspection.
+- Weekly Dependabot checks for both `pip` and GitHub Actions (labelled `dependencies`/`automated`) to keep the stack current without manual babysitting.
 
 Failures post annotated diffs directly in pull requests to guide contributors. The workflow respects the same
 `SKIP_PIP` guardrails so self-hosted runners without external network access can execute the checks.
@@ -63,7 +85,11 @@ Automation-focused contributors (including AI agents) must:
 - Read `AGENTS.md` for repository-wide guardrails.
 - Produce or update ExecPlans under `docs/execplans/` when delivering non-trivial changes.
 - Use the health CLI or `/health` endpoint to verify readiness after deployments.
+- Refresh stewardship metrics with `make audit` whenever architecture or coverage changes.
 - Update `EXTENSION_GUIDE.md` and `CHANGELOG.md` when new extensions or observability hooks are introduced.
 
 Following these patterns keeps local and remote automation aligned, reduces deployment surprises, and provides a
 single source of truth for operational status.
+
+> **Tip:** All scripts under `scripts/` now self-bootstrap the repository root onto `PYTHONPATH`, so running `python scripts/<tool>.py` works without `pip install -e .`.
+

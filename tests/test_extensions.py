@@ -17,12 +17,24 @@ def sample_summary() -> IdiotIndexSummary:
                 "industry_name": "Sample Industry",
                 "materials_share_pct": 42.0,
                 "idiot_index": 1.2,
+                "value_added_pct": 55.0,
+                "resilience_score": 1.5,
+                "materials_dependency_ratio": 0.4,
+                "shock_sensitivity_index": 0.5,
+                "health_score": 72.0,
+                "health_band": "healthy",
             },
             {
                 "industry_code": "2222",
                 "industry_name": "Runner Up",
                 "materials_share_pct": 21.0,
                 "idiot_index": 0.9,
+                "value_added_pct": 48.0,
+                "resilience_score": 1.3,
+                "materials_dependency_ratio": 0.5,
+                "shock_sensitivity_index": 0.6,
+                "health_score": 61.0,
+                "health_band": "watch",
             },
         ]
     )
@@ -43,6 +55,8 @@ def sample_summary() -> IdiotIndexSummary:
         ),
         average_idiot_index=1.05,
         notes=tuple(),
+        health_summary_full=None,
+        health_summary_filtered=None,
     )
 
 
@@ -99,6 +113,7 @@ def test_scenario_extension_enriches_metadata() -> None:
         resilience_score_avg=1.0,
         materials_dependency_ratio_avg=1.0,
         shock_sensitivity_index_avg=1.0,
+        health_score_avg=1.0,
     )
     result = ScenarioResult(
         baseline=baseline,

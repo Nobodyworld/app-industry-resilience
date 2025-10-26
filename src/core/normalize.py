@@ -72,7 +72,7 @@ def normalize_columns(
     for optional in OPTIONAL_COLS:
         if optional not in normalized.columns:
             normalized[optional] = pd.NA
-    # TODO - (schema-evolution): Allow callers to provide dtype overrides instead of
+    # TODO-P2(8h): Allow callers to provide dtype overrides instead of
     # assuming all optional columns are nullable floats.
 
     normalized["industry_code"] = normalized["industry_code"].astype(str).str.strip().str.upper()

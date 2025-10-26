@@ -224,7 +224,7 @@ class SecurityUtils:
 
         if max_requests <= 0 or window_seconds <= 0:
             return ValidationResult.failure("Rate limit parameters must be positive.")
-        # TODO - (rate-limits): Integrate with a shared store (Redis) to enforce limits
+        # TODO-P1(12h): Integrate with a shared store (Redis) to enforce limits
         # across multiple application instances instead of relying on in-process state.
         return ValidationResult.success(None, "Rate limit check passed.")
 

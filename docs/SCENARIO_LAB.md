@@ -7,6 +7,7 @@ The Scenario Lab lets you explore "what-if" narratives directly inside the Strea
 - **Scenario Planner (`src/application/scenario_planner.py`)** – accepts a baseline dataframe, applies percentage deltas to core columns (gross output, materials cost, value added, intermediate inputs), recomputes Idiot Index metrics plus resilience scores, and surfaces per-industry/aggregate deltas.
 - **Scenario Controls** – Streamlit widgets backed by `ScenarioControlState` capture target industries and slider adjustments. Empty selections apply shocks to the entire dataset.
 - **Resilience Metrics** – `resilience_score` (value added ÷ external inputs), `materials_dependency_ratio`, and `shock_sensitivity_index` add context to Idiot Index changes.
+- **Health Analytics** – `ScenarioPlanner` now computes composite health scores and risk bands for baseline vs scenario outcomes, exposing deltas through the UI, API, and CLI helpers.
 
 ## Using the Streamlit Scenario Lab
 
@@ -16,6 +17,7 @@ The Scenario Lab lets you explore "what-if" narratives directly inside the Strea
 4. Adjust the sliders to model % changes in gross output, materials cost, value added, or intermediate inputs.
 5. Review the updated metrics:
    - **Aggregate metrics** show totals/averages with deltas.
+   - **Health summary** highlights average health scores and risk band shifts for the focus set.
    - **Scenario comparison table** lists baseline vs scenario values with per-metric deltas.
    - **Leading changes** highlights the largest Idiot Index deltas and resilience shifts.
    - **Delta chart** visualises Idiot Index changes for the current focus set.

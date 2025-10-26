@@ -7,6 +7,11 @@ from .health import (
     HealthStatus,
     build_default_probe,
 )
+from .instrumentation import (
+    ObservabilityRegistry,
+    ObservationEvent,
+    bootstrap_observability,
+)
 from .metrics import (
     Counter,
     Gauge,
@@ -28,6 +33,9 @@ __all__ = [
     "Tracer",
     "TraceContext",
     "build_default_probe",
+    "ObservationEvent",
+    "ObservabilityRegistry",
+    "bootstrap_observability",
     "current_trace_context",
     "current_trace_id",
     "render_prometheus_text",

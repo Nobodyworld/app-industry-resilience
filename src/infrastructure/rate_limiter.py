@@ -65,7 +65,7 @@ class APIRateLimiter:
         """Block until the caller may execute a request for ``api_name``."""
 
         limiter = self._limiters.get(api_name.lower(), self._limiters["default"])
-        # TODO - (distributed-limits): Persist limiter state to coordinate across
+        # TODO-P1(10h): Persist limiter state to coordinate across
         # horizontally scaled workers when the ingestion service is deployed.
         limiter.wait()
 

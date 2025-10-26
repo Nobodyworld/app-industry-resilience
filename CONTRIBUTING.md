@@ -58,8 +58,12 @@ pre-commit install --hook-type commit-msg
    make test          # Run pytest without coverage
    make security      # Run pip-audit and detect-secrets checks
    make sbom          # Build a CycloneDX SBOM for dependencies
+   make audit         # Generate stewardship metrics (coverage, complexity, dependency graph)
    make docs          # List key documentation links in the terminal
    ```
+
+The helper scripts invoked by these targets now auto-bootstrap the repository root onto `PYTHONPATH`, so you can run
+`python scripts/<name>.py` directly without installing the project as a package.
 
 5. Commit using Conventional Commits. The `commit-msg` hook will reject messages that do not comply.
 6. Push and open a pull request using the provided template.
@@ -73,10 +77,14 @@ Before requesting a review, verify that:
 - New or changed configuration is explained in PR notes (feature flags, environment variables, migrations).
 - Screenshots are attached for UI changes.
 
-### Extensions & Telemetry
+### Extensions, Services & Telemetry
 
-- When adding analytics, prefer creating a module under `src/extensions` using `python scripts/scaffold_extension.py --name <name>`. Update `extensions/manifest.json` and add tests mirroring `tests/test_extensions.py`.
-- Do not remove or bypass telemetry hooks. If a change impacts `/metrics`, `/health`, or trace logging, update `docs/OPERATIONS_INCIDENT_RESPONSE.md` and mention the change in the release notes.
+- Use the scaffolds to keep new modules consistent:
+  - `python scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary/scenario/instrumentation hooks and updates `extensions/manifest.json`.
+  - `python scripts/scaffold_service.py --name <service>` creates an observability-aware service skeleton under `src/application/services/`.
+- Instrumentation extensions should subscribe to events on the shared `ObservabilityRegistry` instead of mutating core services. The reference implementation lives in `src/extensions/builtins/core_instrumentation.py`.
+- When adding analytics, prefer creating a module under `src/extensions` using the scaffold above. Add tests mirroring `tests/test_extensions.py`.
+- Do not remove or bypass telemetry hooks. If a change impacts `/metrics`, `/observability/status`, `/health`, or trace logging, update `docs/OPERATIONS_INCIDENT_RESPONSE.md` and mention the change in the release notes.
 
 ## Code Review
 

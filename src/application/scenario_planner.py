@@ -3,13 +3,22 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from typing import cast
 
 import pandas as pd
 
-from src.core import MetricConfig, compute_metrics, format_for_display
+from src.core import (
+    HealthSummary,
+    MetricConfig,
+    compute_health_scores,
+    compute_metrics,
+    format_for_display,
+    summarise_health,
+)
 from src.extensions.manager import ExtensionManager, get_extension_manager
+from src.infrastructure.observability import ObservabilityRegistry, bootstrap_observability
 
 _INPUT_COLUMNS: tuple[str, ...] = (
     "industry_code",
@@ -44,6 +53,7 @@ class ScenarioSummary:
     resilience_score_avg: float | None
     materials_dependency_ratio_avg: float | None
     shock_sensitivity_index_avg: float | None
+    health_score_avg: float | None
 
 
 @dataclass(frozen=True)
@@ -56,6 +66,8 @@ class ScenarioResult:
     baseline_summary: ScenarioSummary
     scenario_summary: ScenarioSummary
     delta_summary: Mapping[str, float | None]
+    baseline_health_summary: HealthSummary | None = None
+    scenario_health_summary: HealthSummary | None = None
 
 
 @dataclass
@@ -64,10 +76,15 @@ class ScenarioPlanner:
 
     metric_config: MetricConfig = field(default_factory=lambda: MetricConfig(use_cache=False))
     extension_manager: ExtensionManager | None = None
+    observability: ObservabilityRegistry | None = None
 
     def __post_init__(self) -> None:
         if self.extension_manager is None:
             self.extension_manager = get_extension_manager()
+        if self.observability is None:
+            self.observability = bootstrap_observability()
+        if self.extension_manager is not None and self.observability is not None:
+            self.extension_manager.apply_instrumentation_extensions(self.observability)
 
     def plan(
         self,
@@ -77,50 +94,66 @@ class ScenarioPlanner:
         if base.empty:
             raise ValueError("Base dataframe cannot be empty for scenario planning.")
 
-        raw_base = _extract_inputs(base)
-        raw_base.attrs.update(base.attrs)
-
-        baseline_metrics = _compute(raw_base, self.metric_config)
-        adjusted_inputs = raw_base.copy()
-
-        for adjustment in adjustments:
-            _apply_adjustment(adjusted_inputs, adjustment)
-
-        scenario_metrics = _compute(adjusted_inputs, self.metric_config)
-
-        baseline_metrics = format_for_display(baseline_metrics)
-        scenario_metrics = format_for_display(scenario_metrics)
-
-        deltas = _calculate_deltas(baseline_metrics, scenario_metrics)
-
-        baseline_summary = _summarise(baseline_metrics)
-        scenario_summary = _summarise(scenario_metrics)
-        delta_summary = {
-            key: _difference(scenario_summary, baseline_summary, key)
-            for key in baseline_summary.__dict__.keys()
+        attributes = {
+            "records": int(base.shape[0]),
+            "adjustments": len(adjustments),
         }
-
-        result = ScenarioResult(
-            baseline=baseline_metrics,
-            scenario=scenario_metrics,
-            deltas=deltas,
-            baseline_summary=baseline_summary,
-            scenario_summary=scenario_summary,
-            delta_summary=delta_summary,
+        observability_cm = (
+            self.observability.operation("service.scenario.plan", attributes=attributes)
+            if self.observability is not None
+            else nullcontext()
         )
 
-        if self.extension_manager is not None:
-            contributions = self.extension_manager.apply_scenario_extensions(result)
-            if contributions.metadata:
-                for frame in (result.baseline, result.scenario, result.deltas):
-                    extensions_meta = frame.attrs.setdefault("extensions", {})
-                    extensions_meta.update(contributions.metadata)
-            if contributions.notes:
-                notes = list(result.baseline.attrs.get("extension_notes", []))
-                notes.extend(contributions.notes)
-                result.baseline.attrs["extension_notes"] = notes
+        with observability_cm:
+            raw_base = _extract_inputs(base)
+            raw_base.attrs.update(base.attrs)
 
-        return result
+            baseline_metrics = _compute(raw_base, self.metric_config)
+            adjusted_inputs = raw_base.copy()
+
+            for adjustment in adjustments:
+                _apply_adjustment(adjusted_inputs, adjustment)
+
+            scenario_metrics = _compute(adjusted_inputs, self.metric_config)
+
+            baseline_metrics = compute_health_scores(format_for_display(baseline_metrics))
+            scenario_metrics = compute_health_scores(format_for_display(scenario_metrics))
+
+            deltas = _calculate_deltas(baseline_metrics, scenario_metrics)
+
+            baseline_summary = _summarise(baseline_metrics)
+            scenario_summary = _summarise(scenario_metrics)
+            delta_summary = {
+                key: _difference(scenario_summary, baseline_summary, key)
+                for key in baseline_summary.__dict__.keys()
+            }
+
+            baseline_health_summary = summarise_health(baseline_metrics)
+            scenario_health_summary = summarise_health(scenario_metrics)
+
+            result = ScenarioResult(
+                baseline=baseline_metrics,
+                scenario=scenario_metrics,
+                deltas=deltas,
+                baseline_summary=baseline_summary,
+                scenario_summary=scenario_summary,
+                delta_summary=delta_summary,
+                baseline_health_summary=baseline_health_summary,
+                scenario_health_summary=scenario_health_summary,
+            )
+
+            if self.extension_manager is not None:
+                contributions = self.extension_manager.apply_scenario_extensions(result)
+                if contributions.metadata:
+                    for frame in (result.baseline, result.scenario, result.deltas):
+                        extensions_meta = frame.attrs.setdefault("extensions", {})
+                        extensions_meta.update(contributions.metadata)
+                if contributions.notes:
+                    notes = list(result.baseline.attrs.get("extension_notes", []))
+                    notes.extend(contributions.notes)
+                    result.baseline.attrs["extension_notes"] = notes
+
+            return result
 
 
 def plan_scenario(
@@ -189,6 +222,7 @@ def _calculate_deltas(baseline: pd.DataFrame, scenario: pd.DataFrame) -> pd.Data
         "resilience_score",
         "materials_dependency_ratio",
         "shock_sensitivity_index",
+        "health_score",
     ]
 
     baseline_indexed = baseline.set_index("industry_code")
@@ -229,6 +263,11 @@ def _summarise(df: pd.DataFrame) -> ScenarioSummary:
         shock_sensitivity_index_avg=(
             float(df.get("shock_sensitivity_index", pd.Series(dtype="float64")).mean(skipna=True))
             if "shock_sensitivity_index" in df
+            else None
+        ),
+        health_score_avg=(
+            float(df.get("health_score", pd.Series(dtype="float64")).mean(skipna=True))
+            if "health_score" in df
             else None
         ),
     )
