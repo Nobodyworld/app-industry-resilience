@@ -293,6 +293,61 @@ def test_observability_snapshot_store_and_list(monkeypatch, tmp_path, capsys) ->
     assert listing[0]["metadata"]["source"] == "cli"
 
 
+def test_observability_snapshot_reports_remote_replication(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
+
+    class StubReplicator:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, Path]] = []
+            self.closed = False
+            self.bucket = "stub-bucket"
+            self.prefix = "remote/"
+
+        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+            self.calls.append((snapshot.snapshot_id, path))
+
+        def close(self) -> None:
+            self.closed = True
+
+    stub = StubReplicator()
+    monkeypatch.setattr(
+        observability_script,
+        "build_snapshot_replicator",
+        lambda _config: stub,
+    )
+
+    exit_code = observability_script.main(["--store"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert stub.calls
+    assert stub.closed is True
+    assert "Replicated snapshot to s3://stub-bucket/remote/" in captured.err
+
+
+def test_observability_snapshot_logs_remote_failure(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
+
+    class FailingReplicator:
+        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+            raise observability_script.SnapshotReplicationError("boom")
+
+        def close(self) -> None:  # type: ignore[no-untyped-def]
+            pass
+
+    monkeypatch.setattr(
+        observability_script,
+        "build_snapshot_replicator",
+        lambda _config: FailingReplicator(),
+    )
+
+    exit_code = observability_script.main(["--store"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Remote snapshot replication failed" in captured.err
+
+
 def test_observability_snapshot_compare(monkeypatch, tmp_path, capsys) -> None:
     storage_dir = tmp_path / "store"
     monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(storage_dir))
@@ -350,3 +405,36 @@ def test_update_pyproject_replaces_versions(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(bump_module, "PYPROJECT_PATH", pyproject_path)
     bump_module.update_pyproject("0.1.0", "0.2.0")
     assert pyproject_path.read_text(encoding="utf-8").count('version = "0.2.0"') == 2
+
+
+def test_observability_snapshot_reports_debug_destination(monkeypatch, tmp_path, capsys) -> None:
+    monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
+
+    class DebugReplicator:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, Path]] = []
+            self.closed = False
+            self.target_dir = tmp_path / "remote-debug"
+
+        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+            self.calls.append((snapshot.snapshot_id, path))
+            self.target_dir.mkdir(parents=True, exist_ok=True)
+            (self.target_dir / f"{snapshot.snapshot_id}.json").write_bytes(path.read_bytes())
+
+        def close(self) -> None:  # type: ignore[no-untyped-def]
+            self.closed = True
+
+    stub = DebugReplicator()
+    monkeypatch.setattr(
+        observability_script,
+        "build_snapshot_replicator",
+        lambda _config: stub,
+    )
+
+    exit_code = observability_script.main(["--store"])
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert stub.calls
+    assert stub.closed is True
+    assert "remote-debug" in captured.err

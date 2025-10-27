@@ -1,5 +1,49 @@
 # Release Notes
 
+# 2025-11-10 – Replication plugins & telemetry uplift
+
+### Highlights
+- Added the `ReplicationExtension` contract and taught the extension manager to discover custom replication backends before falling back to built-ins.
+- Emitted `observability.snapshot.replication` events from the persistence flow and introduced a `snapshot_replication` instrumentation extension that exposes replication counters, latency histograms, and a dedicated health component.
+- Shipped built-in S3 and debug filesystem replication modules, CLI messaging for both backends, and plugin-aware configuration/tests (including the new `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` variable).
+
+### Upgrade / Migration Notes
+- No manual migration is required; existing S3 configurations continue to work. Optional debug mirroring is available via `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` and a JSON `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` payload (e.g., `{"path": "./build/debug-replication"}`).
+- Observability dashboards and probes now expose `idiot_index_snapshot_replications_total`, `idiot_index_snapshot_replication_latency_seconds`, `idiot_index_snapshot_replication_age_seconds`, and a `snapshot_replication` health component.
+
+# 2025-11-10 – Snapshot replication hardening
+
+### Highlights
+- Normalised snapshot metadata serialisation for the S3 replicator so nested dictionaries, sequences, and sets are emitted as
+  deterministic JSON strings rather than Python reprs.
+- Added a dedicated regression test that verifies the emitted metadata payload, covering IDs, timestamps, JSON-encoded nested
+  values, boolean handling, and set ordering.
+
+### Upgrade / Migration Notes
+- No additional upgrade steps are required. Deployments already configured for remote replication inherit the fix automatically.
+
+# 2025-11-09 – Snapshot remote replication
+
+### Highlights
+- Added an S3-compatible snapshot replicator (`SnapshotRemoteStorageConfig`, `build_snapshot_replicator`, `S3SnapshotReplicator`) so every persisted observability snapshot is streamed to object storage immediately after landing on disk.
+- The observability CLI now reports remote destinations (and surfaces failures) when storing snapshots, and the `snapshot_persistence` extension invokes the same replicator on startup/shutdown/error triggers.
+- New configuration knobs (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND`, `OBSERVABILITY_SNAPSHOT_S3_*`, `OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES`) unlock remote shipping with full validation and documentation coverage.
+
+### Upgrade / Migration Notes
+- Install the new runtime dependency `botocore` and set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=s3` with the target bucket/prefix. Optional variables control endpoint overrides, credentials, TLS, and retry counts.
+- CLI and automation workflows that previously watched for `Stored snapshot` messages now also receive `Replicated snapshot to s3://...` on success; failures log to stderr but do not block local persistence.
+- Configuration summaries now include a `observability_snapshot_remote` entry; automation should treat secrets as boolean flags (`has_access_key`, etc.) rather than raw strings.
+
+# 2025-11-08 – Snapshot persistence automation
+
+### Highlights
+- Added the `snapshot_persistence` instrumentation extension so observability snapshots are persisted automatically on startup, shutdown, and when instrumentation emits `warn`/`error` events, keeping history available for comparisons without manual CLI runs.
+- Extended configuration with snapshot retention controls (`OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`, `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`, `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`) and refreshed tests/docs to surface the new knobs across README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION, and STATUS.
+
+### Upgrade / Migration Notes
+- Deployments should set retention variables to match storage expectations; defaults retain 20 snapshots for 30 days with a 10 minute minimum interval between auto-captures. Count/day thresholds can be disabled by setting them to `0`.
+- Automation consuming `get_config_summary` should read snapshot metadata from the new `observability_snapshot` structure (with `dir`, `retention_count`, `retention_days`, `min_interval_seconds`).
+
 # 2025-11-05 – Observability diagnostics & snapshot guardrails
 
 ### Highlights

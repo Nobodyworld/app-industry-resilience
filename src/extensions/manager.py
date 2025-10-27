@@ -15,12 +15,15 @@ from typing import TYPE_CHECKING, Literal
 from .contracts import (
     ExtensionContributions,
     InstrumentationExtension,
+    ReplicationExtension,
     ScenarioExtension,
     SummaryExtension,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from src.core.config import SnapshotRemoteStorageConfig
     from src.infrastructure.observability.instrumentation import ObservabilityRegistry
+    from src.infrastructure.observability.replication import SnapshotReplicator
 
 LOGGER = logging.getLogger(__name__)
 MANIFEST_PATH = Path("extensions/manifest.json")
@@ -32,7 +35,7 @@ class ExtensionDescriptor:
     """Describes a registered extension for catalog or CLI tooling."""
 
     name: str
-    kind: Literal["summary", "scenario", "instrumentation"]
+    kind: Literal["summary", "scenario", "instrumentation", "replication"]
     module: str
     description: str | None = None
 
@@ -44,6 +47,7 @@ class ExtensionManager:
     summary_extensions: list[SummaryExtension] = field(default_factory=list)
     scenario_extensions: list[ScenarioExtension] = field(default_factory=list)
     instrumentation_extensions: list[InstrumentationExtension] = field(default_factory=list)
+    replication_extensions: list[ReplicationExtension] = field(default_factory=list)
     logger: logging.Logger = field(default=LOGGER)
     _instrumentation_registry_cache: dict[str, set[int]] = field(
         default_factory=dict, init=False, repr=False
@@ -63,6 +67,10 @@ class ExtensionManager:
         )
         self.instrumentation_extensions.append(extension)
 
+    def register_replication_extension(self, extension: ReplicationExtension) -> None:
+        self.logger.debug("Registering replication extension", extra={"extension": extension.name})
+        self.replication_extensions.append(extension)
+
     def catalog(self) -> list[ExtensionDescriptor]:
         """Return metadata describing registered extensions."""
 
@@ -75,11 +83,14 @@ class ExtensionManager:
             descriptors.append(
                 self._describe_extension(instrumentation_extension, "instrumentation")
             )
+        for replication_extension in self.replication_extensions:
+            descriptors.append(self._describe_extension(replication_extension, "replication"))
         return sorted(descriptors, key=lambda item: (item.kind, item.name))
 
     @staticmethod
     def _describe_extension(
-        extension: object, kind: Literal["summary", "scenario", "instrumentation"]
+        extension: object,
+        kind: Literal["summary", "scenario", "instrumentation", "replication"],
     ) -> ExtensionDescriptor:
         name = getattr(extension, "name", extension.__class__.__name__)
         module = extension.__class__.__module__
@@ -138,6 +149,25 @@ class ExtensionManager:
                 )
                 continue
             applied.add(registry_id)
+
+    def build_replication_backend(
+        self, config: SnapshotRemoteStorageConfig
+    ) -> SnapshotReplicator | None:
+        """Return the first matching replication backend from registered extensions."""
+
+        for extension in self.replication_extensions:
+            try:
+                if not extension.supports(config):
+                    continue
+                replicator = extension.build(config)
+            except Exception:  # pragma: no cover - defensive logging
+                self.logger.exception(
+                    "Replication extension failed",
+                    extra={"extension": extension.name},
+                )
+                continue
+            return replicator
+        return None
 
 
 def _parse_manifest(path: Path) -> list[str]:
@@ -202,7 +232,9 @@ _MANAGER_SINGLETON: ExtensionManager | None = None
 def get_extension_manager() -> ExtensionManager:
     global _MANAGER_SINGLETON
     if _MANAGER_SINGLETON is None:
-        _MANAGER_SINGLETON = load_extensions(ExtensionManager())
+        manager = ExtensionManager()
+        _MANAGER_SINGLETON = manager
+        load_extensions(manager)
     return _MANAGER_SINGLETON
 
 

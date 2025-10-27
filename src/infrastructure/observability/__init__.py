@@ -19,6 +19,13 @@ from .metrics import (
     MetricRegistry,
     render_prometheus_text,
 )
+from .replication import (
+    NullSnapshotReplicator,
+    S3SnapshotReplicator,
+    SnapshotReplicationError,
+    SnapshotReplicator,
+    build_snapshot_replicator,
+)
 from .storage import (
     ObservabilitySnapshot,
     SnapshotStorage,
@@ -39,14 +46,19 @@ __all__ = [
     "Tracer",
     "TraceContext",
     "build_default_probe",
+    "NullSnapshotReplicator",
     "ObservationEvent",
     "ObservabilityRegistry",
     "ObservabilitySnapshot",
+    "SnapshotReplicationError",
+    "SnapshotReplicator",
     "bootstrap_observability",
+    "build_snapshot_replicator",
     "build_snapshot_id",
     "current_trace_context",
     "current_trace_id",
     "load_snapshot_from_file",
     "render_prometheus_text",
+    "S3SnapshotReplicator",
     "SnapshotStorage",
 ]

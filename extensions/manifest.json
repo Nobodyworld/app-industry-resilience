@@ -4,6 +4,8 @@
     "src.extensions.builtins.rate_limiting",
     "src.extensions.builtins.manufacturing_cost_driver",
     "src.extensions.builtins.data_quality",
-    "src.extensions.builtins.snapshot_monitor"
+    "src.extensions.builtins.snapshot_monitor",
+    "src.extensions.builtins.snapshot_replication",
+    "src.extensions.builtins.snapshot_persistence"
   ]
 }

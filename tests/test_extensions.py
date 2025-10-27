@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -8,6 +9,7 @@ import pytest
 from src.application.idiot_index_service import IdiotIndexSummary, IndustryMetrics
 from src.application.scenario_planner import ScenarioResult, ScenarioSummary
 from src.extensions.manager import ExtensionManager, load_extensions
+from src.infrastructure.observability.instrumentation import ObservabilityRegistry
 
 
 @pytest.fixture()
@@ -136,9 +138,20 @@ def test_extension_catalog_includes_data_quality() -> None:
     manager = load_extensions(ExtensionManager())
     catalog = manager.catalog()
     names = {entry.name for entry in catalog}
-    assert "data_quality" in names
+    assert {
+        "data_quality",
+        "snapshot_persistence",
+        "snapshot_replication_s3",
+        "snapshot_replication_debug",
+    }.issubset(names)
     instrumentation_entries = [entry for entry in catalog if entry.kind == "instrumentation"]
-    assert any(entry.module.endswith("data_quality") for entry in instrumentation_entries)
+    instrumentation_modules = {entry.module for entry in instrumentation_entries}
+    assert "src.extensions.builtins.data_quality" in instrumentation_modules
+    assert "src.extensions.builtins.snapshot_persistence" in instrumentation_modules
+    assert "src.extensions.builtins.snapshot_replication" in instrumentation_modules
+    replication_entries = [entry for entry in catalog if entry.kind == "replication"]
+    replication_modules = {entry.module for entry in replication_entries}
+    assert "src.extensions.builtins.snapshot_replication" in replication_modules
 
 
 def test_extensions_catalog_cli_json(capsys) -> None:
@@ -150,3 +163,59 @@ def test_extensions_catalog_cli_json(capsys) -> None:
 
     assert exit_code == 0
     assert any(entry["name"] == "data_quality" for entry in payload)
+    assert any(entry["name"] == "snapshot_persistence" for entry in payload)
+
+
+def test_snapshot_persistence_extension_persists_and_prunes(tmp_path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from src.extensions.builtins import snapshot_persistence
+
+    config_stub = SimpleNamespace(
+        observability_snapshot_dir=tmp_path,
+        observability_snapshot_retention_count=1,
+        observability_snapshot_retention_days=0,
+        observability_snapshot_min_interval_seconds=0.0,
+        observability_snapshot_remote=None,
+    )
+
+    monkeypatch.setattr(snapshot_persistence, "load_config", lambda: config_stub)
+
+    class StubReplicator:
+        def __init__(self) -> None:
+            self.calls: list[Path] = []
+            self.closed = False
+
+        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+            self.calls.append(path)
+
+        def close(self) -> None:  # type: ignore[no-untyped-def]
+            self.closed = True
+
+    stub_replicator = StubReplicator()
+    monkeypatch.setattr(
+        snapshot_persistence,
+        "build_snapshot_replicator",
+        lambda _cfg: stub_replicator,
+    )
+
+    registry = ObservabilityRegistry()
+    extension = snapshot_persistence._SnapshotPersistenceExtension()
+    extension.register(registry)
+
+    startup_files = sorted(tmp_path.glob("*.json"))
+    assert len(startup_files) == 1
+
+    registry.record_event(
+        "service.demo",
+        status="error",
+        duration=0.05,
+        attributes={"source": "test"},
+        error="boom",
+    )
+
+    remaining_files = sorted(tmp_path.glob("*.json"))
+    assert len(remaining_files) == 1
+    payload = json.loads(remaining_files[0].read_text())
+    assert payload["metadata"]["reason"] in {"event", "shutdown"}
+    assert stub_replicator.calls

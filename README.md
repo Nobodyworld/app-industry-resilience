@@ -149,6 +149,24 @@ python scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for an
 python scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
 ```
 
+To replicate observability snapshots to an S3-compatible object store in addition to local disk, set the remote backend variables before running the app or CLI:
+
+```bash
+export OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=s3
+export OBSERVABILITY_SNAPSHOT_S3_BUCKET=idiot-index-snapshots
+# Optional tuning knobs
+export OBSERVABILITY_SNAPSHOT_S3_PREFIX=nightly/
+export OBSERVABILITY_SNAPSHOT_S3_REGION=us-east-1
+export OBSERVABILITY_SNAPSHOT_S3_ENDPOINT=https://s3.example.com  # for MinIO/other vendors
+export OBSERVABILITY_SNAPSHOT_S3_ACCESS_KEY=...  # omit when relying on IAM roles
+export OBSERVABILITY_SNAPSHOT_S3_SECRET_KEY=...
+export OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"storage_class": "STANDARD_IA"}'  # optional JSON options consumed by extensions
+```
+
+Extensions can also provide alternative backends. For example, setting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` and `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"path": "./build/debug-replication"}'` mirrors every snapshot into a local directory without touching S3. Custom replication modules registered via `ExtensionManager` can read the same options payload to discover per-backend configuration.
+
+The CLI automatically reports whether replication succeeded and where the object landed (S3 URLs or debug filesystem paths), while failures log to stderr without interrupting local persistence.
+
 All helper scripts now self-bootstrap the repository root onto `PYTHONPATH`, so running `python scripts/<name>.py` works without
 activating editable installs or manually exporting environment variables.
 
@@ -205,8 +223,8 @@ Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + m
 ### Observability & Extensions
 
 - The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics`, `/observability/status`, the richer `/observability/digest`, and the snapshot catalogue endpoints under `/observability/snapshots` for historical exports.
-- Streamlit's dashboard includes an Observability tab that visualises stored snapshots (event totals, error trends, and last-error payloads). Snapshots persist under `build/observability_snapshots` by default and respect the `OBSERVABILITY_SNAPSHOT_DIR` environment variable.
-- Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance. The built-in `data_quality` instrumentation extension demonstrates how to subscribe to dataset/scenario profile events, emit gauges, and contribute health checks.
+- Streamlit's dashboard includes an Observability tab that visualises stored snapshots (event totals, error trends, and last-error payloads). Snapshots persist under `build/observability_snapshots` by default and respect the `OBSERVABILITY_SNAPSHOT_DIR` environment variable. Retention and auto-capture cadence are controlled via `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`, `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`, and `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`.
+- Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance. The built-in `data_quality` instrumentation extension demonstrates how to subscribe to dataset/scenario profile events, emit gauges, and contribute health checks, while the `snapshot_replication` package wires both S3 and debug replication extensions together with a metrics/health observer that tracks the `observability.snapshot.replication` events emitted by `snapshot_persistence` on startup/shutdown and whenever instrumentation emits `warn`/`error` events. Retention and auto-capture cadence remain governed by the `OBSERVABILITY_SNAPSHOT_RETENTION_*` knobs.
 
 Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
 
@@ -278,6 +296,11 @@ The app validates configuration at startup before rendering the UI. Key environm
 - `CACHE_ENABLED`: Enable/disable filesystem caches (`true`/`false`).
 - `CACHE_DIR`: Base directory for cache files (defaults to `.cache`).
 - `OBSERVABILITY_SNAPSHOT_DIR`: Directory where observability snapshots are persisted (defaults to `build/observability_snapshots`).
+- `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`: Maximum number of snapshots to retain before pruning oldest archives (`0` disables count-based pruning).
+- `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`: Age threshold (in days) for pruning historical snapshots (`0` disables age-based pruning).
+- `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`: Minimum number of seconds between automatic snapshot captures triggered by the persistence extension.
+- `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND`: Remote replication backend identifier (`s3`, `plugin:<name>`, or `off`).
+- `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS`: JSON object handed to replication extensions for backend-specific configuration (e.g., `{"path": "./build/debug-replication"}`).
 - `BEA_API_KEY`, `CENSUS_API_KEY`: Required when `ENVIRONMENT=production`.
 
 Launch the app and open the “Configuration summary” expander in the sidebar to review resolved values and warnings.

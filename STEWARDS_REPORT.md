@@ -3,30 +3,28 @@
 ## System Metrics
 | Metric | Value | Source |
 | --- | --- | --- |
-| Test coverage (src) | 93.00% | `make quality-gate` trace fallback (`scripts/run_tests_with_trace.py`). 【05f7f4†L1-L33】 |
-| Avg cyclomatic complexity (core modules) | 29.22 (Top 5: `core.config` 72.0, `core.security` 56.0, `core.analytics` 34.0, `core.normalize` 30.0, `core.cache` 29.0) | `python scripts/audit_metrics.py --runs 3`. 【ecb1e0†L1-L29】 |
-| Dependency depth / cohesion ratio | Depth 5 / Cohesion 0.798 (245 internal edges, 62 external) | `python scripts/audit_metrics.py --runs 3`. 【ecb1e0†L1-L29】 |
-| Source footprint | 0.263 MB of Python modules under `src/` | `python scripts/audit_metrics.py --runs 3`. 【ecb1e0†L1-L29】 |
-| IdiotIndexService evaluate latency | 0.0443 s average on bundled dataset (3 runs) | `python scripts/audit_metrics.py --runs 3`. 【ecb1e0†L1-L29】 |
-| Quality gate duration | 54.66 s real time end-to-end (`make quality-gate`) | `time make quality-gate`. 【05f7f4†L24-L33】 |
+| Test coverage (src) | 93.26% | `make quality-gate` trace fallback (`scripts/run_tests_with_trace.py`). 【F:build/reports/audit-metrics.json†L2-L31】 |
+| Avg cyclomatic complexity (core modules) | 30.00 (Top 5: `core.config` 79.0, `core.security` 56.0, `core.analytics` 34.0, `core.normalize` 30.0, `core.cache` 29.0) | `python scripts/audit_metrics.py --runs 3`. 【F:build/reports/audit-metrics.json†L2-L31】 |
+| Dependency depth / cohesion ratio | Depth 5 / Cohesion 0.8057 (282 internal edges, 68 external) | `python scripts/audit_metrics.py --runs 3`. 【F:build/reports/audit-metrics.json†L2-L31】 |
+| Source footprint | 0.293 MB of Python modules under `src/` | `python scripts/audit_metrics.py --runs 3`. 【F:build/reports/audit-metrics.json†L2-L31】 |
+| IdiotIndexService evaluate latency | 0.0712 s average on bundled dataset (3 runs) | `python scripts/audit_metrics.py --runs 3`. 【F:build/reports/audit-metrics.json†L2-L31】 |
+| Quality gate duration | 19.57 s real time end-to-end (`make quality-gate`) | `time make quality-gate`. 【597cf0†L4-L6】 |
 
 ## Audit Highlights
-- Eliminated empty observability contexts by adding `ObservabilityRegistry.record_event(...)` and refactoring Idiot Index workflows plus data-quality instrumentation to emit profiling signals through the helper. 【F:src/infrastructure/observability/instrumentation.py†L109-L139】【F:src/application/idiot_index_service.py†L174-L178】【F:src/application/scenario_planner.py†L156-L164】【F:tests/test_observability.py†L33-L129】
-- Hardened the steward metrics CLI with a `coverage.xml` fallback so audits succeed even when only pytest coverage artefacts are present, with regression tests covering the path. 【F:scripts/audit_metrics.py†L170-L187】【F:tests/test_scripts.py†L45-L62】
-- Unified script execution by adding `_bootstrap` and packaging `scripts/` so every helper works with plain `python scripts/<tool>.py`, keeping automation resilient to PYTHONPATH differences. 【F:scripts/_bootstrap.py†L1-L10】【F:scripts/__init__.py†L1-L8】
-- Introduced the steward metrics CLI (`scripts/audit_metrics.py`) and `make audit` target, wiring the output into docs and `build/reports/audit-metrics.json`. 【F:scripts/audit_metrics.py†L1-L239】【F:Makefile†L18-L33】【F:Makefile†L136-L147】
-- Captured automation responsibilities in the new `AUTOMATION_ROLES.md` and updated contributor/automation guides with the audit workflow and script bootstrap expectations. 【F:AUTOMATION_ROLES.md†L1-L11】【F:AUTOMATION.md†L1-L84】【F:CONTRIBUTING.md†L1-L73】
-- Delivered `/observability/digest`, the `observability_tail.py` streaming CLI, and the `extensions_catalog.py` inventory tool so operators and agents can inspect telemetry and extension metadata without code changes. 【F:src/interfaces/api/app.py†L135-L169】【F:scripts/observability_tail.py†L1-L127】【F:scripts/extensions_catalog.py†L1-L78】
+- Generalised snapshot replication behind a new `ReplicationExtension` protocol and taught `ExtensionManager` to resolve plugin backends before falling back to built-ins, avoiding recursion while the manifest loads. 【F:src/extensions/contracts.py†L1-L63】【F:src/extensions/manager.py†L1-L224】【F:src/infrastructure/observability/replication.py†L1-L207】
+- Added plugin-aware configuration knobs (JSON options, plugin backend identifiers) and validation/tests covering both S3 and debug scenarios so operators and automation can pass backend-specific configuration safely. 【F:src/core/config.py†L1-L364】【F:tests/test_config.py†L1-L212】
+- Emitted structured `observability.snapshot.replication` events from the persistence extension and introduced the `snapshot_replication` instrumentation module with replication metrics, health checks, and a debug filesystem replicator, all covered by new tests and CLI messaging. 【F:src/extensions/builtins/snapshot_persistence.py†L1-L204】【F:src/extensions/builtins/snapshot_replication.py†L1-L175】【F:tests/test_observability_replication.py†L1-L212】【F:scripts/observability_snapshot.py†L1-L170】【F:tests/test_scripts.py†L296-L360】
+- Updated operator docs and stewardship artefacts (README, OBSERVABILITY_SNAPSHOTS.md, EXTENSION_GUIDE.md, AUTOMATION.md, STATUS.md, RELEASE_NOTES.md) to describe replication plugins, new metrics, and health surfaces. 【F:README.md†L148-L306】【F:docs/OBSERVABILITY_SNAPSHOTS.md†L31-L112】【F:EXTENSION_GUIDE.md†L1-L120】【F:AUTOMATION.md†L32-L120】【F:STATUS.md†L1-L37】【F:RELEASE_NOTES.md†L1-L48】
 
 ## Simplification Log
-- Replaced no-op observability contexts with the dedicated `record_event(...)` helper so dataset/scenario profiling emits spans and counters without boilerplate. 【F:src/infrastructure/observability/instrumentation.py†L118-L139】【F:src/application/idiot_index_service.py†L174-L178】【F:src/application/scenario_planner.py†L156-L164】
-- Normalised script entry points via a shared `_bootstrap` shim and defensive imports, eliminating repeated `sys.path` hacks across the CLI surface. 【F:scripts/audit_metrics.py†L5-L21】【F:scripts/prefetch_data.py†L6-L17】
-- Added a coverage report fallback that reads `coverage.xml` when the trace JSON is absent so stewardship audits continue to run in pytest-only environments. 【F:scripts/audit_metrics.py†L170-L187】【F:tests/test_scripts.py†L45-L62】
+- Centralised replication backend resolution through `ExtensionManager.build_replication_backend`, replacing per-call switch statements and allowing new connectors to hook in without editing infrastructure code. 【F:src/extensions/manager.py†L1-L224】【F:src/infrastructure/observability/replication.py†L108-L207】
+- Surfaced replication options alongside retention defaults in config summaries, reducing bespoke environment parsing in tests and scripts. 【F:src/core/config.py†L310-L362】【F:tests/test_config.py†L128-L212】
+- Deferred Redis imports for rate limiting behind guarded try/except blocks, simplifying local execution environments that lack the optional dependency. 【F:src/infrastructure/rate_limiter.py†L9-L37】
 
 ## Key Recommendations
-1. Restore native `pytest-cov` availability (vendor wheels) so coverage enforcement no longer depends on the trace fallback. 【05f7f4†L1-L33】
-2. Decompose `src/core/security` and `src/core/config` into focused helpers; both dominate complexity rankings in the audit output. 【ecb1e0†L1-L29】
-3. Persist observability state (metrics/recent events) to survive process restarts, enabling richer long-term audit trails.
+1. Restore native `pytest-cov` availability (vendor wheels) so coverage enforcement no longer depends on the trace fallback.
+2. Tame complexity in `src/core/config` and `src/core/security`, which continue to top the audit leaderboard (79 and 56 respectively).
+3. Add policy knobs for remote retention (e.g., S3 lifecycle templates, optional server-side encryption) so regulated deployments can adopt the new replication workflow safely.
 
 ## Automation Hooks & Agent Notes
 - `make quality-gate` – full lint/type/test/security pipeline (# agent-safe-task). 【F:Makefile†L54-L90】
@@ -36,21 +34,24 @@
 
 ## Forward Roadmap
 ### Short Term
-- Package offline wheels for `pytest-cov` and allied tooling so CI and local runs share identical coverage enforcement.
-- Refactor the heaviest complexity hotspots surfaced by the audit (`core.security`, `core.config`) into testable submodules.
+- Vendor offline wheels for `pytest-cov` and related tooling so coverage gates no longer rely on the trace fallback.
+- Break up `core.config` into config-domain helpers, especially around snapshot retention parsing, to reduce the 79 complexity score.
+- Add guardrails for remote replication (S3 lifecycle policy templates, optional KMS encryption toggle, and smoke tests for failed uploads).
 
 ### Mid Term
-- Add persistent telemetry exporters (e.g., JSON or OTLP) so observability snapshots survive process restarts and feed external monitors.
-- Expand stewardship metrics to include memory footprints and extension load times for regression tracking.
+- Add optional exporters (JSON/OTLP) so observability snapshots and event streams can be mirrored to external monitoring stacks.
+- Expand stewardship metrics with memory footprint and extension load-time probes for regression tracking.
+- Automate pruning/retention smoke tests in CI to assert snapshot rotation under varied policies.
 
 ### Long Term
-- Explore distributed observability/state backends to support multi-instance deployments with coordinated health and rate limiting.
+- Explore distributed observability/state backends to support multi-instance deployments with coordinated snapshot capture and rate limiting.
 - Define a declarative extension manifest validator so agent-authored plugins can be auto-checked before activation.
+- Investigate intelligent retention advisors that adjust thresholds based on storage utilisation trends.
 
-## Emerging Risks
-- **Complexity concentration** – `src/core.config` and `src/core.security` now lead the branching rankings (72 and 56 respectively), increasing maintenance risk. 【ecb1e0†L1-L29】
-- **Ephemeral telemetry** – observability data is in-memory only; audits lose context after restarts, reducing trend visibility.
-- **Dependency gaps** – continuing without vendored coverage tooling leaves CI reliant on the trace fallback and manual JSON parsing.
+- **Complexity concentration** – `src/core.config` and `src/core.security` remain the top complexity hotspots (79 and 56), raising change risk.
+- **Snapshot storage pressure** – disabling retention knobs can cause unbounded growth in `build/observability_snapshots`; automation should enforce sane defaults (and now consider remote bucket retention rules).
+- **Dependency gaps** – coverage enforcement still leans on the trace fallback until pytest-cov wheels are restored.
+- **Credential management** – remote replication depends on S3 credentials/roles; deployments must safeguard secret distribution and consider path-style/endpoint overrides when using alternative providers.
 
 ## Potential Agent Roles
 | Role | Mandate | Trigger |
@@ -58,6 +59,7 @@
 | Stewardship Auditor | Run `make audit`, archive `build/reports/audit-metrics.json`, and update this report after major merges. | Weekly cadence or when core/tests change. |
 | Observability Sentinel | Verify `/health`, `/observability/status`, and CLI probes, ensuring instrumentation docs stay accurate. | Post-deployment. |
 | Telemetry Archivist | Confirm dataset/scenario profiling emits via `registry.record_event(...)`, archive `/observability/digest` snapshots, and diff recent events after releases. | After observability or extension changes. |
+| Snapshot Custodian | Review automated snapshot archives, verify retention pruning, and ship retained bundles to long-term storage when required. | Weekly or post-incident. |
 | Extension Gatekeeper | Vet extension manifests, run scaffolds, and ensure new modules register instrumentation correctly. | When `extensions/manifest.json` changes. |
 
 For detailed task descriptions and tool references see `AUTOMATION_ROLES.md`.

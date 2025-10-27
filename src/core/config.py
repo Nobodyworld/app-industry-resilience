@@ -13,6 +13,7 @@ from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -119,6 +120,42 @@ class CacheConfig:
 
 
 @dataclass(frozen=True)
+class SnapshotRemoteStorageConfig:
+    """Configuration for replicating observability snapshots to remote storage."""
+
+    enabled: bool
+    backend: str
+    bucket: str | None
+    prefix: str
+    region: str | None
+    endpoint_url: str | None
+    access_key: str | None
+    secret_key: str | None
+    session_token: str | None
+    use_ssl: bool
+    force_path_style: bool
+    max_retries: int
+    options: Mapping[str, Any] | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "enabled": self.enabled,
+            "backend": self.backend,
+            "bucket": self.bucket,
+            "prefix": self.prefix,
+            "region": self.region,
+            "endpoint_url": self.endpoint_url,
+            "use_ssl": self.use_ssl,
+            "force_path_style": self.force_path_style,
+            "max_retries": self.max_retries,
+            "has_access_key": bool(self.access_key),
+            "has_secret_key": bool(self.secret_key),
+            "has_session_token": bool(self.session_token),
+            "options_keys": sorted(self.options.keys()) if self.options else [],
+        }
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """Primary configuration object consumed by the application."""
 
@@ -132,6 +169,10 @@ class AppConfig:
     rate_limits: RateLimitConfig
     cache: CacheConfig
     observability_snapshot_dir: Path
+    observability_snapshot_retention_count: int
+    observability_snapshot_retention_days: int
+    observability_snapshot_min_interval_seconds: float
+    observability_snapshot_remote: SnapshotRemoteStorageConfig | None
     max_csv_size_mb: int
     supported_years_bea: range
     supported_years_census: range
@@ -288,6 +329,19 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
         values.get("SUPPORTED_YEARS_CENSUS", "1997-2024"), "SUPPORTED_YEARS_CENSUS"
     )
 
+    snapshot_retention_count = _parse_int(
+        values.get("OBSERVABILITY_SNAPSHOT_RETENTION_COUNT", "20"),
+        "OBSERVABILITY_SNAPSHOT_RETENTION_COUNT",
+    )
+    snapshot_retention_days = _parse_int(
+        values.get("OBSERVABILITY_SNAPSHOT_RETENTION_DAYS", "30"),
+        "OBSERVABILITY_SNAPSHOT_RETENTION_DAYS",
+    )
+    snapshot_min_interval_seconds = _parse_float(
+        values.get("OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS", "600"),
+        "OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS",
+    )
+
     normalization_overrides: dict[str, str] = {}
     overrides_raw = values.get("NORMALIZE_DTYPE_OVERRIDES")
     if overrides_raw:
@@ -305,6 +359,69 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
             str(key).strip().lower(): str(value).strip() for key, value in parsed.items()
         }
 
+    remote_backend_raw = values.get("OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND", "").strip()
+    remote_backend = remote_backend_raw.lower()
+    remote_cfg: SnapshotRemoteStorageConfig | None = None
+    if remote_backend:
+        if remote_backend in {"off", "none", "disabled"}:
+            remote_cfg = None
+        else:
+            remote_options = _parse_remote_options(
+                values.get("OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS")
+            )
+            max_retries = _parse_int(
+                values.get("OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES", "3"),
+                "OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES",
+            )
+            if remote_backend == "s3":
+                bucket = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_BUCKET"))
+                prefix_raw = values.get("OBSERVABILITY_SNAPSHOT_S3_PREFIX", "")
+                prefix_clean = prefix_raw.strip()
+                if prefix_clean:
+                    prefix_clean = prefix_clean.strip("/")
+                    if prefix_clean:
+                        prefix_clean = f"{prefix_clean}/"
+                region = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_REGION"))
+                endpoint_url = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_ENDPOINT"))
+                access_key = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_ACCESS_KEY"))
+                secret_key = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_SECRET_KEY"))
+                session_token = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_SESSION_TOKEN"))
+                use_ssl = _parse_bool(values.get("OBSERVABILITY_SNAPSHOT_S3_USE_SSL", "true"))
+                force_path_style = _parse_bool(
+                    values.get("OBSERVABILITY_SNAPSHOT_S3_FORCE_PATH_STYLE")
+                )
+                remote_cfg = SnapshotRemoteStorageConfig(
+                    enabled=True,
+                    backend="s3",
+                    bucket=bucket,
+                    prefix=prefix_clean,
+                    region=region,
+                    endpoint_url=endpoint_url,
+                    access_key=access_key,
+                    secret_key=secret_key,
+                    session_token=session_token,
+                    use_ssl=use_ssl,
+                    force_path_style=force_path_style,
+                    max_retries=max_retries,
+                    options=remote_options,
+                )
+            else:
+                remote_cfg = SnapshotRemoteStorageConfig(
+                    enabled=True,
+                    backend=remote_backend_raw or remote_backend,
+                    bucket=None,
+                    prefix="",
+                    region=None,
+                    endpoint_url=None,
+                    access_key=None,
+                    secret_key=None,
+                    session_token=None,
+                    use_ssl=True,
+                    force_path_style=False,
+                    max_retries=max_retries,
+                    options=remote_options,
+                )
+
     return AppConfig(
         environment=environment,
         log_level=log_level,
@@ -321,6 +438,10 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
             computation_ttl_seconds=computation_ttl,
         ),
         observability_snapshot_dir=snapshot_dir,
+        observability_snapshot_retention_count=snapshot_retention_count,
+        observability_snapshot_retention_days=snapshot_retention_days,
+        observability_snapshot_min_interval_seconds=snapshot_min_interval_seconds,
+        observability_snapshot_remote=remote_cfg,
         max_csv_size_mb=max_csv_size,
         supported_years_bea=supported_years_bea,
         supported_years_census=supported_years_census,
@@ -364,6 +485,13 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
     ):
         errors.append("OBSERVABILITY_SNAPSHOT_DIR must reference a directory path.")
 
+    if config.observability_snapshot_retention_count < 0:
+        errors.append("OBSERVABILITY_SNAPSHOT_RETENTION_COUNT must be zero or positive.")
+    if config.observability_snapshot_retention_days < 0:
+        errors.append("OBSERVABILITY_SNAPSHOT_RETENTION_DAYS must be zero or positive.")
+    if config.observability_snapshot_min_interval_seconds < 0:
+        errors.append("OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS must be zero or positive.")
+
     for name, value in config.rate_limits.as_dict().items():
         if value <= 0:
             errors.append(f"Rate limit for {name} must be a positive integer.")
@@ -380,6 +508,36 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
             errors.append("RATE_LIMIT_REDIS_TIMEOUT_SECONDS must be positive when provided.")
         if dist.host is None and not dist.ssl:
             warnings.append("Redis host not specified; defaulting to localhost.")
+
+    if config.observability_snapshot_remote and config.observability_snapshot_remote.enabled:
+        remote = config.observability_snapshot_remote
+        if remote.max_retries < 0:
+            errors.append("OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES must be zero or positive.")
+        if remote.backend == "s3":
+            if not remote.bucket:
+                errors.append(
+                    "OBSERVABILITY_SNAPSHOT_S3_BUCKET is required when remote shipping is enabled."
+                )
+            if remote.prefix and any(part.strip() == "" for part in remote.prefix.split("/")):
+                errors.append(
+                    "OBSERVABILITY_SNAPSHOT_S3_PREFIX must not contain empty path segments."
+                )
+            if remote.endpoint_url and not remote.access_key and not remote.secret_key:
+                warnings.append(
+                    "OBSERVABILITY_SNAPSHOT_S3_ENDPOINT set without credentials; ensure IAM role or instance profile provides access."
+                )
+        else:
+            backend_label = remote.backend or "unspecified"
+            if backend_label.startswith("plugin:"):
+                if not remote.options:
+                    warnings.append(
+                        "OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS not provided; verify plugin backends have the configuration they require."
+                    )
+            else:
+                warnings.append(
+                    "OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND "
+                    f"'{backend_label}' requires a matching replication extension; without one, replication remains local-only."
+                )
 
     if config.environment.is_production:
         if not config.bea_api_key:
@@ -411,7 +569,17 @@ def get_config_summary(config: AppConfig | None = None) -> dict[str, object]:
         "default_year": config.default_year,
         "cache_enabled": config.cache.enabled,
         "cache_dir": str(config.cache.base_dir),
-        "observability_snapshot_dir": str(config.observability_snapshot_dir),
+        "observability_snapshot": {
+            "dir": str(config.observability_snapshot_dir),
+            "retention_count": config.observability_snapshot_retention_count,
+            "retention_days": config.observability_snapshot_retention_days,
+            "min_interval_seconds": config.observability_snapshot_min_interval_seconds,
+        },
+        "observability_snapshot_remote": (
+            config.observability_snapshot_remote.as_dict()
+            if config.observability_snapshot_remote
+            else {"enabled": False, "backend": "none"}
+        ),
         "cache_ttl": {
             "api": config.cache.api_ttl_seconds,
             "computation": config.cache.computation_ttl_seconds,
@@ -438,6 +606,31 @@ def get_config_summary(config: AppConfig | None = None) -> dict[str, object]:
         "bea_api_version": config.bea_api_version or "default",
         "bea_api_base_urls": list(config.bea_api_base_urls),
     }
+
+
+def _parse_remote_options(raw: str | None) -> Mapping[str, Any] | None:
+    """Parse backend-specific options encoded as JSON."""
+
+    if raw is None:
+        return None
+    raw = raw.strip()
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:  # pragma: no cover - defensive
+        raise ConfigError("OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS must be a JSON object.") from exc
+    if not isinstance(parsed, Mapping):
+        raise ConfigError("OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS must be a JSON object.")
+    options: dict[str, Any] = {}
+    for key, value in parsed.items():
+        key_str = str(key).strip()
+        if not key_str:
+            raise ConfigError(
+                "OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS keys must be non-empty strings."
+            )
+        options[key_str] = value
+    return options
 
 
 def _parse_int(value: str, name: str) -> int:
@@ -521,6 +714,7 @@ __all__ = [
     "ConfigValidationResult",
     "Environment",
     "DistributedRateLimitConfig",
+    "SnapshotRemoteStorageConfig",
     "RateLimitConfig",
     "get_config_summary",
     "load_config",

@@ -1,5 +1,26 @@
 # Changelog
 
+# 2025-11-10 – Replication plugins & telemetry uplift
+- Introduced the `ReplicationExtension` contract and taught `ExtensionManager` to resolve plugin backends before falling back to built-in replicators, enabling out-of-tree connectors.
+- Emitted `observability.snapshot.replication` events from the persistence extension and shipped the `snapshot_replication` instrumentation module with replication counters, latency histograms, and a dedicated health component.
+- Added a debug filesystem replicator (`plugin:debug`), CLI messaging for both S3 and debug backends, plugin-aware configuration options (`OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS`), and comprehensive unit tests/docs covering the new workflow.
+
+# 2025-11-10 – Snapshot replication hardening
+- Normalised metadata serialisation in the S3 replicator so nested mappings, sequences, and sets are encoded as deterministic
+  JSON strings instead of relying on Python reprs, keeping remote archives friendly to consumers expecting structured metadata.
+- Added a targeted regression test that validates the S3 replicator emits normalised metadata (IDs, timestamps, JSON-encoded
+  nested values) so future refactors keep remote archives queryable.
+
+# 2025-11-09 – Snapshot remote replication
+- Added S3-compatible snapshot replication with the new `SnapshotRemoteStorageConfig`, `build_snapshot_replicator(...)`, and the `S3SnapshotReplicator`, ensuring automatic uploads whenever snapshots are persisted by the extension or CLI while preserving local disk durability.
+- Extended configuration parsing/validation and `get_config_summary` with remote backend settings plus environment-variable support for bucket, prefix, endpoint, credentials, and retry tuning.
+- Updated the observability CLI to report remote destinations, added replication unit tests (`tests/test_observability_replication.py`, script/extension stubs), and refreshed docs (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION, STATUS, RELEASE_NOTES, STEWARDS_REPORT) so operators can enable the feature confidently.
+
+# 2025-11-08 – Snapshot persistence automation
+- Introduced the `snapshot_persistence` instrumentation extension so observability snapshots are captured automatically on startup/shutdown and after `warn`/`error` events, including retention pruning governed by new configuration knobs.
+- Extended configuration loading/validation with `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`, `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`, and `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`, refreshed tests, and exposed the values via `get_config_summary`.
+- Updated docs (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION, STATUS) and extension catalog/tests to reflect the new workflow and ensure automation inherits the extension by default.
+
 # 2025-11-05 – Observability diagnostics & snapshot guardrails
 - Added `/observability/events` to expose filtered, reverse-chronological telemetry along with unit tests and schema updates so automation can replay recent incidents without parsing full digests.
 - Introduced the `snapshot_monitor` instrumentation extension plus `observability.snapshot.persisted` events, publishing gauges/health checks for snapshot freshness and tightening documentation around archival workflows.

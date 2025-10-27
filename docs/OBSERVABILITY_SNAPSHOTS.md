@@ -10,6 +10,35 @@ The observability registry now supports durable snapshots so operators can archi
   - `python scripts/observability_snapshot.py --list --pretty` – view stored snapshot metadata (IDs, timestamps, labels).
   - `python scripts/observability_snapshot.py --compare <snapshot.json>` – diff the latest stored snapshot against a previously captured file to see event/metric deltas.
 - Storage can be relocated via the `OBSERVABILITY_SNAPSHOT_DIR` environment variable when running in multi-node or shared-volume deployments.
+- When the built-in `snapshot_persistence` instrumentation extension is enabled (loaded by default via `extensions/manifest.json`), snapshots are captured automatically on process startup, graceful shutdown, and whenever instrumentation emits `warn`/`error` events. This keeps history alive even if operators forget to run the CLI after an incident.
+
+Configure the retention policy with the following environment variables:
+
+- `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT` – maximum number of snapshots to keep (`0` disables count-based pruning).
+- `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS` – prune snapshots older than this many days (`0` disables age-based pruning).
+- `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS` – throttle automatic persistence so repeated failures do not overwhelm disk space.
+
+## Remote replication (S3-compatible)
+
+Set the remote backend to `s3` to stream every persisted snapshot to object storage immediately after it lands on disk:
+
+| Variable | Purpose |
+| --- | --- |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` | Set to `s3` to enable replication (use `off`/`none` to disable). |
+| `OBSERVABILITY_SNAPSHOT_S3_BUCKET` | Destination bucket name (required when backend is enabled). |
+| `OBSERVABILITY_SNAPSHOT_S3_PREFIX` | Optional key prefix (e.g., `nightly/`); omit trailing slash. |
+| `OBSERVABILITY_SNAPSHOT_S3_REGION` | AWS region/MinIO region (optional). |
+| `OBSERVABILITY_SNAPSHOT_S3_ENDPOINT` | Custom endpoint URL for non-AWS providers. |
+| `OBSERVABILITY_SNAPSHOT_S3_ACCESS_KEY` / `OBSERVABILITY_SNAPSHOT_S3_SECRET_KEY` | Credentials for environments without IAM roles (optional). |
+| `OBSERVABILITY_SNAPSHOT_S3_SESSION_TOKEN` | Session token for temporary credentials. |
+| `OBSERVABILITY_SNAPSHOT_S3_USE_SSL` | Set to `false`/`0` to disable TLS (defaults to `true`). |
+| `OBSERVABILITY_SNAPSHOT_S3_FORCE_PATH_STYLE` | Set to `true` for path-style addressing (MinIO compatibility). |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES` | Number of attempts (including the first) before giving up (defaults to `3`). |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` | JSON object forwarded to replication extensions for backend-specific configuration. |
+
+Replication runs both from the automatic extension (`snapshot_persistence`) and the CLI (`python scripts/observability_snapshot.py --store`). The CLI prints a confirmation such as `Replicated snapshot to s3://bucket/nightly/<id>.json`; failures produce a warning while keeping the local file. The replicator closes connections on shutdown so long-running Streamlit sessions do not leak sockets.
+
+Extensions can supply additional backends: the built-in `plugin:debug` target mirrors each archive into the directory provided via `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` (defaults to `build/observability_snapshots/debug-replication`). Custom extensions can inspect the same options payload to connect to alternative transports without modifying core infrastructure code.
 
 ## Programmatic access
 
@@ -21,13 +50,17 @@ The observability API also exposes `/observability/events`, which returns the mo
 
 ## Health & metrics
 
-The `snapshot_monitor` instrumentation extension keeps runtime health checks in sync with persisted history:
+The `snapshot_monitor` instrumentation extension keeps runtime health checks in sync with persisted history, while `snapshot_persistence` ensures new captures arrive for the monitor to evaluate. Replication adds an extra layer of observability via the `snapshot_replication` extension:
 
 - `idiot_index_observability_snapshots_total` – gauge reflecting how many snapshots currently live in storage.
 - `idiot_index_observability_snapshot_age_seconds` – gauge with the age of the latest snapshot (0 when none exist).
+- `idiot_index_snapshot_replications_total` – counter tracking replication attempts by status (`success`, `error`, `skipped`) and backend.
+- `idiot_index_snapshot_replication_latency_seconds` – histogram of replication durations per backend.
+- `idiot_index_snapshot_replication_age_seconds` – gauge with seconds since the most recent successful replication (0 when disabled or never run).
 - `observability_snapshots` health component – `warn`s if no snapshots have been captured yet or the latest is older than 24 hours.
+- `snapshot_replication` health component – summarises the most recent replication outcome and surfaces the last error message when uploads fail.
 
-These signals appear under `/observability/status` and `/health`, so operators (or Kubernetes liveness probes) can detect stale archives.
+These signals appear under `/observability/status` and `/health`, so operators (or Kubernetes liveness probes) can detect stale archives or remote replication issues quickly.
 
 ## Visualising history
 

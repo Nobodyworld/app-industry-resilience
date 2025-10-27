@@ -7,17 +7,32 @@ import threading
 import time
 from collections.abc import Callable, MutableMapping
 from dataclasses import dataclass, field
-
-try:  # pragma: no cover - optional dependency
-    import redis
-    from redis.exceptions import RedisError
-except Exception:  # pragma: no cover - redis optional
-    redis = None
-    RedisError = Exception
+from typing import TYPE_CHECKING, Any, cast
 
 from src.core import DistributedRateLimitConfig, RateLimitConfig, load_config
 from src.core.security import RateLimitDecision, SecurityUtils
 from src.infrastructure.observability.metrics import Counter, Histogram
+
+try:  # pragma: no cover - optional dependency
+    import redis as _redis_module
+except Exception:  # pragma: no cover - redis optional
+    _redis_module = cast(Any, None)
+redis = cast(Any, _redis_module)
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from redis import Redis as RedisClient
+    from redis.exceptions import RedisError
+else:  # pragma: no cover - fallback when redis missing
+    RedisClient = Any
+    try:  # pragma: no cover - runtime optional import
+        from redis.exceptions import RedisError
+    except Exception:  # pragma: no cover - redis optional
+
+        class RedisError(Exception):
+            """Fallback RedisError when redis is unavailable."""
+
+            pass
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -187,7 +202,7 @@ return {allowed, tokens, retry_after}
 class RedisTokenBucket(TokenBucketBackend):
     """Redis-backed token bucket with optional in-memory fallback."""
 
-    client: redis.Redis
+    client: RedisClient
     key_prefix: str
     ttl_seconds: float
     backend_name: str = "redis"
@@ -353,7 +368,7 @@ def _build_backend(config: RateLimitConfig) -> TokenBucketBackend:
     return InMemoryTokenBucket()
 
 
-def _create_redis_client(cfg: DistributedRateLimitConfig) -> redis.Redis:
+def _create_redis_client(cfg: DistributedRateLimitConfig) -> RedisClient:
     kwargs: dict[str, object] = {
         "host": cfg.host,
         "port": cfg.port,
@@ -366,7 +381,8 @@ def _create_redis_client(cfg: DistributedRateLimitConfig) -> redis.Redis:
         kwargs["password"] = cfg.password
     if cfg.socket_timeout is not None:
         kwargs["socket_timeout"] = cfg.socket_timeout
-    return redis.Redis(**kwargs)
+    redis_module = cast(Any, redis)
+    return cast(RedisClient, redis_module.Redis(**kwargs))
 
 
 api_limiter = get_api_limiter()
