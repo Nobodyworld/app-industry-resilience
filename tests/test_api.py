@@ -46,8 +46,8 @@ def test_healthz_alias_matches_health() -> None:
     probe = client.get("/healthz").json()
 
     ignore_keys = {"trace_id", "checked_at", "metadata", "telemetry"}
-    comparable_keys = {key: value for key, value in base.items() if key not in ignore_keys}
-    assert comparable_keys == {key: value for key, value in probe.items() if key not in ignore_keys}
+    comparable_keys = _normalise_health_payload(base, ignore_keys)
+    assert comparable_keys == _normalise_health_payload(probe, ignore_keys)
     assert base["metadata"]["config"] == probe["metadata"]["config"]
     if base.get("trace_id") and probe.get("trace_id"):
         assert base["trace_id"] != probe["trace_id"]
@@ -117,6 +117,19 @@ def test_observability_digest_exposes_subscriptions() -> None:
     assert response.status_code == 200
     assert payload["events"]["total"] >= 0
     assert isinstance(payload["subscriptions"], dict)
+
+
+def _normalise_health_payload(payload: dict, ignore_keys: set[str]) -> dict:
+    filtered = {key: value for key, value in payload.items() if key not in ignore_keys}
+    components = []
+    for component in filtered.get("components", []):
+        normalised = json.loads(json.dumps(component))
+        if normalised.get("name") == "observability_snapshots":
+            normalised.get("details", {}).pop("latest_snapshot_age_seconds", None)
+        components.append(normalised)
+    if components:
+        filtered["components"] = components
+    return filtered
 
 
 def test_observability_events_endpoint_filters() -> None:

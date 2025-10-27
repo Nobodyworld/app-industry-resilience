@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:  # pragma: no cover - imported for typing only
     from src.application.idiot_index_service import IdiotIndexSummary
     from src.application.scenario_planner import ScenarioResult
+    from src.core.config import SnapshotRemoteStorageConfig
     from src.infrastructure.observability.instrumentation import ObservabilityRegistry
+    from src.infrastructure.observability.replication import SnapshotReplicator
 
 
 @dataclass(frozen=True)
@@ -44,9 +46,20 @@ class InstrumentationExtension(Protocol):
     def register(self, registry: ObservabilityRegistry) -> None: ...
 
 
+class ReplicationExtension(Protocol):
+    """Provide custom snapshot replication implementations."""
+
+    name: str
+
+    def supports(self, config: SnapshotRemoteStorageConfig) -> bool: ...
+
+    def build(self, config: SnapshotRemoteStorageConfig) -> SnapshotReplicator: ...
+
+
 __all__ = [
     "ExtensionContributions",
     "InstrumentationExtension",
+    "ReplicationExtension",
     "SummaryExtension",
     "ScenarioExtension",
 ]

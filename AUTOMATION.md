@@ -42,6 +42,10 @@ python scripts/observability_tail.py --follow --limit 20
 
 The snapshot mirrors the HTTP payload and includes recent operation events, metric counts, registered health checks, and event counters. Use it alongside the health probe for incident reviews, and reach for `observability_tail.py` when you need a streaming view without hitting the HTTP API.
 
+Snapshot persistence is also automated by the `snapshot_persistence` instrumentation extension. It records a snapshot on process startup/shutdown and whenever instrumentation publishes `warn`/`error` events, then prunes history according to `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`, `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`, and `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`. Each persistence run emits an `observability.snapshot.replication` event so the companion `snapshot_replication` instrumentation extension can update replication counters, latency histograms, and a health component summarising the latest remote outcome.
+
+Enable remote shipping by exporting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=s3` alongside the S3 configuration variables (bucket, optional prefix/endpoint/credentials). When set, every persisted snapshot—whether triggered by the extension or `python scripts/observability_snapshot.py --store`—is uploaded to the bucket immediately. Failures are surfaced in the CLI/stdout but never block local disk persistence, so automation can safely depend on remote archives without risking data loss during outages. For local mirroring or dry runs, set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` and optionally `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"path": "./build/debug-replication"}'` to mirror each archive into a deterministic directory.
+
 When you need a single artefact for ticket attachments, run `python scripts/diagnostics_bundle.py --pretty --include-metrics --output build/reports/diagnostics.json`. The bundle combines the health probe output, observability digest, filtered recent events, and snapshot metadata so you can archive the exact system state during an incident.
 
 ### CLI Usage

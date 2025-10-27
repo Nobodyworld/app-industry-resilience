@@ -3,6 +3,7 @@
 from .contracts import (
     ExtensionContributions,
     InstrumentationExtension,
+    ReplicationExtension,
     ScenarioExtension,
     SummaryExtension,
 )
@@ -16,6 +17,7 @@ from .manager import (
 __all__ = [
     "ExtensionContributions",
     "InstrumentationExtension",
+    "ReplicationExtension",
     "ScenarioExtension",
     "SummaryExtension",
     "ExtensionManager",

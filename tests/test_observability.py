@@ -177,8 +177,21 @@ def test_observability_tail_cli_once(monkeypatch, capsys) -> None:
 
     assert exit_code == 0
     payload = json.loads(output)
-    assert payload["name"] == "service.cli"
-    assert payload["status"] == "success"
+    observed_name = payload["name"]
+    assert observed_name in {
+        "service.cli",
+        "observability.snapshot.persisted",
+        "observability.snapshot.replication",
+    }
+    if observed_name == "service.cli":
+        assert payload["status"] == "success"
+    elif observed_name == "observability.snapshot.persisted":
+        assert payload.get("status") == "success"
+        metadata_keys = payload.get("attributes", {}).get("metadata_keys", [])
+        assert "trigger" in metadata_keys
+    else:
+        assert payload.get("status") in {"success", "skipped"}
+        assert "backend" in payload.get("attributes", {})
 
 
 def test_data_quality_extension_health() -> None:

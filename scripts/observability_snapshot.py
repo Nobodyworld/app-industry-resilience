@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 try:
     from scripts import _bootstrap  # type: ignore  # noqa: F401
@@ -18,6 +19,11 @@ except ModuleNotFoundError:  # pragma: no cover - direct execution fallback
 from src.core import load_config
 from src.extensions.manager import get_extension_manager
 from src.infrastructure.observability import bootstrap_observability
+from src.infrastructure.observability.replication import (
+    NullSnapshotReplicator,
+    SnapshotReplicationError,
+    build_snapshot_replicator,
+)
 from src.infrastructure.observability.storage import (
     ObservabilitySnapshot,
     SnapshotStorage,
@@ -107,6 +113,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     manager = get_extension_manager()
     manager.apply_instrumentation_extensions(registry)
 
+    replicator = build_snapshot_replicator(config.observability_snapshot_remote)
+
     metadata: dict[str, Any] = {"source": "cli"}
     if args.label:
         metadata["label"] = args.label
@@ -114,17 +122,48 @@ def main(argv: Sequence[str] | None = None) -> int:
     snapshot = registry.capture_snapshot(metadata=metadata)
     digest_payload = snapshot.payload
 
-    if args.store:
-        saved_path = storage.save(snapshot)
-        print(f"Stored snapshot at {saved_path}", file=sys.stderr)
+    try:
+        if args.store:
+            saved_path = storage.save(snapshot)
+            print(f"Stored snapshot at {saved_path}", file=sys.stderr)
+            try:
+                replicator.replicate(snapshot, saved_path)
+            except SnapshotReplicationError as exc:
+                print(
+                    f"Remote snapshot replication failed: {exc}",
+                    file=sys.stderr,
+                )
+            else:
+                _report_remote_destination(replicator, snapshot, saved_path)
 
-    if args.output:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(json.dumps(snapshot.to_dict(), indent=2), encoding="utf-8")
-        print(f"Wrote snapshot to {args.output}", file=sys.stderr)
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(json.dumps(snapshot.to_dict(), indent=2), encoding="utf-8")
+            print(f"Wrote snapshot to {args.output}", file=sys.stderr)
+    finally:
+        try:
+            replicator.close()
+        except Exception:  # pragma: no cover - defensive cleanup
+            pass
 
     print(json.dumps(digest_payload, indent=indent))
     return 0
+
+
+def _report_remote_destination(
+    replicator: object, snapshot: ObservabilitySnapshot, saved_path: Path
+) -> None:
+    if isinstance(replicator, NullSnapshotReplicator):
+        return
+    if hasattr(replicator, "bucket"):
+        bucket = replicator.bucket  # type: ignore[attr-defined]
+        prefix = replicator.prefix if hasattr(replicator, "prefix") else ""  # type: ignore[attr-defined]
+        key = f"{prefix}{snapshot.snapshot_id}.json"
+        print(f"Replicated snapshot to s3://{bucket}/{key}", file=sys.stderr)
+    elif hasattr(replicator, "target_dir"):
+        target_dir = Path(str(getattr(replicator, "target_dir")))
+        destination = target_dir / f"{snapshot.snapshot_id}.json"
+        print(f"Replicated snapshot to {destination}", file=sys.stderr)
 
 
 def _serialise_snapshot_metadata(
@@ -213,7 +252,7 @@ def _extract_metric_counts(snapshot: ObservabilitySnapshot) -> dict[str, int]:
     metrics = snapshot.payload.get("metrics", {})
     result: dict[str, int] = {}
     for key, value in metrics.items():
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             result[key] = int(value)
     return result
 

@@ -1,12 +1,24 @@
-# 2025-10-31T09:10Z – chore: stewardship simplification & observability polish
-- **Summary:** Added `ObservabilityRegistry.record_event(...)` so services and extensions can emit telemetry without empty context managers, refreshed dataset/scenario instrumentation to use the helper, and taught `scripts/audit_metrics.py` to read `coverage.xml` when trace JSON is absent. Documentation (architecture, extension guide) and tests now reflect the streamlined API.
-- **Next:** Backfill streaming digest support and persist observability snapshots so automation can diff state across deploys.
+# 2025-11-10T06:10Z – feat: replication plugins & telemetry uplift
+- **Summary:** Generalised snapshot replication via `ReplicationExtension`, added plugin-aware config options, emitted structured `observability.snapshot.replication` events, and introduced a `snapshot_replication` instrumentation extension that tracks counts, latency, and health. Shipped built-in S3 and debug filesystem replication modules, updated the CLI to report destinations, and refreshed docs/tests (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION, STATUS, STEWARDS_REPORT, RELEASE_NOTES, CHANGELOG) to describe the plugin seam and metrics.
+- **Next:** Evaluate additional remote backends (GCS/Azure) using the new extension contract and consider auto-validating replication health during CI smoke tests.
 
 # Modernization Status
 
 ## 2025-10-19T10:30Z – docs: add repo intelligence report and modernization plan
 - **Summary:** Established baseline documentation via `REPORT.md` and `PLAN.md`, capturing the current architecture, risks, and a prioritized modernization roadmap.
 - **Next:** Stand up governance files, CI/CD scaffolding, and local developer tooling so follow-on tasks can build on a consistent foundation.
+
+## 2025-11-09T11:40Z – feat: snapshot remote replication
+- **Summary:** Implemented S3-compatible snapshot replication with `SnapshotRemoteStorageConfig`, a reusable replicator factory, and CLI/extension integration so every persisted observability snapshot streams to remote storage while still landing on disk. Added botocore as a runtime dependency, expanded configuration summaries/tests, and refreshed docs (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION, RELEASE_NOTES, STEWARDS_REPORT) to cover the new workflow.
+- **Next:** Explore remote retention policies (object lifecycle rules, size-based pruning) and add optional server-side encryption/metadata tagging knobs for compliance-heavy deployments.
+
+## 2025-11-08T16:40Z – feat: snapshot persistence automation
+- **Summary:** Added the `snapshot_persistence` instrumentation extension to persist observability snapshots on startup, shutdown, and warn/error events with throttling plus retention pruning governed by new `OBSERVABILITY_SNAPSHOT_RETENTION_*` environment variables. Updated configuration parsing/tests, documentation (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION), and extension catalog/tests so automation inherits the workflow by default.
+- **Next:** Layer size-based pruning atop count/day limits and pilot remote snapshot shipping to object storage (now available) to complete the roadmap.
+
+## 2025-10-31T09:10Z – chore: stewardship simplification & observability polish
+- **Summary:** Added `ObservabilityRegistry.record_event(...)` so services and extensions can emit telemetry without empty context managers, refreshed dataset/scenario instrumentation to use the helper, and taught `scripts/audit_metrics.py` to read `coverage.xml` when trace JSON is absent. Documentation (architecture, extension guide) and tests now reflect the streamlined API.
+- **Next:** Backfill streaming digest support and persist observability snapshots so automation can diff state across deploys.
 
 ## 2025-10-26T11:45Z – feat: observability digest & extension catalog
 - **Summary:** Added `/observability/digest`, the streaming `observability_tail.py` CLI, and the `extensions_catalog.py` inventory tool; introduced the `data_quality` instrumentation extension with gauges/health checks; refreshed docs (README, AUTOMATION, EXTENSION_GUIDE, OPERATIONS) and Make targets so operators can inspect telemetry and extensions without code changes.
