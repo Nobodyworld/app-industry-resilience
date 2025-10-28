@@ -9,13 +9,17 @@ from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .health import HealthComponent, HealthProbe
 from .metrics import Counter as MetricCounter
 from .metrics import Gauge, Histogram, MetricRegistry
 from .storage import ObservabilitySnapshot, SnapshotStorage, build_snapshot_id
 from .tracing import Tracer
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from src.extensions.connectors import ConnectorRegistry
+
 
 LOGGER = logging.getLogger(__name__)
 _RECENT_EVENTS_LIMIT = 25
@@ -67,6 +71,7 @@ class ObservabilityRegistry:
     )
     _event_counters: Counter[str] = field(default_factory=Counter, init=False, repr=False)
     _last_error_event: ObservationEvent | None = field(default=None, init=False, repr=False)
+    _connector_registry: ConnectorRegistry | None = field(default=None, init=False, repr=False)
 
     def counter(
         self,
@@ -262,6 +267,7 @@ class ObservabilityRegistry:
             "event_counters": digest["events"]["counts"],
             "last_error": digest["events"].get("last_error"),
             "subscriptions": digest["subscriptions"],
+            "connectors": digest.get("connectors", {}),
         }
 
     def digest(self) -> dict[str, Any]:
@@ -273,7 +279,7 @@ class ObservabilityRegistry:
         last_error = (
             self._last_error_event.as_dict() if self._last_error_event is not None else None
         )
-        return {
+        payload = {
             "metrics": self.metrics_summary(),
             "traces": {"exported_spans": self.tracer.span_count()},
             "health_checks": sorted(self._health_checks),
@@ -287,6 +293,11 @@ class ObservabilityRegistry:
                 name: len(handlers) for name, handlers in self._subscriptions.items()
             },
         }
+        if self._connector_registry is not None:
+            payload["connectors"] = self._connector_registry.summary(include_health=True)
+        else:
+            payload["connectors"] = {"count": 0, "by_kind": {}, "items": []}
+        return payload
 
     def events(
         self,
@@ -347,6 +358,14 @@ class ObservabilityRegistry:
             handler(event)
         except Exception:  # pragma: no cover - defensive logging
             LOGGER.exception("Observability subscriber failed", extra={"event": event.as_dict()})
+
+    def attach_connector_registry(self, registry: ConnectorRegistry) -> None:
+        """Link a connector registry so digests expose integration metadata."""
+
+        if self._connector_registry is registry:
+            return
+        self._connector_registry = registry
+        registry.attach_observability(self)
 
 
 _REGISTRY_SINGLETON: ObservabilityRegistry | None = None

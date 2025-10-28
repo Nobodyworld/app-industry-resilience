@@ -32,6 +32,7 @@ help:
 	@echo "  observability-tail Follow observability events from the registry (pass extra args via ARGS=...)"
 	@echo "  diagnostics        Capture a consolidated diagnostics bundle (pass extra args via ARGS=...)"
 	@echo "  extensions-catalog List registered extensions (pass extra args via ARGS=...)"
+	@echo "  connectors-catalog List registered connectors (pass extra args via ARGS=...)"
 	@echo "  audit              Compute stewardship audit metrics (pass extra args via ARGS=...)"
 	@echo "  api                Launch the headless API service (pass extra args via ARGS=...)"
 
@@ -130,6 +131,7 @@ docs:
 	@echo "  docs/API_REFERENCE.md"
 	@echo "  docs/WORKFLOWS_DATA_REFRESH.md"
 	@echo "  docs/DEPENDENCIES.md"
+	@echo "  docs/CONNECTORS.md"
 
 scenario:
 	${PYTHON} scripts/run_scenario.py ${ARGS}
@@ -159,6 +161,10 @@ diagnostics:
 # agent-safe-task: inventories extension metadata for automation
 extensions-catalog:
 	${PYTHON} scripts/extensions_catalog.py ${ARGS}
+
+# agent-safe-task: inventories connector metadata for automation
+connectors-catalog:
+	${PYTHON} scripts/connectors_catalog.py ${ARGS}
 
 # agent-safe-task: generates stewardship metrics for automated audits
 audit:

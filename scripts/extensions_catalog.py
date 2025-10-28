@@ -35,7 +35,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--kind",
-        choices=["all", "summary", "scenario", "instrumentation"],
+        choices=["all", "summary", "scenario", "instrumentation", "replication", "connector"],
         default="all",
         help="Filter catalog entries by extension type.",
     )

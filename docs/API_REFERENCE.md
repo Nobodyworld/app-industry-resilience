@@ -71,7 +71,7 @@ Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
 ## Headless API
 
 ### `src.interfaces.api.app`
-- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/evaluate`, `/scenario`, `/analytics/health`, `/metrics`, `/observability/status`, and `/observability/digest` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
+- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/meta/connectors`, `/evaluate`, `/scenario`, `/analytics/health`, `/metrics`, `/observability/status`, and `/observability/digest` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
 - `ObservabilityRegistry` – Singleton registry (see `src/infrastructure/observability/instrumentation.py`) aggregating metrics, traces, and health checks. Extensions register instrumentation hooks through it instead of modifying services directly.
 
 ### `src.interfaces.api.schemas`
@@ -81,6 +81,6 @@ Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
 - CLI entrypoint to launch the headless API service with configurable host/port. Falls back to the built-in WSGI server when third-party servers are unavailable. Used by `make api` and the Docker `APP_MODE=api` entrypoint.
 
 ### `src.extensions.manager`
-- `ExtensionManager` – registry that loads `SummaryExtension` and `ScenarioExtension` implementations declared in `extensions/manifest.json`. Provides `apply_summary_extensions` and `apply_scenario_extensions` helpers that augment service responses with extension metadata and notes.
+- `ExtensionManager` – registry that loads `SummaryExtension`, `ScenarioExtension`, `ConnectorExtension`, and `InstrumentationExtension` implementations declared in `extensions/manifest.json`. Provides helpers (`apply_*`, `connector_catalog`, `initialise_connectors`) that augment service responses with extension metadata, observability hooks, and connector catalogues.
 - `load_extensions(modules=None)` – import modules and invoke their `register(manager)` function.
 - `get_extension_manager()` – singleton accessor used by the API, services, and scripts.

@@ -1,5 +1,21 @@
 # Changelog
 
+# 2025-11-12 – Connector catalog & automation scaffolds
+- Introduced a connector registry and `ConnectorExtension` contract so integrations publish metadata, health checks, and capabilities that surface via `/meta/connectors`, observability digests, Streamlit, and the new `make connectors-catalog` CLI.
+- Added a built-in connector catalog covering the bundled sample dataset, BEA API, and Census ASM source along with health diagnostics that flag missing credentials or stale datasets.
+- Delivered `scripts/changelog_entry.py` to append structured changelog entries and extended the extension scaffolder with a connector template, improving developer ergonomics for future plug-ins.
+
+# 2025-11-11 – Snapshot replication timeout enforcement
+- Applied configured timeout values to GCS and Azure Blob snapshot replication uploads while ignoring
+  invalid/non-positive inputs to prevent hanging transfers.
+- Expanded regression tests to assert timeout propagation for both backends and updated documentation
+  to clarify how the knobs influence upload behaviour.
+
+# 2025-11-10 – Multi-cloud snapshot replication & UI telemetry
+- Added built-in Google Cloud Storage and Azure Blob Storage replicators alongside the existing S3 support, with configuration parsing, validation, and tests exercising the new knobs.
+- Enhanced the Streamlit observability panel and CLI messaging to surface replication backend/status metadata, making it obvious where archives land and whether the last attempt succeeded.
+- Updated documentation (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION) to cover multi-cloud configuration flows and refreshed tests to stub cloud SDKs so the suite remains hermetic.
+
 # 2025-11-10 – Replication plugins & telemetry uplift
 - Introduced the `ReplicationExtension` contract and taught `ExtensionManager` to resolve plugin backends before falling back to built-in replicators, enabling out-of-tree connectors.
 - Emitted `observability.snapshot.replication` events from the persistence extension and shipped the `snapshot_replication` instrumentation module with replication counters, latency histograms, and a dedicated health component.

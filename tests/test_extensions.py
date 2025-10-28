@@ -166,6 +166,18 @@ def test_extensions_catalog_cli_json(capsys) -> None:
     assert any(entry["name"] == "snapshot_persistence" for entry in payload)
 
 
+def test_connector_catalog_includes_builtins() -> None:
+    manager = load_extensions(ExtensionManager())
+    manager.initialise_connectors()
+    summary = manager.connector_registry.summary(include_health=True)
+
+    assert summary["count"] >= 3
+    identifiers = {item["identifier"] for item in summary["items"]}
+    assert {"sample_offline", "bea", "census_asm"}.issubset(identifiers)
+    sample = next(item for item in summary["items"] if item["identifier"] == "sample_offline")
+    assert sample["health"]["status"] in {"pass", "warn", "fail"}
+
+
 def test_snapshot_persistence_extension_persists_and_prunes(tmp_path, monkeypatch) -> None:
     from types import SimpleNamespace
 

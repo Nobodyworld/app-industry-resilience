@@ -42,7 +42,12 @@ def _update_manifest(module_path: str) -> None:
 
 
 def scaffold_extension(
-    name: str, *, include_scenario: bool, include_instrumentation: bool, force: bool
+    name: str,
+    *,
+    include_scenario: bool,
+    include_instrumentation: bool,
+    include_connector: bool,
+    force: bool,
 ) -> Path:
     safe_name = name.strip().replace(" ", "_").replace("-", "_")
     if not safe_name:
@@ -60,6 +65,15 @@ def scaffold_extension(
         contracts.append("ScenarioExtension")
     if include_instrumentation:
         contracts.append("InstrumentationExtension")
+    if include_connector:
+        contracts.append("ConnectorExtension")
+
+    extra_imports: list[str] = []
+    if include_connector:
+        extra_imports.append("from src.extensions.connectors import ConnectorRegistration")
+        extra_imports.append(
+            "from src.infrastructure.observability.health import HealthComponent"
+        )
 
     lines: list[str] = [
         '"""Generated extension scaffold."""',
@@ -71,6 +85,8 @@ def scaffold_extension(
         f"from src.extensions.contracts import {', '.join(contracts)}",
         "from src.extensions.manager import ExtensionManager",
     ]
+
+    lines.extend(extra_imports)
 
     lines.extend(
         [
@@ -128,12 +144,51 @@ def scaffold_extension(
             ]
         )
 
+    if include_connector:
+        lines.extend(
+            [
+                "",
+                "",
+                "def _connector_health() -> HealthComponent:",
+                '    """TODO-P2(2h): Implement connector health validation."""',
+                "    return HealthComponent(",
+                f'        name="connector:{safe_name}",',
+                "        status=\"warn\",",
+                "        summary=\"Connector health check not implemented\",",
+                "    )",
+                "",
+                "",
+                "@dataclass",
+                "class _ConnectorExtension(ConnectorExtension):",
+                f'    name: str = "{safe_name}"',
+                "",
+                "    def register(self, registry) -> None:  # type: ignore[override]",
+                '        """Register connector metadata with optional health checks."""',
+                "        registry.register(",
+                "            ConnectorRegistration(",
+                f'                identifier="{safe_name}",',
+                f"                name=\"{safe_name.replace('_', ' ').title()} Connector\",",
+                "                kind=\"data_source\",",
+                "                version=\"0.1.0\",",
+                "                description=\"TODO-P2(2h): Describe connector purpose.\",",
+                "                tags=(\"experimental\",),",
+                "                capabilities=(\"read\",),",
+                "                metadata={},",
+                "                health_check=_connector_health,",
+                "            )",
+                "        )",
+                "",
+            ]
+        )
+
     lines.extend(["", "", "def register(manager: ExtensionManager) -> None:"])
     lines.append("    manager.register_summary_extension(_SummaryExtension())")
     if include_scenario:
         lines.append("    manager.register_scenario_extension(_ScenarioExtension())")
     if include_instrumentation:
         lines.append("    manager.register_instrumentation_extension(_InstrumentationExtension())")
+    if include_connector:
+        lines.append("    manager.register_connector_extension(_ConnectorExtension())")
     lines.append('\n\n__all__ = ["register"]\n')
 
     content = "\n".join(lines)
@@ -160,6 +215,11 @@ def parse_args() -> argparse.Namespace:
         help="Include an instrumentation extension scaffold for observability hooks.",
     )
     parser.add_argument(
+        "--with-connector",
+        action="store_true",
+        help="Include a connector extension scaffold registered with ConnectorRegistry.",
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Overwrite existing files if the target extension already exists.",
@@ -174,6 +234,7 @@ def main() -> int:
         args.name,
         include_scenario=args.with_scenario,
         include_instrumentation=args.instrumentation,
+        include_connector=args.with_connector,
         force=args.force,
     )
 

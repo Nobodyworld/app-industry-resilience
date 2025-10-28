@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from typing import Any, Literal, cast
 
@@ -78,6 +78,71 @@ class HealthResponse(BaseModel):
 
 class MetaSourcesResponse(BaseModel):
     sources: list[str]
+
+
+class ConnectorHealthModel(BaseModel):
+    name: str | None = None
+    status: Literal["pass", "warn", "fail"] | None = None
+    summary: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ConnectorDescriptorModel(BaseModel):
+    identifier: str
+    name: str
+    kind: str
+    version: str
+    description: str | None = None
+    owner: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    health: ConnectorHealthModel | None = None
+
+
+class MetaConnectorsResponse(BaseModel):
+    connectors: list[ConnectorDescriptorModel] = Field(default_factory=list)
+    count: int = 0
+    by_kind: dict[str, int] = Field(default_factory=dict)
+
+    @classmethod
+    def from_summary(cls, summary: Mapping[str, Any]) -> MetaConnectorsResponse:
+        items_raw = summary.get("items", [])
+        connectors: list[ConnectorDescriptorModel] = []
+        for item in items_raw:
+            if not isinstance(item, Mapping):
+                continue
+            health_payload = item.get("health") if isinstance(item, Mapping) else None
+            health = None
+            if isinstance(health_payload, Mapping):
+                health = ConnectorHealthModel(**health_payload)
+            connectors.append(
+                ConnectorDescriptorModel(
+                    identifier=str(item.get("identifier", "")),
+                    name=str(item.get("name", "")),
+                    kind=str(item.get("kind", "")),
+                    version=str(item.get("version", "")),
+                    description=item.get("description"),
+                    owner=item.get("owner"),
+                    tags=list(item.get("tags", [])),
+                    capabilities=list(item.get("capabilities", [])),
+                    metadata=dict(item.get("metadata", {})),
+                    health=health,
+                )
+            )
+
+        counts_raw = summary.get("by_kind", {})
+        counts: dict[str, int] = {}
+        if isinstance(counts_raw, Mapping):
+            for key, value in counts_raw.items():
+                counts[str(key)] = int(value)
+
+        total = summary.get("count", len(connectors))
+        try:
+            count_int = int(total)
+        except (TypeError, ValueError):
+            count_int = len(connectors)
+        return cls(connectors=connectors, count=count_int, by_kind=counts)
 
 
 class ObservationEventModel(BaseModel):

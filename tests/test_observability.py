@@ -129,6 +129,18 @@ def test_core_instrumentation_registers_metrics_and_health() -> None:
     assert overview["event_counters"]["success"] >= 1
 
 
+def test_digest_includes_connector_snapshot() -> None:
+    registry = ObservabilityRegistry()
+    manager = load_extensions(ExtensionManager())
+    manager.apply_instrumentation_extensions(registry)
+
+    digest = registry.digest()
+    connectors = digest.get("connectors", {})
+    assert connectors.get("count", 0) >= 3
+    identifiers = {item["identifier"] for item in connectors.get("items", [])}
+    assert "bea" in identifiers
+
+
 def test_snapshot_monitor_extension_tracks_state(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
     registry = ObservabilityRegistry()

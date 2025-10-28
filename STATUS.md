@@ -1,3 +1,11 @@
+# 2025-11-12T09:15Z – feat: connector catalog & automation tooling
+- **Summary:** Delivered a connector registry and catalog surfaces (`/meta/connectors`, Streamlit sidebar, observability digest, `make connectors-catalog`) so integrations expose metadata, capabilities, and health checks. Shipped built-in entries for the sample dataset, BEA API, and Census ASM with health diagnostics, added a changelog automation script, and extended the extension scaffold with connector support to streamline future plug-ins.
+- **Next:** Expand the catalog with connector-specific metrics (latency, cache hit rates) and explore auto-validating connector health in CI smoke tests.
+
+# 2025-11-10T22:45Z – feat: multi-cloud snapshot replication & UI telemetry
+- **Summary:** Added first-class Google Cloud Storage and Azure Blob Storage replicators alongside the existing S3 implementation, expanded configuration/validation/tests to cover the new knobs, enriched the Streamlit observability dashboard with replication health badges, and refreshed docs (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION) plus CLI messaging to highlight the active backend URI. Unit tests now stub cloud SDKs to keep the suite hermetic.
+- **Next:** Explore lifecycle/retention helpers per backend (object tags, storage class transitions) and consider surfacing replication state via the headless API for automation consumers.
+
 # 2025-11-10T06:10Z – feat: replication plugins & telemetry uplift
 - **Summary:** Generalised snapshot replication via `ReplicationExtension`, added plugin-aware config options, emitted structured `observability.snapshot.replication` events, and introduced a `snapshot_replication` instrumentation extension that tracks counts, latency, and health. Shipped built-in S3 and debug filesystem replication modules, updated the CLI to report destinations, and refreshed docs/tests (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION, STATUS, STEWARDS_REPORT, RELEASE_NOTES, CHANGELOG) to describe the plugin seam and metrics.
 - **Next:** Evaluate additional remote backends (GCS/Azure) using the new extension contract and consider auto-validating replication health during CI smoke tests.

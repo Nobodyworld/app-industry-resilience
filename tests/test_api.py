@@ -60,6 +60,21 @@ def test_meta_sources_lists_available_values() -> None:
     assert {"sample", "bea", "census"}.issubset(set(response.json()["sources"]))
 
 
+def test_meta_connectors_lists_catalog() -> None:
+    response = client.get("/meta/connectors")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] >= 1
+    identifiers = {item["identifier"] for item in payload["connectors"]}
+    assert {"sample_offline", "bea", "census_asm"}.issubset(identifiers)
+    sample_entry = next(
+        item for item in payload["connectors"] if item["identifier"] == "sample_offline"
+    )
+    assert sample_entry["kind"] == "data_source"
+    assert sample_entry.get("health", {}).get("status") in {"pass", "warn", "fail"}
+
+
 def test_evaluate_with_inline_dataset_returns_leaderboard() -> None:
     records = _sample_records()
     payload = {

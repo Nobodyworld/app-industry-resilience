@@ -6,6 +6,7 @@
     "src.extensions.builtins.data_quality",
     "src.extensions.builtins.snapshot_monitor",
     "src.extensions.builtins.snapshot_replication",
-    "src.extensions.builtins.snapshot_persistence"
+    "src.extensions.builtins.snapshot_persistence",
+    "src.extensions.builtins.connector_catalog"
   ]
 }
