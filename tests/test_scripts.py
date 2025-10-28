@@ -7,7 +7,7 @@ import pytest
 
 from scripts import audit_metrics as audit_script
 from scripts import bump_version as bump_module
-from scripts import diagnostics_bundle
+from scripts import changelog_entry, connectors_catalog, diagnostics_bundle
 from scripts import observability_snapshot as observability_script
 from scripts import run_tests_with_trace as trace_script
 from scripts import scaffold_extension as scaffold_module
@@ -124,6 +124,39 @@ def test_diagnostics_bundle_main(tmp_path, monkeypatch) -> None:
     assert payload["snapshots"]["directory"].endswith("snapshots")
 
 
+def test_connectors_catalog_cli_reports_summary(capsys) -> None:
+    exit_code = connectors_catalog.main(["--json", "--pretty"])
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+
+    assert exit_code == 0
+    identifiers = {item["identifier"] for item in payload}
+    assert "sample_offline" in identifiers
+
+
+def test_changelog_entry_appends(tmp_path) -> None:
+    changelog_path = tmp_path / "CHANGELOG.md"
+    changelog_path.write_text("# Changelog\n\n", encoding="utf-8")
+
+    exit_code = changelog_entry.main(
+        [
+            "--title",
+            "Test Entry",
+            "--lines",
+            "Added sample feature",
+            "--date",
+            "2099-01-01",
+            "--file",
+            str(changelog_path),
+        ]
+    )
+
+    assert exit_code == 0
+    content = changelog_path.read_text(encoding="utf-8")
+    assert "# 2099-01-01 – Test Entry" in content
+    assert "- Added sample feature" in content
+
+
 def test_parse_adjustment_expression() -> None:
     adjustment = parse_adjustment_expression("codes=111|112,gross=5,materials=-3,value=2")
     assert adjustment.industry_codes == ["111", "112"]
@@ -172,12 +205,16 @@ def test_scaffold_extension_generates_module(monkeypatch, tmp_path) -> None:
         "demo_scaffold",
         include_scenario=True,
         include_instrumentation=True,
+        include_connector=True,
         force=False,
     )
 
     assert module_path.exists()
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert "src.extensions.community.demo_scaffold" in manifest["modules"]
+    content = module_path.read_text(encoding="utf-8")
+    assert "class _ConnectorExtension" in content
+    assert "ConnectorRegistration(" in content
 
 
 def test_collect_executable_lines_skips_docstrings(tmp_path) -> None:
@@ -297,6 +334,8 @@ def test_observability_snapshot_reports_remote_replication(monkeypatch, tmp_path
     monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
 
     class StubReplicator:
+        uri_scheme = "s3"
+
         def __init__(self) -> None:
             self.calls: list[tuple[str, Path]] = []
             self.closed = False
@@ -322,7 +361,9 @@ def test_observability_snapshot_reports_remote_replication(monkeypatch, tmp_path
     assert exit_code == 0
     assert stub.calls
     assert stub.closed is True
-    assert "Replicated snapshot to s3://stub-bucket/remote/" in captured.err
+    snapshot_id, _ = stub.calls[0]
+    expected = f"Replicated snapshot to s3://stub-bucket/remote/{snapshot_id}.json"
+    assert expected in captured.err
 
 
 def test_observability_snapshot_logs_remote_failure(monkeypatch, tmp_path, capsys) -> None:

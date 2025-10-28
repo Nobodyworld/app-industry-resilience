@@ -361,6 +361,7 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
 
     remote_backend_raw = values.get("OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND", "").strip()
     remote_backend = remote_backend_raw.lower()
+    remote_prefix = _resolve_snapshot_remote_prefix(values)
     remote_cfg: SnapshotRemoteStorageConfig | None = None
     if remote_backend:
         if remote_backend in {"off", "none", "disabled"}:
@@ -375,12 +376,6 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
             )
             if remote_backend == "s3":
                 bucket = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_BUCKET"))
-                prefix_raw = values.get("OBSERVABILITY_SNAPSHOT_S3_PREFIX", "")
-                prefix_clean = prefix_raw.strip()
-                if prefix_clean:
-                    prefix_clean = prefix_clean.strip("/")
-                    if prefix_clean:
-                        prefix_clean = f"{prefix_clean}/"
                 region = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_REGION"))
                 endpoint_url = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_ENDPOINT"))
                 access_key = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_S3_ACCESS_KEY"))
@@ -394,7 +389,7 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
                     enabled=True,
                     backend="s3",
                     bucket=bucket,
-                    prefix=prefix_clean,
+                    prefix=remote_prefix,
                     region=region,
                     endpoint_url=endpoint_url,
                     access_key=access_key,
@@ -405,12 +400,98 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
                     max_retries=max_retries,
                     options=remote_options,
                 )
+            elif remote_backend == "gcs":
+                bucket = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_GCS_BUCKET"))
+                project = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_GCS_PROJECT"))
+                credentials_file = _clean_secret(
+                    values.get("OBSERVABILITY_SNAPSHOT_GCS_CREDENTIALS_FILE")
+                )
+                credentials_json = _clean_secret(
+                    values.get("OBSERVABILITY_SNAPSHOT_GCS_CREDENTIALS_JSON")
+                )
+                location = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_GCS_LOCATION"))
+                timeout_raw = values.get("OBSERVABILITY_SNAPSHOT_GCS_TIMEOUT_SECONDS")
+                timeout_seconds = (
+                    _parse_float(
+                        timeout_raw,
+                        "OBSERVABILITY_SNAPSHOT_GCS_TIMEOUT_SECONDS",
+                    )
+                    if timeout_raw
+                    else None
+                )
+                options = _merge_options(
+                    remote_options,
+                    {
+                        "project": project,
+                        "credentials_file": credentials_file,
+                        "credentials_json": credentials_json,
+                        "location": location,
+                        "timeout_seconds": timeout_seconds,
+                    },
+                )
+                remote_cfg = SnapshotRemoteStorageConfig(
+                    enabled=True,
+                    backend="gcs",
+                    bucket=bucket,
+                    prefix=remote_prefix,
+                    region=None,
+                    endpoint_url=None,
+                    access_key=None,
+                    secret_key=None,
+                    session_token=None,
+                    use_ssl=True,
+                    force_path_style=False,
+                    max_retries=max_retries,
+                    options=options,
+                )
+            elif remote_backend in {"azure", "azure-blob", "azure_blob"}:
+                container = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_AZURE_CONTAINER"))
+                connection_string = _clean_secret(
+                    values.get("OBSERVABILITY_SNAPSHOT_AZURE_CONNECTION_STRING")
+                )
+                account_url = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_AZURE_ACCOUNT_URL"))
+                credential = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_AZURE_CREDENTIAL"))
+                sas_token = _clean_secret(values.get("OBSERVABILITY_SNAPSHOT_AZURE_SAS_TOKEN"))
+                timeout_raw = values.get("OBSERVABILITY_SNAPSHOT_AZURE_TIMEOUT_SECONDS")
+                timeout_seconds = (
+                    _parse_float(
+                        timeout_raw,
+                        "OBSERVABILITY_SNAPSHOT_AZURE_TIMEOUT_SECONDS",
+                    )
+                    if timeout_raw
+                    else None
+                )
+                options = _merge_options(
+                    remote_options,
+                    {
+                        "connection_string": connection_string,
+                        "account_url": account_url,
+                        "credential": credential,
+                        "sas_token": sas_token,
+                        "timeout_seconds": timeout_seconds,
+                    },
+                )
+                remote_cfg = SnapshotRemoteStorageConfig(
+                    enabled=True,
+                    backend="azure-blob",
+                    bucket=container,
+                    prefix=remote_prefix,
+                    region=None,
+                    endpoint_url=None,
+                    access_key=None,
+                    secret_key=None,
+                    session_token=None,
+                    use_ssl=True,
+                    force_path_style=False,
+                    max_retries=max_retries,
+                    options=options,
+                )
             else:
                 remote_cfg = SnapshotRemoteStorageConfig(
                     enabled=True,
                     backend=remote_backend_raw or remote_backend,
                     bucket=None,
-                    prefix="",
+                    prefix=remote_prefix,
                     region=None,
                     endpoint_url=None,
                     access_key=None,
@@ -518,13 +599,48 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
                 errors.append(
                     "OBSERVABILITY_SNAPSHOT_S3_BUCKET is required when remote shipping is enabled."
                 )
-            if remote.prefix and any(part.strip() == "" for part in remote.prefix.split("/")):
-                errors.append(
-                    "OBSERVABILITY_SNAPSHOT_S3_PREFIX must not contain empty path segments."
-                )
+            if remote.prefix:
+                segments = remote.prefix.split("/")
+                if segments and segments[-1] == "":
+                    segments = segments[:-1]
+                if any(part.strip() == "" for part in segments):
+                    errors.append(
+                        "OBSERVABILITY_SNAPSHOT_S3_PREFIX must not contain empty path segments."
+                    )
             if remote.endpoint_url and not remote.access_key and not remote.secret_key:
                 warnings.append(
                     "OBSERVABILITY_SNAPSHOT_S3_ENDPOINT set without credentials; ensure IAM role or instance profile provides access."
+                )
+        elif remote.backend == "gcs":
+            if not remote.bucket:
+                errors.append(
+                    "OBSERVABILITY_SNAPSHOT_GCS_BUCKET is required when remote shipping is enabled."
+                )
+            if remote.prefix:
+                segments = remote.prefix.split("/")
+                if segments and segments[-1] == "":
+                    segments = segments[:-1]
+                if any(part.strip() == "" for part in segments):
+                    errors.append(
+                        "OBSERVABILITY_SNAPSHOT_GCS_PREFIX must not contain empty path segments."
+                    )
+        elif remote.backend in {"azure-blob", "azure_blob", "azure"}:
+            if not remote.bucket:
+                errors.append(
+                    "OBSERVABILITY_SNAPSHOT_AZURE_CONTAINER is required when remote shipping is enabled."
+                )
+            if remote.prefix:
+                segments = remote.prefix.split("/")
+                if segments and segments[-1] == "":
+                    segments = segments[:-1]
+                if any(part.strip() == "" for part in segments):
+                    errors.append(
+                        "OBSERVABILITY_SNAPSHOT_AZURE_PREFIX must not contain empty path segments."
+                    )
+            options = remote.options or {}
+            if not options.get("connection_string") and not options.get("account_url"):
+                warnings.append(
+                    "Azure Blob backend configured without connection string or account URL; ensure default credentials are available."
                 )
         else:
             backend_label = remote.backend or "unspecified"
@@ -631,6 +747,49 @@ def _parse_remote_options(raw: str | None) -> Mapping[str, Any] | None:
             )
         options[key_str] = value
     return options
+
+
+def _merge_options(
+    base: Mapping[str, Any] | None, extra: Mapping[str, Any]
+) -> Mapping[str, Any] | None:
+    """Merge backend option dictionaries while dropping ``None`` values."""
+
+    merged: dict[str, Any] = {}
+    if base:
+        for key, value in base.items():
+            if value is not None:
+                merged[str(key)] = value
+    for key, value in extra.items():
+        if value is None:
+            continue
+        merged[str(key)] = value
+    return merged or None
+
+
+def _resolve_snapshot_remote_prefix(values: Mapping[str, str]) -> str:
+    """Return a normalised remote prefix from supported environment variables."""
+
+    for key in (
+        "OBSERVABILITY_SNAPSHOT_REMOTE_PREFIX",
+        "OBSERVABILITY_SNAPSHOT_S3_PREFIX",
+        "OBSERVABILITY_SNAPSHOT_GCS_PREFIX",
+        "OBSERVABILITY_SNAPSHOT_AZURE_PREFIX",
+    ):
+        raw = values.get(key)
+        if raw and raw.strip():
+            return _normalise_remote_prefix(raw)
+    return ""
+
+
+def _normalise_remote_prefix(raw: str | None) -> str:
+    """Ensure prefixes end with a single slash when provided."""
+
+    if raw is None:
+        return ""
+    value = raw.strip().strip("/")
+    if not value:
+        return ""
+    return f"{value}/"
 
 
 def _parse_int(value: str, name: str) -> int:

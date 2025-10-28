@@ -31,6 +31,7 @@ from src.interfaces.api.schemas import (
     HealthAnalyticsRequest,
     HealthAnalyticsResponse,
     HealthResponse,
+    MetaConnectorsResponse,
     MetaSourcesResponse,
     ObservabilityDigestResponse,
     ObservabilityEventsResponse,
@@ -282,6 +283,15 @@ def list_sources() -> MetaSourcesResponse:
     """List supported data sources."""
 
     return MetaSourcesResponse(sources=[source.value for source in DataSource])
+
+
+@app.get("/meta/connectors", response_model=MetaConnectorsResponse, tags=["meta"])
+def list_connectors() -> MetaConnectorsResponse:
+    """List registered connectors with optional health metadata."""
+
+    _extension_manager.initialise_connectors()
+    summary = _extension_manager.connector_registry.summary(include_health=True)
+    return MetaConnectorsResponse.from_summary(summary)
 
 
 @app.post(

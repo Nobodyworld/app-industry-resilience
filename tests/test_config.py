@@ -143,12 +143,43 @@ def test_load_config_parses_remote_snapshot_settings() -> None:
     assert remote.options is None
 
 
+def test_load_config_parses_gcs_remote_snapshot_settings() -> None:
+    env = {
+        "OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "gcs",
+        "OBSERVABILITY_SNAPSHOT_GCS_BUCKET": "idiot-index-gcs",
+        "OBSERVABILITY_SNAPSHOT_GCS_PREFIX": "cloud/",
+        "OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES": "2",
+        "OBSERVABILITY_SNAPSHOT_GCS_PROJECT": "idiot-index",
+        "OBSERVABILITY_SNAPSHOT_GCS_TIMEOUT_SECONDS": "15",
+    }
+
+    config = load_config(env)
+
+    remote = config.observability_snapshot_remote
+    assert remote is not None
+    assert remote.backend == "gcs"
+    assert remote.bucket == "idiot-index-gcs"
+    assert remote.prefix == "cloud/"
+    assert remote.max_retries == 2
+    assert remote.options is not None
+    assert remote.options.get("project") == "idiot-index"
+    assert remote.options.get("timeout_seconds") == 15.0
+
+
 def test_validate_config_rejects_remote_without_bucket() -> None:
     config = load_config({"OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "s3"})
 
     result = validate_config(config)
 
     assert any("S3_BUCKET" in error for error in result.errors)
+
+
+def test_validate_config_rejects_gcs_without_bucket() -> None:
+    config = load_config({"OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "gcs"})
+
+    result = validate_config(config)
+
+    assert any("GCS_BUCKET" in error for error in result.errors)
 
 
 def test_config_summary_masks_remote_secrets() -> None:
@@ -169,6 +200,35 @@ def test_config_summary_masks_remote_secrets() -> None:
     assert remote_summary["has_secret_key"] is True
     assert remote_summary["options_keys"] == []
     assert "abc" not in str(remote_summary)
+
+
+def test_load_config_parses_azure_remote_snapshot_settings() -> None:
+    env = {
+        "OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "azure-blob",
+        "OBSERVABILITY_SNAPSHOT_AZURE_CONTAINER": "snapshots",
+        "OBSERVABILITY_SNAPSHOT_AZURE_PREFIX": "nightly/",
+        "OBSERVABILITY_SNAPSHOT_AZURE_CONNECTION_STRING": "UseDevelopmentStorage=true",
+        "OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES": "5",
+    }
+
+    config = load_config(env)
+
+    remote = config.observability_snapshot_remote
+    assert remote is not None
+    assert remote.backend == "azure-blob"
+    assert remote.bucket == "snapshots"
+    assert remote.prefix == "nightly/"
+    assert remote.max_retries == 5
+    assert remote.options is not None
+    assert remote.options.get("connection_string") == "UseDevelopmentStorage=true"
+
+
+def test_validate_config_rejects_azure_without_container() -> None:
+    config = load_config({"OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "azure-blob"})
+
+    result = validate_config(config)
+
+    assert any("AZURE_CONTAINER" in error for error in result.errors)
 
 
 def test_load_config_parses_plugin_backend_options(tmp_path: Path) -> None:

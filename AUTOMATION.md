@@ -44,9 +44,20 @@ The snapshot mirrors the HTTP payload and includes recent operation events, metr
 
 Snapshot persistence is also automated by the `snapshot_persistence` instrumentation extension. It records a snapshot on process startup/shutdown and whenever instrumentation publishes `warn`/`error` events, then prunes history according to `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`, `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`, and `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`. Each persistence run emits an `observability.snapshot.replication` event so the companion `snapshot_replication` instrumentation extension can update replication counters, latency histograms, and a health component summarising the latest remote outcome.
 
-Enable remote shipping by exporting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=s3` alongside the S3 configuration variables (bucket, optional prefix/endpoint/credentials). When set, every persisted snapshot—whether triggered by the extension or `python scripts/observability_snapshot.py --store`—is uploaded to the bucket immediately. Failures are surfaced in the CLI/stdout but never block local disk persistence, so automation can safely depend on remote archives without risking data loss during outages. For local mirroring or dry runs, set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` and optionally `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"path": "./build/debug-replication"}'` to mirror each archive into a deterministic directory.
+Enable remote shipping by exporting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` with the desired backend (`s3`, `gcs`, or `azure-blob`) alongside the backend-specific configuration variables (bucket/container, optional prefix, credential knobs). When set, every persisted snapshot—whether triggered by the extension or `python scripts/observability_snapshot.py --store`—is uploaded immediately after the local write completes. Failures are surfaced in the CLI/stdout but never block local disk persistence, so automation can safely depend on remote archives without risking data loss during outages. For local mirroring or dry runs, set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` and optionally `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"path": "./build/debug-replication"}'` to mirror each archive into a deterministic directory.
 
 When you need a single artefact for ticket attachments, run `python scripts/diagnostics_bundle.py --pretty --include-metrics --output build/reports/diagnostics.json`. The bundle combines the health probe output, observability digest, filtered recent events, and snapshot metadata so you can archive the exact system state during an incident.
+
+### Connector Catalog
+
+The connector registry powers `/meta/connectors`, Streamlit's configuration sidebar, and downstream automation. Inspect the current catalog and health snapshots without hitting the API:
+
+```bash
+make connectors-catalog ARGS="--json --pretty"
+python scripts/connectors_catalog.py --kind data_source --pretty
+```
+
+Each entry includes identifier, version, capabilities, metadata, and the most recent health component published via the observability registry. Built-in connectors cover the bundled sample CSV, BEA API, and Census ASM sources; custom extensions should register additional connectors so operators and agents can track rollout status centrally.
 
 ### CLI Usage
 
@@ -94,6 +105,7 @@ Automation-focused contributors (including AI agents) must:
 - Use the health CLI or `/health` endpoint to verify readiness after deployments.
 - Refresh stewardship metrics with `make audit` whenever architecture or coverage changes.
 - Update `EXTENSION_GUIDE.md` and `CHANGELOG.md` when new extensions or observability hooks are introduced. Verify registration with `make extensions-catalog` (or `python scripts/extensions_catalog.py --json`).
+- Audit connector coverage with `make connectors-catalog` (or `python scripts/connectors_catalog.py --json`) whenever new integrations are added or retired so health snapshots stay truthful.
 - Capture live telemetry during incident response by running `make observability-tail ARGS="--follow --limit 50"` and archiving the stream alongside `/observability/digest` snapshots.
 
 Following these patterns keeps local and remote automation aligned, reduces deployment surprises, and provides a

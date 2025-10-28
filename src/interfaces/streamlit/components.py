@@ -641,6 +641,28 @@ def render_observability_snapshots(
         errors_observed = latest_events.get("error", 0)
         st.metric("Errors observed", cast(MetricValue, errors_observed))
 
+    replication = latest.get("replication")
+    if isinstance(replication, Mapping):
+        status_raw = replication.get("status")
+        backend_raw = replication.get("backend")
+        destination = replication.get("path")
+        error_message = replication.get("error")
+        status = str(status_raw).strip().lower() if status_raw else ""
+        backend = str(backend_raw).strip() if backend_raw else "unspecified backend"
+        message = f"Latest replication {status or 'status unknown'} via **{backend}**."
+        if destination:
+            message += f" Destination: `{destination}`."
+        if error_message:
+            message += f" Error: {error_message}."
+        if status == "success":
+            st.success(message)
+        elif status == "error":
+            st.error(message)
+        else:
+            st.info(message)
+    else:
+        st.caption("Remote replication disabled or no replication telemetry captured yet.")
+
     timeline = snapshot_timeline_frame(history)
     if not timeline.empty:
         timeline_chart = timeline.set_index("captured_at")[["event_total", "errors", "success"]]

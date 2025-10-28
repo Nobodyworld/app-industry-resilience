@@ -15,6 +15,7 @@
 - Added plugin-aware configuration knobs (JSON options, plugin backend identifiers) and validation/tests covering both S3 and debug scenarios so operators and automation can pass backend-specific configuration safely. 【F:src/core/config.py†L1-L364】【F:tests/test_config.py†L1-L212】
 - Emitted structured `observability.snapshot.replication` events from the persistence extension and introduced the `snapshot_replication` instrumentation module with replication metrics, health checks, and a debug filesystem replicator, all covered by new tests and CLI messaging. 【F:src/extensions/builtins/snapshot_persistence.py†L1-L204】【F:src/extensions/builtins/snapshot_replication.py†L1-L175】【F:tests/test_observability_replication.py†L1-L212】【F:scripts/observability_snapshot.py†L1-L170】【F:tests/test_scripts.py†L296-L360】
 - Updated operator docs and stewardship artefacts (README, OBSERVABILITY_SNAPSHOTS.md, EXTENSION_GUIDE.md, AUTOMATION.md, STATUS.md, RELEASE_NOTES.md) to describe replication plugins, new metrics, and health surfaces. 【F:README.md†L148-L306】【F:docs/OBSERVABILITY_SNAPSHOTS.md†L31-L112】【F:EXTENSION_GUIDE.md†L1-L120】【F:AUTOMATION.md†L32-L120】【F:STATUS.md†L1-L37】【F:RELEASE_NOTES.md†L1-L48】
+- Introduced a connector registry and catalog across API, Streamlit, CLI, and observability digests, shipping built-in entries (sample CSV, BEA API, Census ASM) with health diagnostics plus tooling (`make connectors-catalog`, connector-aware scaffolder, changelog helper) to accelerate future integrations. 【F:src/extensions/connectors.py†L1-L161】【F:src/extensions/builtins/connector_catalog.py†L1-L109】【F:scripts/connectors_catalog.py†L1-L72】【F:scripts/scaffold_extension.py†L1-L210】【F:scripts/changelog_entry.py†L1-L83】【F:README.md†L133-L210】
 
 ## Simplification Log
 - Centralised replication backend resolution through `ExtensionManager.build_replication_backend`, replacing per-call switch statements and allowing new connectors to hook in without editing infrastructure code. 【F:src/extensions/manager.py†L1-L224】【F:src/infrastructure/observability/replication.py†L108-L207】
@@ -30,6 +31,7 @@
 - `make quality-gate` – full lint/type/test/security pipeline (# agent-safe-task). 【F:Makefile†L54-L90】
 - `make observability` – JSON snapshot of metrics/traces/health (# agent-safe-task). 【F:Makefile†L136-L142】
 - `make audit` – steward metrics JSON (coverage, complexity, dependencies, latency) tagged for agents. 【F:Makefile†L139-L145】
+- `make connectors-catalog` – connector inventory with health summaries for integration triage (# agent-safe-task). 【F:Makefile†L146-L154】
 - `AUTOMATION_ROLES.md` enumerates steward-facing agent roles and trigger points; keep it aligned with new workflows. 【F:AUTOMATION_ROLES.md†L1-L13】
 
 ## Forward Roadmap

@@ -1,5 +1,38 @@
 # Release Notes
 
+# 2025-11-12 – Connector catalog & developer tooling
+
+### Highlights
+- Added a connector registry and catalog endpoint/CLI so data integrations expose metadata, capabilities, and health checks through `/meta/connectors`, observability digests, Streamlit configuration panels, and `make connectors-catalog`.
+- Shipped built-in connector entries for the bundled sample dataset, BEA API, and Census ASM with health checks that flag missing credentials or offline resources.
+- Extended developer tooling with `scripts/changelog_entry.py` for changelog automation and a connector-aware extension scaffold (`python scripts/scaffold_extension.py --with-connector`).
+
+### Upgrade / Migration Notes
+- No breaking changes. New connector health signals appear automatically once the process restarts. Run `make connectors-catalog` after deploying custom connectors to verify registration.
+- Streamlit and the headless API now surface connector metadata; automation consuming `/observability/digest` will see a new `connectors` block alongside existing metrics/events.
+
+# 2025-11-11 – Snapshot replication timeout enforcement
+
+### Highlights
+- GCS and Azure Blob replicators now honour the optional timeout configuration so uploads fail fast instead of hanging indefinitely.
+- Invalid or non-positive timeout values are ignored with a warning, preventing misconfiguration from wedging replication workers.
+- Documentation clarifies that the timeout knobs apply directly to upload calls, aligning operator expectations with runtime behaviour.
+
+### Upgrade / Migration Notes
+- Set `OBSERVABILITY_SNAPSHOT_GCS_TIMEOUT_SECONDS` or `OBSERVABILITY_SNAPSHOT_AZURE_TIMEOUT_SECONDS` to a positive number to enable upload timeouts; unset or invalid values are ignored safely.
+- No other action is required—existing configurations continue to function, and defaults remain unchanged.
+
+# 2025-11-10 – Multi-cloud snapshot replication & UI telemetry
+
+### Highlights
+- Introduced native Google Cloud Storage and Azure Blob Storage snapshot replicators alongside the existing S3 support, with configuration parsing/validation and stubbed unit tests for each backend.
+- Streamlit’s observability panel now surfaces replication status badges and destinations, while the CLI reports `gs://` / `azure://` URIs in addition to `s3://` so operators immediately know where archives landed.
+- Documentation (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, AUTOMATION) has been expanded to cover backend-specific environment variables and automation flows.
+
+### Upgrade / Migration Notes
+- Existing S3 deployments continue to work without changes. To adopt GCS or Azure, set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=gcs` or `azure-blob` along with the corresponding bucket/container and credential variables documented above.
+- The CLI’s replication summary now reports backend-specific URI schemes; automation that parsed the previous `s3://` prefix should treat the destination as an opaque string.
+
 # 2025-11-10 – Replication plugins & telemetry uplift
 
 ### Highlights

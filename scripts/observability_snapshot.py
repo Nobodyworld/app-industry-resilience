@@ -155,11 +155,17 @@ def _report_remote_destination(
 ) -> None:
     if isinstance(replicator, NullSnapshotReplicator):
         return
-    if hasattr(replicator, "bucket"):
-        bucket = replicator.bucket  # type: ignore[attr-defined]
-        prefix = replicator.prefix if hasattr(replicator, "prefix") else ""  # type: ignore[attr-defined]
+    scheme = getattr(replicator, "uri_scheme", None)
+    if scheme and hasattr(replicator, "bucket"):
+        bucket = getattr(replicator, "bucket")
+        prefix = getattr(replicator, "prefix", "")
         key = f"{prefix}{snapshot.snapshot_id}.json"
-        print(f"Replicated snapshot to s3://{bucket}/{key}", file=sys.stderr)
+        print(f"Replicated snapshot to {scheme}://{bucket}/{key}", file=sys.stderr)
+    elif scheme and hasattr(replicator, "container"):
+        container = getattr(replicator, "container")
+        prefix = getattr(replicator, "prefix", "")
+        blob = f"{prefix}{snapshot.snapshot_id}.json"
+        print(f"Replicated snapshot to {scheme}://{container}/{blob}", file=sys.stderr)
     elif hasattr(replicator, "target_dir"):
         target_dir = Path(str(getattr(replicator, "target_dir")))
         destination = target_dir / f"{snapshot.snapshot_id}.json"

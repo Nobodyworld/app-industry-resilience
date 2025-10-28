@@ -18,9 +18,11 @@ Configure the retention policy with the following environment variables:
 - `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS` – prune snapshots older than this many days (`0` disables age-based pruning).
 - `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS` – throttle automatic persistence so repeated failures do not overwhelm disk space.
 
-## Remote replication (S3-compatible)
+## Remote replication (built-in backends)
 
-Set the remote backend to `s3` to stream every persisted snapshot to object storage immediately after it lands on disk:
+Set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` to stream every persisted snapshot to object storage immediately after it lands on disk. The Idiot Index app ships with first-class support for S3-compatible APIs, Google Cloud Storage, and Azure Blob Storage.
+
+### S3-compatible
 
 | Variable | Purpose |
 | --- | --- |
@@ -36,7 +38,34 @@ Set the remote backend to `s3` to stream every persisted snapshot to object stor
 | `OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES` | Number of attempts (including the first) before giving up (defaults to `3`). |
 | `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` | JSON object forwarded to replication extensions for backend-specific configuration. |
 
-Replication runs both from the automatic extension (`snapshot_persistence`) and the CLI (`python scripts/observability_snapshot.py --store`). The CLI prints a confirmation such as `Replicated snapshot to s3://bucket/nightly/<id>.json`; failures produce a warning while keeping the local file. The replicator closes connections on shutdown so long-running Streamlit sessions do not leak sockets.
+### Google Cloud Storage (GCS)
+
+| Variable | Purpose |
+| --- | --- |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` | Set to `gcs` to enable GCS replication. |
+| `OBSERVABILITY_SNAPSHOT_GCS_BUCKET` | Destination bucket name (required). |
+| `OBSERVABILITY_SNAPSHOT_GCS_PREFIX` | Optional object prefix (e.g., `cloud/`). |
+| `OBSERVABILITY_SNAPSHOT_GCS_PROJECT` | Override the active project (defaults to Google SDK behaviour). |
+| `OBSERVABILITY_SNAPSHOT_GCS_CREDENTIALS_FILE` | Path to a service-account JSON file (optional). |
+| `OBSERVABILITY_SNAPSHOT_GCS_CREDENTIALS_JSON` | Raw service-account JSON string (optional alternative to the file). |
+| `OBSERVABILITY_SNAPSHOT_GCS_TIMEOUT_SECONDS` | Optional timeout (seconds) applied to upload requests. |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES` | Number of attempts before surfacing an error. |
+
+### Azure Blob Storage
+
+| Variable | Purpose |
+| --- | --- |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` | Set to `azure-blob` to enable Azure replication. |
+| `OBSERVABILITY_SNAPSHOT_AZURE_CONTAINER` | Target container name (required). |
+| `OBSERVABILITY_SNAPSHOT_AZURE_PREFIX` | Optional virtual directory prefix (e.g., `nightly/`). |
+| `OBSERVABILITY_SNAPSHOT_AZURE_CONNECTION_STRING` | Standard storage connection string (recommended). |
+| `OBSERVABILITY_SNAPSHOT_AZURE_ACCOUNT_URL` | Account URL for SAS/managed identity authentication. |
+| `OBSERVABILITY_SNAPSHOT_AZURE_CREDENTIAL` / `OBSERVABILITY_SNAPSHOT_AZURE_SAS_TOKEN` | Credential or SAS token used with `ACCOUNT_URL`. |
+| `OBSERVABILITY_SNAPSHOT_AZURE_TIMEOUT_SECONDS` | Optional timeout (seconds) applied to blob uploads. |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_MAX_RETRIES` | Number of attempts before surfacing an error. |
+| `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` | JSON payload forwarded to extensions/custom backends. |
+
+Replication runs both from the automatic extension (`snapshot_persistence`) and the CLI (`python scripts/observability_snapshot.py --store`). The CLI prints a confirmation such as `Replicated snapshot to gs://bucket/nightly/<id>.json` or `azure://container/nightly/<id>.json`; failures produce a warning while keeping the local file. The replicator closes connections on shutdown so long-running Streamlit sessions do not leak sockets.
 
 Extensions can supply additional backends: the built-in `plugin:debug` target mirrors each archive into the directory provided via `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` (defaults to `build/observability_snapshots/debug-replication`). Custom extensions can inspect the same options payload to connect to alternative transports without modifying core infrastructure code.
 

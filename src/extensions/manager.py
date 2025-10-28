@@ -10,9 +10,11 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
+from .connectors import ConnectorRegistry
 from .contracts import (
+    ConnectorExtension,
     ExtensionContributions,
     InstrumentationExtension,
     ReplicationExtension,
@@ -35,7 +37,7 @@ class ExtensionDescriptor:
     """Describes a registered extension for catalog or CLI tooling."""
 
     name: str
-    kind: Literal["summary", "scenario", "instrumentation", "replication"]
+    kind: Literal["summary", "scenario", "instrumentation", "replication", "connector"]
     module: str
     description: str | None = None
 
@@ -48,10 +50,13 @@ class ExtensionManager:
     scenario_extensions: list[ScenarioExtension] = field(default_factory=list)
     instrumentation_extensions: list[InstrumentationExtension] = field(default_factory=list)
     replication_extensions: list[ReplicationExtension] = field(default_factory=list)
+    connector_extensions: list[ConnectorExtension] = field(default_factory=list)
+    connector_registry: ConnectorRegistry = field(default_factory=ConnectorRegistry)
     logger: logging.Logger = field(default=LOGGER)
     _instrumentation_registry_cache: dict[str, set[int]] = field(
         default_factory=dict, init=False, repr=False
     )
+    _connectors_initialised: bool = field(default=False, init=False, repr=False)
 
     def register_summary_extension(self, extension: SummaryExtension) -> None:
         self.logger.debug("Registering summary extension", extra={"extension": extension.name})
@@ -71,6 +76,10 @@ class ExtensionManager:
         self.logger.debug("Registering replication extension", extra={"extension": extension.name})
         self.replication_extensions.append(extension)
 
+    def register_connector_extension(self, extension: ConnectorExtension) -> None:
+        self.logger.debug("Registering connector extension", extra={"extension": extension.name})
+        self.connector_extensions.append(extension)
+
     def catalog(self) -> list[ExtensionDescriptor]:
         """Return metadata describing registered extensions."""
 
@@ -85,12 +94,14 @@ class ExtensionManager:
             )
         for replication_extension in self.replication_extensions:
             descriptors.append(self._describe_extension(replication_extension, "replication"))
+        for connector_extension in self.connector_extensions:
+            descriptors.append(self._describe_extension(connector_extension, "connector"))
         return sorted(descriptors, key=lambda item: (item.kind, item.name))
 
     @staticmethod
     def _describe_extension(
         extension: object,
-        kind: Literal["summary", "scenario", "instrumentation", "replication"],
+        kind: Literal["summary", "scenario", "instrumentation", "replication", "connector"],
     ) -> ExtensionDescriptor:
         name = getattr(extension, "name", extension.__class__.__name__)
         module = extension.__class__.__module__
@@ -135,6 +146,7 @@ class ExtensionManager:
     def apply_instrumentation_extensions(
         self, registry: ObservabilityRegistry
     ) -> None:  # pragma: no cover - thin orchestrator
+        self.initialise_connectors()
         for extension in self.instrumentation_extensions:
             applied = self._instrumentation_registry_cache.setdefault(extension.name, set())
             registry_id = id(registry)
@@ -149,6 +161,27 @@ class ExtensionManager:
                 )
                 continue
             applied.add(registry_id)
+        registry.attach_connector_registry(self.connector_registry)
+
+    def initialise_connectors(self) -> None:
+        if self._connectors_initialised:
+            return
+        for extension in self.connector_extensions:
+            try:
+                extension.register(self.connector_registry)
+            except Exception:  # pragma: no cover - defensive logging
+                self.logger.exception(
+                    "Connector extension failed",
+                    extra={"extension": extension.name},
+                )
+                continue
+        self._connectors_initialised = True
+
+    def connector_catalog(self) -> list[dict[str, object]]:
+        self.initialise_connectors()
+        summary = self.connector_registry.summary(include_health=True)
+        items = cast("list[dict[str, object]]", summary["items"])
+        return items
 
     def build_replication_backend(
         self, config: SnapshotRemoteStorageConfig
@@ -223,6 +256,7 @@ def load_extensions(
                 extra={"extension_module": module_path},
             )
             continue
+    manager.initialise_connectors()
     return manager
 
 

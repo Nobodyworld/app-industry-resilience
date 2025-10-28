@@ -7,7 +7,7 @@ import json
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -341,6 +341,30 @@ def summarise_observability_snapshot(snapshot: ObservabilitySnapshot) -> dict[st
     numeric_metrics = {
         key: int(value) for key, value in metrics.items() if isinstance(value, int | float)
     }
+    replication_summary: dict[str, Any] | None = None
+    recent_events = events.get("recent")
+    if isinstance(recent_events, Sequence):
+        for event in recent_events:
+            if not isinstance(event, Mapping):
+                continue
+            if event.get("name") != "observability.snapshot.replication":
+                continue
+            attributes = (
+                event.get("attributes") if isinstance(event.get("attributes"), Mapping) else {}
+            )
+            attributes = cast(Mapping[str, Any], attributes)
+            replication_summary = {
+                "status": event.get("status"),
+                "backend": attributes.get("backend"),
+                "replicator": attributes.get("replicator"),
+                "path": attributes.get("path"),
+                "reason": attributes.get("reason"),
+                "label": attributes.get("label"),
+                "trace_id": event.get("trace_id"),
+                "error": event.get("error"),
+                "timestamp": event.get("timestamp"),
+            }
+            break
     return {
         "snapshot_id": snapshot.snapshot_id,
         "captured_at": snapshot.captured_at,
@@ -349,6 +373,7 @@ def summarise_observability_snapshot(snapshot: ObservabilitySnapshot) -> dict[st
         "metadata": dict(snapshot.metadata),
         "metrics": numeric_metrics,
         "last_error": events.get("last_error"),
+        "replication": replication_summary,
     }
 
 
@@ -371,6 +396,24 @@ def snapshot_history_table(summaries: Sequence[Mapping[str, Any]]) -> pd.DataFra
     for summary in summaries:
         events = summary.get("events", {})
         metadata = summary.get("metadata", {})
+        replication = summary.get("replication")
+        replication_label: str | None = None
+        if isinstance(replication, Mapping):
+            status = replication.get("status")
+            backend = replication.get("backend")
+            parts: list[str] = []
+            if isinstance(status, str) and status.strip():
+                parts.append(status.strip().capitalize())
+            if isinstance(backend, str) and backend.strip():
+                label = backend.strip()
+                if parts:
+                    parts[-1] = f"{parts[-1]} ({label})"
+                else:
+                    parts.append(label)
+            if parts:
+                replication_label = " ".join(parts)
+        if not replication_label:
+            replication_label = "Local only"
         rows.append(
             {
                 "Snapshot": summary.get("snapshot_id"),
@@ -379,6 +422,7 @@ def snapshot_history_table(summaries: Sequence[Mapping[str, Any]]) -> pd.DataFra
                 "Errors": events.get("error", 0),
                 "Success": events.get("success", 0),
                 "Label": metadata.get("label"),
+                "Replication": replication_label,
             }
         )
     return pd.DataFrame(rows)

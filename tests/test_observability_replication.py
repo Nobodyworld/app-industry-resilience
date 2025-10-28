@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -244,6 +246,96 @@ def test_s3_replicator_raises_on_client_error(
     stubber.assert_no_pending_responses()
 
 
+def test_gcs_replicator_uploads_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from src.infrastructure.observability import replication as module
+
+    class StubBlob:
+        def __init__(self) -> None:
+            self.metadata: dict[str, Any] = {}
+            self.calls: list[tuple[str, str, float | None]] = []
+
+        def upload_from_filename(
+            self,
+            filename: str,
+            *,
+            content_type: str,
+            timeout: float | None = None,
+        ) -> None:
+            self.calls.append((filename, content_type, timeout))
+
+    class StubBucket:
+        def __init__(self) -> None:
+            self.requests: list[str] = []
+            self.last_blob: StubBlob | None = None
+
+        def blob(self, key: str) -> StubBlob:
+            self.requests.append(key)
+            blob = StubBlob()
+            self.last_blob = blob
+            return blob
+
+    class StubGCSClient:
+        def __init__(self, project: str | None = None) -> None:
+            self.project = project
+            self.bucket_calls: list[str] = []
+            self.closed = False
+            self.buckets: dict[str, StubBucket] = {}
+
+        @classmethod
+        def from_service_account_json(cls, *_: Any, project: str | None = None) -> StubGCSClient:
+            return cls(project=project)
+
+        @classmethod
+        def from_service_account_info(cls, *_: Any, project: str | None = None) -> StubGCSClient:
+            return cls(project=project)
+
+        def bucket(self, name: str) -> StubBucket:
+            self.bucket_calls.append(name)
+            return self.buckets.setdefault(name, StubBucket())
+
+        def close(self) -> None:
+            self.closed = True
+
+    monkeypatch.setattr(module, "_HAS_GCS", True)
+    monkeypatch.setattr(module, "gcs_storage", type("Storage", (), {"Client": StubGCSClient}))
+    monkeypatch.setattr(module, "GoogleAPIError", RuntimeError)
+
+    config = SnapshotRemoteStorageConfig(
+        enabled=True,
+        backend="gcs",
+        bucket="idiot-index-snapshots",
+        prefix="remote/",
+        region=None,
+        endpoint_url=None,
+        access_key=None,
+        secret_key=None,
+        session_token=None,
+        use_ssl=True,
+        force_path_style=False,
+        max_retries=2,
+        options={"project": "test", "timeout_seconds": 15},
+    )
+
+    replicator = build_snapshot_replicator(config)
+    snapshot = _make_snapshot("gcs-snap")
+    snapshot_path = tmp_path / "gcs-snap.json"
+    _write_snapshot(snapshot_path, snapshot)
+
+    replicator.replicate(snapshot, snapshot_path)
+    replicator.close()
+
+    client = replicator.client
+    assert isinstance(client, StubGCSClient)
+    assert client.project == "test"
+    assert client.bucket_calls == ["idiot-index-snapshots"]
+    assert client.closed is True
+
+    bucket = client.buckets["idiot-index-snapshots"]
+    assert bucket.requests == ["remote/gcs-snap.json"]
+    assert bucket.last_blob is not None
+    assert bucket.last_blob.calls[0] == (str(snapshot_path), "application/json", 15.0)
+
+
 def test_build_snapshot_replicator_handles_missing_botocore(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -265,6 +357,110 @@ def test_build_snapshot_replicator_handles_missing_botocore(
     monkeypatch.setattr("src.infrastructure.observability.replication._HAS_BOTOCORE", False)
     replicator = build_snapshot_replicator(config)
     assert isinstance(replicator, NullSnapshotReplicator)
+
+
+def test_azure_replicator_uploads_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from src.infrastructure.observability import replication as module
+
+    class StubBlobClient:
+        def __init__(self) -> None:
+            self.uploads: list[tuple[bytes, bool, dict[str, Any], str]] = []
+
+        def upload_blob(
+            self,
+            data: bytes,
+            *,
+            overwrite: bool,
+            metadata: Mapping[str, Any],
+            content_type: str,
+            timeout: float | None = None,
+        ) -> None:
+            self.uploads.append((data, overwrite, dict(metadata), content_type, timeout))
+
+    class StubAzureClient:
+        def __init__(
+            self,
+            *,
+            connection_string: str | None = None,
+            account_url: str | None = None,
+            credential: Any | None = None,
+        ) -> None:
+            self.connection_string = connection_string
+            self.account_url = account_url
+            self.credential = credential
+            self.closed = False
+            self._blob_client = StubBlobClient()
+            self.last_request: tuple[str, str] | None = None
+
+        @classmethod
+        def from_connection_string(cls, connection_string: str) -> StubAzureClient:
+            return cls(connection_string=connection_string)
+
+        def get_blob_client(self, *, container: str, blob: str) -> StubBlobClient:
+            self.last_request = (container, blob)
+            return self._blob_client
+
+        def close(self) -> None:
+            self.closed = True
+
+    monkeypatch.setattr(module, "_HAS_AZURE", True)
+
+    def _factory(**kwargs: Any) -> StubAzureClient:
+        return StubAzureClient(**kwargs)
+
+    monkeypatch.setattr(
+        module,
+        "BlobServiceClient",
+        type(
+            "BlobServiceClient",
+            (),
+            {
+                "from_connection_string": staticmethod(
+                    lambda conn: StubAzureClient(connection_string=conn)
+                ),
+                "__call__": staticmethod(_factory),
+            },
+        ),
+    )
+
+    config = SnapshotRemoteStorageConfig(
+        enabled=True,
+        backend="azure-blob",
+        bucket="snapshots",
+        prefix="nightly/",
+        region=None,
+        endpoint_url=None,
+        access_key=None,
+        secret_key=None,
+        session_token=None,
+        use_ssl=True,
+        force_path_style=False,
+        max_retries=1,
+        options={
+            "connection_string": "UseDevelopmentStorage=true",
+            "timeout_seconds": 12,
+        },
+    )
+
+    replicator = build_snapshot_replicator(config)
+    snapshot = _make_snapshot("azure-snap")
+    snapshot_path = tmp_path / "azure-snap.json"
+    _write_snapshot(snapshot_path, snapshot)
+
+    replicator.replicate(snapshot, snapshot_path)
+    replicator.close()
+
+    client = replicator.client
+    assert isinstance(client, StubAzureClient)
+    assert client.connection_string == "UseDevelopmentStorage=true"
+    assert client.last_request == ("snapshots", "nightly/azure-snap.json")
+    assert client.closed is True
+
+    uploads = client._blob_client.uploads
+    assert uploads[0][1] is True
+    assert uploads[0][3] == "application/json"
+    assert uploads[0][4] == 12.0
+    assert uploads[0][2]["snapshot-id"] == "azure-snap"
 
 
 def test_debug_plugin_replicator_writes_local(

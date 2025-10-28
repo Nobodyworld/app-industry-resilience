@@ -192,14 +192,24 @@ def _extensions_component(manager: ExtensionManager) -> HealthComponent:
     instrumentation_extensions = [
         extension.name for extension in manager.instrumentation_extensions
     ]
+    connector_extensions = [extension.name for extension in manager.connector_extensions]
+    manager.initialise_connectors()
+    connector_snapshot = manager.connector_registry.summary(include_health=False)
 
     details = {
         "summary_extensions": summary_extensions,
         "scenario_extensions": scenario_extensions,
         "instrumentation_extensions": instrumentation_extensions,
+        "connector_extensions": connector_extensions,
+        "connectors_registered": connector_snapshot,
     }
 
-    if not summary_extensions and not scenario_extensions and not instrumentation_extensions:
+    if (
+        not summary_extensions
+        and not scenario_extensions
+        and not instrumentation_extensions
+        and not connector_extensions
+    ):
         return HealthComponent(
             name="extensions",
             status="warn",
@@ -213,7 +223,8 @@ def _extensions_component(manager: ExtensionManager) -> HealthComponent:
         summary=(
             f"{len(summary_extensions)} summary, "
             f"{len(scenario_extensions)} scenario, "
-            f"{len(instrumentation_extensions)} instrumentation extensions active"
+            f"{len(instrumentation_extensions)} instrumentation, "
+            f"{len(connector_extensions)} connector extensions active"
         ),
         details=details,
     )

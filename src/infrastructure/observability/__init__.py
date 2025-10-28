@@ -20,6 +20,8 @@ from .metrics import (
     render_prometheus_text,
 )
 from .replication import (
+    AzureBlobSnapshotReplicator,
+    GCSnapshotReplicator,
     NullSnapshotReplicator,
     S3SnapshotReplicator,
     SnapshotReplicationError,
@@ -59,6 +61,8 @@ __all__ = [
     "current_trace_id",
     "load_snapshot_from_file",
     "render_prometheus_text",
+    "AzureBlobSnapshotReplicator",
+    "GCSnapshotReplicator",
     "S3SnapshotReplicator",
     "SnapshotStorage",
 ]

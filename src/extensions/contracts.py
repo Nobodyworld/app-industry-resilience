@@ -10,6 +10,7 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
     from src.application.idiot_index_service import IdiotIndexSummary
     from src.application.scenario_planner import ScenarioResult
     from src.core.config import SnapshotRemoteStorageConfig
+    from src.extensions.connectors import ConnectorRegistry
     from src.infrastructure.observability.instrumentation import ObservabilityRegistry
     from src.infrastructure.observability.replication import SnapshotReplicator
 
@@ -56,10 +57,19 @@ class ReplicationExtension(Protocol):
     def build(self, config: SnapshotRemoteStorageConfig) -> SnapshotReplicator: ...
 
 
+class ConnectorExtension(Protocol):
+    """Register connector metadata and optional health hooks."""
+
+    name: str
+
+    def register(self, registry: ConnectorRegistry) -> None: ...
+
+
 __all__ = [
     "ExtensionContributions",
     "InstrumentationExtension",
     "ReplicationExtension",
     "SummaryExtension",
     "ScenarioExtension",
+    "ConnectorExtension",
 ]

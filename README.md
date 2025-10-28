@@ -137,6 +137,7 @@ make observability # Print a JSON observability snapshot (pass ARGS="--pretty")
 make observability-snapshot # Persist an observability snapshot to disk (pass ARGS="--label nightly")
 make observability-tail # Follow observability events in real time (pass ARGS="--limit 5 --follow")
 make extensions-catalog # List registered extensions (pass ARGS="--json --pretty")
+make connectors-catalog # List registered connectors and health (pass ARGS="--json --pretty")
 make audit         # Capture stewardship metrics and write build/reports/audit-metrics.json
 make api             # Launch the headless API service (pass ARGS="--port 9100" for custom ports)
 make docs          # List key documentation links in the terminal
@@ -145,25 +146,35 @@ python scripts/observability_snapshot.py --store --pretty  # Persist + print a s
 python scripts/observability_tail.py --follow --limit 10  # Stream recent observability events for triage
 python scripts/diagnostics_bundle.py --pretty --output build/reports/diagnostics.json  # Capture config, health, events, and metrics in one bundle
 python scripts/extensions_catalog.py --json --pretty  # Inspect registered summary/scenario/instrumentation extensions
+python scripts/connectors_catalog.py --json --pretty  # Inspect registered data source and automation connectors
 python scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for analytics/API critical paths (override with --paths)
 python scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
 ```
 
-To replicate observability snapshots to an S3-compatible object store in addition to local disk, set the remote backend variables before running the app or CLI:
+To replicate observability snapshots to a remote object store in addition to local disk, set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` and the backend-specific variables before running the app or CLI. Built-in options include:
+
+- `s3` – supply `OBSERVABILITY_SNAPSHOT_S3_BUCKET` plus optional prefix/region/endpoint/credentials (`OBSERVABILITY_SNAPSHOT_S3_PREFIX`, `OBSERVABILITY_SNAPSHOT_S3_REGION`, `OBSERVABILITY_SNAPSHOT_S3_ENDPOINT`, `OBSERVABILITY_SNAPSHOT_S3_ACCESS_KEY`, etc.).
+- `gcs` – supply `OBSERVABILITY_SNAPSHOT_GCS_BUCKET` with optional `OBSERVABILITY_SNAPSHOT_GCS_PREFIX`, project overrides, and credentials (`OBSERVABILITY_SNAPSHOT_GCS_PROJECT`, `OBSERVABILITY_SNAPSHOT_GCS_CREDENTIALS_FILE`, `OBSERVABILITY_SNAPSHOT_GCS_CREDENTIALS_JSON`).
+- `azure-blob` – supply `OBSERVABILITY_SNAPSHOT_AZURE_CONTAINER` with optional `OBSERVABILITY_SNAPSHOT_AZURE_PREFIX` and either `OBSERVABILITY_SNAPSHOT_AZURE_CONNECTION_STRING` or the combination of `OBSERVABILITY_SNAPSHOT_AZURE_ACCOUNT_URL` + credential (`OBSERVABILITY_SNAPSHOT_AZURE_CREDENTIAL` or `OBSERVABILITY_SNAPSHOT_AZURE_SAS_TOKEN`).
 
 ```bash
+# S3 example
 export OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=s3
 export OBSERVABILITY_SNAPSHOT_S3_BUCKET=idiot-index-snapshots
-# Optional tuning knobs
 export OBSERVABILITY_SNAPSHOT_S3_PREFIX=nightly/
-export OBSERVABILITY_SNAPSHOT_S3_REGION=us-east-1
-export OBSERVABILITY_SNAPSHOT_S3_ENDPOINT=https://s3.example.com  # for MinIO/other vendors
-export OBSERVABILITY_SNAPSHOT_S3_ACCESS_KEY=...  # omit when relying on IAM roles
-export OBSERVABILITY_SNAPSHOT_S3_SECRET_KEY=...
-export OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"storage_class": "STANDARD_IA"}'  # optional JSON options consumed by extensions
+
+# Google Cloud Storage example
+export OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=gcs
+export OBSERVABILITY_SNAPSHOT_GCS_BUCKET=idiot-index-snapshots
+export OBSERVABILITY_SNAPSHOT_GCS_PROJECT=idiot-index
+
+# Azure Blob example
+export OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=azure-blob
+export OBSERVABILITY_SNAPSHOT_AZURE_CONTAINER=idiot-index-snapshots
+export OBSERVABILITY_SNAPSHOT_AZURE_CONNECTION_STRING=UseDevelopmentStorage=true
 ```
 
-Extensions can also provide alternative backends. For example, setting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` and `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"path": "./build/debug-replication"}'` mirrors every snapshot into a local directory without touching S3. Custom replication modules registered via `ExtensionManager` can read the same options payload to discover per-backend configuration.
+Extensions can also provide alternative backends. For example, setting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` and `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS='{"path": "./build/debug-replication"}'` mirrors every snapshot into a local directory without touching cloud storage. Custom replication modules registered via `ExtensionManager` can read the same options payload to discover per-backend configuration.
 
 The CLI automatically reports whether replication succeeded and where the object landed (S3 URLs or debug filesystem paths), while failures log to stderr without interrupting local persistence.
 
@@ -190,6 +201,7 @@ This invokes `scripts/run_api.py`, which serves the lightweight FastAPI-compatib
 - `GET /observability/snapshots` – list of stored observability snapshots (metadata + capture timestamps).
 - `GET /observability/snapshots/{snapshot_id}` – full persisted snapshot payload including event counters and last-error context.
 - `GET /meta/sources` – list of supported data sources.
+- `GET /meta/connectors` – catalog of registered connectors including health summaries and capabilities.
 - `POST /evaluate` – compute Idiot Index metrics for a dataset or remote source.
 - `POST /scenario` – run Scenario Lab adjustments on a supplied dataset.
 - `POST /analytics/health` – return composite health scores, band distribution, and top-risk industries for the requested dataset.
@@ -225,6 +237,7 @@ Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + m
 - The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics`, `/observability/status`, the richer `/observability/digest`, and the snapshot catalogue endpoints under `/observability/snapshots` for historical exports.
 - Streamlit's dashboard includes an Observability tab that visualises stored snapshots (event totals, error trends, and last-error payloads). Snapshots persist under `build/observability_snapshots` by default and respect the `OBSERVABILITY_SNAPSHOT_DIR` environment variable. Retention and auto-capture cadence are controlled via `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`, `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`, and `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`.
 - Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance. The built-in `data_quality` instrumentation extension demonstrates how to subscribe to dataset/scenario profile events, emit gauges, and contribute health checks, while the `snapshot_replication` package wires both S3 and debug replication extensions together with a metrics/health observer that tracks the `observability.snapshot.replication` events emitted by `snapshot_persistence` on startup/shutdown and whenever instrumentation emits `warn`/`error` events. Retention and auto-capture cadence remain governed by the `OBSERVABILITY_SNAPSHOT_RETENTION_*` knobs.
+- Connector extensions share the same lifecycle: `ConnectorRegistry` (see `src/extensions/connectors.py`) catalogues data/automation integrations, publishes health/metrics through the observability registry, and surfaces them via `/meta/connectors`, `make connectors-catalog`, and the Streamlit sidebar. The built-in catalog ships entries for the bundled sample CSV, BEA API, and Census ASM sources; custom connectors can be shipped as extensions without modifying core services.
 
 Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
 

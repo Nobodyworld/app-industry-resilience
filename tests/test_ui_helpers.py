@@ -130,7 +130,15 @@ def test_snapshot_helpers_build_views(tmp_path) -> None:
     assert history and history[0]["metadata"]["label"] == "nightly"
 
     table = snapshot_history_table(history)
-    assert list(table.columns) == ["Snapshot", "Captured", "Events", "Errors", "Success", "Label"]
+    assert list(table.columns) == [
+        "Snapshot",
+        "Captured",
+        "Events",
+        "Errors",
+        "Success",
+        "Label",
+        "Replication",
+    ]
     timeline = snapshot_timeline_frame(history)
     assert set(["captured_at", "event_total", "errors", "success", "snapshot_id"]).issubset(
         timeline.columns
