@@ -4,9 +4,10 @@
 - One TASKLIST.md per directory with active work.
 
 ## Open
-- [ ] Add repo defaults (no functional changes) | owner: unassigned | added: 2025-10-29
-- [ ] Wire reusable CI (workflow_call) | owner: unassigned | added: 2025-10-29
-- [ ] Fill URGENT.md from template | owner: unassigned | added: 2025-10-29
-- [ ] Compare dependencies to MASTER-VERSIONS.json | owner: unassigned | added: 2025-10-29
+- _None_
 
 ## Done
+- [x] Add repo defaults (no functional changes) | owner: automation | added: 2025-10-29 | closed: 2025-10-30 – `.gitattributes` committed, defaults verified.
+- [x] Wire reusable CI (workflow_call) | owner: automation | added: 2025-10-29 | closed: 2025-10-30 – new `quality-gate` workflow in place and CI wired to it.
+- [x] Fill URGENT.md from template | owner: automation | added: 2025-10-29 | closed: 2025-10-30 – repository plan populated with current state.
+- [x] Compare dependencies to MASTER-VERSIONS.json | owner: automation | added: 2025-10-29 | closed: 2025-10-30 – targets captured in `MASTER-VERSIONS.json` with alignment report.

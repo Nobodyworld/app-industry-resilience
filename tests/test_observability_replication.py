@@ -45,7 +45,15 @@ def _make_snapshot(snapshot_id: str) -> ObservabilitySnapshot:
 
 
 def _write_snapshot(path: Path, snapshot: ObservabilitySnapshot) -> None:
-    path.write_text(json.dumps(snapshot.to_dict()), encoding="utf-8")
+    payload = snapshot.to_dict()
+    metadata = payload.get("metadata", {})
+    if isinstance(metadata, dict):
+        normalised = {
+            key: sorted(value, key=str) if isinstance(value, set) else value
+            for key, value in metadata.items()
+        }
+        payload["metadata"] = normalised
+    path.write_text(json.dumps(payload), encoding="utf-8")
 
 
 def test_build_snapshot_replicator_returns_null_for_disabled() -> None:
