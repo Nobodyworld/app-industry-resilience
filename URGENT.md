@@ -1,79 +1,96 @@
-<!-- Detected primary: python -->
-# URGENT: Repo Standardization Plan
+<!-- Detected primary: pwa -->
+# URGENT: Repo Standardization Plan (Template)
 
-This plan captures the state of the Idiot Index repository as we finish Phase 1 defaults and
-prepare for broader modernization. Tasks remain tracked exclusively in `TASKLIST.md`.
+Use this template to create a repo-local `URGENT.md` when we begin alignment work. Copy into a repo after direction and Master Versions are finalized. Keep tasks ONLY in `TASKLIST.md`.
 
 - Repo: app-economics-idiot-index
-- Maintainers: @idiot-index/maintainers
-- Contacts: GitHub Discussions (community support); security issues via SECURITY.md process
-- Last Updated: 2025-10-30
+- Maintainers: <owners or CODEOWNERS>
+- Contacts: <slack/email>
+- Last Updated: <YYYY-MM-DD>
 
 ## Summary
+## Repo Snapshot
+- **Stack**: Python
+- **Package Manager**: poetry
+- **Lock Files**: 
+- **CI Present**: Yes
+- **Tests Present**: Yes
+- **Binary Files**: None detected
+- **Defaults Status**: 
+
+### Repo-Specific Tasks
+
+## Outputs
+- Paste check-only results (lint/format/tests) into the PR.
+- Check off items in TASKLIST.md as you complete them.
+
+## Fallback
+- If central version targets are unavailable, capture current versions and note 'version snapshot only; awaiting org targets' in the PR.
+
 - Stack classification (choose one primary):
   - [ ] Tauri (Rust + TS + React + Vite)
   - [ ] Electron (Node + TS + React)
   - [ ] React + Vite (SPA/PWA)
   - [ ] Next.js (SSR/ISR)
-  - [x] Python service/app
+  - [ ] Python service/app
   - [ ] Rust CLI/service
-  - [ ] Other: _n/a_
-- Current CI: GitHub Actions workflow `CI` delegates to reusable `quality-gate` (workflow_call) to run `make quality-gate` on Python 3.11.
-- Current tests: `make quality-gate` executes Ruff lint, Black formatting check, mypy, pytest with coverage, detect-secrets, and pip-audit.
+  - [ ] Other: <describe>
+- Current CI: <describe workflows/checks>
+- Current tests: <frameworks and coverage notes>
 
-## Phase 0  Audit (read-only)
-- Git state clean and fetched: [x] Managed via `make` workflows and CI protections.
-- Language(s) and runtime(s): Python 3.11 (Streamlit dashboard + domain services).
-- Package manager(s): pip with `requirements.txt` and `requirements-dev.txt`.
-- Build tooling: Makefile (`make quality-gate`, `make api`, `make security`), Dockerfile for Streamlit image.
-- Lint/format/test: Ruff, Black, mypy, pytest (+ coverage) invoked by `make quality-gate`.
-- CI/CD: GitHub Actions (`ci.yml`) using reusable `quality-gate` workflow; uploads coverage artefacts.
-- Releases/versioning: Conventional commits via Commitizen; CHANGELOG and RELEASE_NOTES maintained manually.
-- Security: detect-secrets baseline, gitleaks in CI, pip-audit, SBOM generation (`make security`).
-- Docs: README, docs/ knowledge base, REPORT/STATUS/PLAN suites kept current.
-- License & NOTICE: LICENSE (proprietary terms), no additional NOTICE file required.
-- Special notes: Observability snapshots generated under `build/`; no submodules or LFS.
+## Phase 0 — Audit (read-only)
+- Git state clean and fetched: [ ]
+- Language(s) and runtime(s): <list>
+- Package manager(s): <npm/yarn/pnpm/pip/poetry/go mod/etc>
+- Build tooling: <list>
+- Lint/format/test: <tools + status>
+- CI/CD: <workflows + gates>
+- Releases/versioning: <semver/tags/changelog>
+- Security: <secret scanning, SAST/DAST, deps scanning>
+- Docs: <README, docs/, ADRs>
+- License & NOTICE: <files>
+- Special notes: <generated code, LFS, submodules, binaries>
 
-## Phase 1  Defaults (no functional changes)
-- [.editorconfig] Add/verify: [x] Existing file aligned with org defaults.
-- [.gitattributes] Add/verify: [x] Added repository-wide normalization rules (2025-10-30).
-- [.gitignore] Language-appropriate: [x] Python-focused ignore list confirmed.
-- [CODEOWNERS] Define or confirm: [x] `.github/CODEOWNERS` routes reviews to @idiot-index/maintainers.
-- [CONTRIBUTING.md] Add/refresh: [x] Current guidelines cover workflow and quality expectations.
-- [SECURITY.md] Add/refresh: [x] Private disclosure workflow documented.
-- [PR/Issue templates] Add/refresh: [x] Bug/feature templates and PR template present.
-- [CI check-only] Lint/format/test baseline: [x] Reusable `quality-gate` workflow enforces checks.
-- [Pre-commit] Whitespace/EOL/secret scan (check-only): [x] `.pre-commit-config.yaml` with hooks for formatting, Ruff, detect-secrets.
-- [README] Standard sections present: [x] Overview, setup, and governance documented.
+## Phase 1 — Defaults (no functional changes)
+- [.editorconfig] Add/verify: [ ]
+- [.gitattributes] Add/verify: [ ]
+- [.gitignore] Language-appropriate: [ ]
+- [CODEOWNERS] Define or confirm: [ ]
+- [CONTRIBUTING.md] Add/refresh: [ ]
+- [SECURITY.md] Add/refresh: [ ]
+- [PR/Issue templates] Add/refresh: [ ]
+- [CI check-only] Lint/format/test baseline: [ ]
+- [Pre-commit] Whitespace/EOL/secret scan (check-only): [ ]
+- [README] Standard sections present: [ ]
 
 ## Version Alignment Plan
-- Refer to root `MASTER-VERSIONS.json` for target versions.
+- Refer to the organization-wide Master Versions Record (maintained centrally) for target versions.
 - Node (dev tooling):
-  - [ ] Align TypeScript/ESLint/Prettier/@typescript-eslint/vitest to org targets. _Not applicable – no Node toolchain._
-  - [ ] Re-run lint/format in check-only mode. _Not applicable – no Node toolchain._
+  - [ ] Align TypeScript/ESLint/Prettier/@typescript-eslint/vitest to org targets.
+  - [ ] Re-run lint/format in check-only mode.
 - Node (runtime, if applicable):
-  - [ ] Review `react`, `vite`, `next`, `zod` against targets, plan upgrades if safe. _Not applicable – no Node runtime._
+  - [ ] Review `react`, `vite`, `next`, `zod` against targets, plan upgrades if safe.
 - Python:
-  - [x] Align `numpy`, `pandas`, `pydantic`, `fastapi`, `uvicorn`, `requests`, `pyyaml`, `matplotlib`, `scikit-learn`, `prometheus-client`, `torch`, `torchvision`, `streamlit`. _All listed packages absent or already compliant per comparison; see repo-specific deltas._
-  - [x] Decide pinned vs compatible specifiers; prefer pinned + lockfile where feasible. _Using compatible floor/ceiling specifiers consistent with stewardship policy._
+  - [ ] Align `numpy`, `pandas`, `pydantic`, `fastapi`, `uvicorn`, `requests`, `pyyaml`, `matplotlib`, `scikit-learn`, `prometheus-client`, `torch`, `torchvision`, `streamlit`.
+  - [ ] Decide pinned vs compatible specifiers; prefer pinned + lockfile where feasible.
 - Rust:
-  - [ ] Align key crates (`tauri`, `tokio`, `serde`, `anyhow`) if present. _Not applicable – no Rust components._
+  - [ ] Align key crates (`tauri`, `tokio`, `serde`, `anyhow`) if present.
 
-### Repo-specific deltas vs Master Versions
-- All monitored Python runtime and development dependencies match master targets (see `REPORTS/009_DEPENDENCY_ALIGNMENT.md`). No upgrades required at this stage.
+### Repo-specific deltas vs the organization version targets
+- Example: `numpy` current: <x>, target: <y>, action: <pin/upgrade/hold>
+- Example: `typescript` current: <x>, target: <y>, action: <pin/upgrade/hold>
 
 ## Risks & Constraints
-- Standardization work may touch generated artefacts (e.g., coverage reports); keep `.gitattributes` in sync to avoid churn.
-- Dependency upgrades rely on upstream Streamlit ecosystem stability; continue running full `make quality-gate` before releases.
+- Potential secret exposure, licensing, binary/LFS concerns, line-endings changes, large diffs. Mitigations: check-only first, small PRs, opt-in auto-fixes later.
+- Upgrade risk: run full tests in CI; stage upgrades in small batches.
 
 ## Decisions & ADRs
-- 2025-10-30: Introduced reusable `quality-gate` workflow and `.gitattributes` to enforce defaults without touching application code.
-- 2025-10-30: Authored `MASTER-VERSIONS.json` and comparison report to document dependency parity with organization baselines.
+- <Link or inline notes>
 
 ## Timeline & Owners
-- Target window: 2025-10-30 → 2025-11-05 for Phase 1 wrap-up.
-- Responsible: Automation Stewardship Team (@idiot-index/maintainers).
-- Reviewers: @idiot-index/maintainers, CI guardians.
+- Target window: <dates>
+- Responsible: <name>
+- Reviewers: <names>
 
 ## Definition of Done (Phase 1)
 - Defaults added, CI check-only green.
@@ -85,18 +102,60 @@ prepare for broader modernization. Tasks remain tracked exclusively in `TASKLIST
 - Pre-flight
   - [ ] Create branch `chore/align-versions`
   - [ ] Ensure clean git state and fetched remotes
-  - [ ] Open repository `TASKLIST.md` and confirm modernization tasks
+  - [ ] Open directory `TASKLIST.md` and list upgrade tasks; no other TODO docs
 
-- Node (TypeScript/React/Vite/Next) – _not applicable_
+- Node (TypeScript/React/Vite/Next)
+  - [ ] Pin dev tooling to the centrally maintained version targets (TypeScript, ESLint, Prettier, @typescript-eslint, Vitest)
+  - [ ] Install; run `lint` and `test` in check-only mode; fix config only (no large code changes)
+  - [ ] Upgrade runtime libs as needed (react, react-dom, next, vite, zod, router, etc.) to targets
+  - [ ] Run `build` and smoke `dev`; address minor type breaks; avoid behavior changes
 
 - Python
-  - [x] Update requirements/pyproject to targets; refresh lock if used (not required – ranges already aligned).
-  - [x] Run tests; fix minimal type/compat issues (`make quality-gate`).
-  - [x] Record blockers in `TASKLIST.md` (none observed during comparison).
+  - [ ] Update requirements/pyproject to targets; refresh lock if used
+  - [ ] Run tests; fix minimal type/compat issues (pydantic/fastapi/numpy)
+  - [ ] Record blockers in `TASKLIST.md`
 
-- Rust – _not applicable_
+- Rust
+  - [ ] Update crate versions; run `cargo check`, `cargo test`
+  - [ ] Fix warnings and minor API changes only
 
 - Wrap-up
-  - [x] Ensure CI check-only passes (lint/format/test/security/license).
-  - [ ] Update repo `README` only if necessary (current content sufficient; revisit after future upgrades).
-  - [x] Summarize changes and deltas vs Master Versions in PR body and `REPORTS/009_DEPENDENCY_ALIGNMENT.md`.
+  - [ ] Ensure CI check-only passes (lint/format/test/security/license)
+  - [ ] Update repo `README` only if necessary
+  - [ ] Summarize changes and deltas vs the organization version targets in PR body
+
+## Agent Quickstart
+
+- Do not change behavior; planning and check-only tasks first.
+- Always sync first: run the Preflight commands below.
+- Prefer small, reviewable changes with clear checklists.
+
+### Preflight
+```
+git status --porcelain
+git fetch --all --prune
+```
+
+### Branching & Commits
+- Branch: `chore/standards-setup`
+- Commits: Conventional Commits (e.g., `chore: add .editorconfig`)
+
+### Commands - React + Vite (Node)
+```
+# Run basic checks suitable for most repositories
+```
+
+### Version Alignment
+- Consult the organization-wide version targets (central record) when proposing upgrades.
+- Prefer conservative, compatible updates; propose plan before changing major versions.
+
+### PR Checklist (Planning-Only)
+- [ ] Defaults verified/added (.editorconfig, .gitattributes, .gitignore, CODEOWNERS, CONTRIBUTING.md, SECURITY.md)
+- [ ] CI run locally (check-only) with results pasted in PR
+- [ ] Version deltas summarized vs organization targets
+- [ ] No functional changes made
+
+## Binary Artifacts
+- Do not commit binaries (executables, archives, large models, images/datasets).
+- If any are tracked, propose relocating to object storage or Git LFS and add ignore rules.
+- List any found binaries in the PR body and add a plan to remove them (planning-only change first).
