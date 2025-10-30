@@ -1,0 +1,30 @@
+# Normalize line endings and diff settings across contributors
+* text=auto eol=lf
+
+# Explicit text files
+*.py text diff=python
+*.pyi text diff=python
+*.md text
+*.yml text
+*.yaml text
+*.json text
+*.toml text
+*.csv text
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+# Treat data and binary artefacts appropriately
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary
+*.xz binary
+*.ipynb binary
+
+# Keep generated coverage artefacts stable
+coverage.xml text
+
