@@ -645,6 +645,6 @@ The repository follows a layered structure with lightweight indexes in each dire
 - [`extensions/`](extensions/README.md) – manifest-driven plugin catalog used by the ExtensionManager.
 - [`data/`](data/README.md) – offline sample dataset powering the demo and regression tests.
 - [`assets/`](assets/README.md) – lightweight imagery and UI assets referenced by Streamlit components and docs.
-- [`REPORTS/`](REPORTS/README.md) – archived stewardship and phase reports linked from the handbook and exec plans.
+- Executive reports live under [`docs/exec/`](docs/exec/README.md); see handbook/report links from exec plans for archived summaries.
 
 Refer to [`SPEC.md`](SPEC.md) for the canonical requirements snapshot and [`STYLE-GUIDE.md`](STYLE-GUIDE.md) for coding conventions.

@@ -38,7 +38,7 @@ This guide explains how to refresh the Idiot Index datasets, rotate API keys, an
 
 - Note the refresh in `CHANGELOG.md` and mention any schema changes.
 - Update `docs/API_REFERENCE.md` if public adapter signatures changed.
-- Add operational notes to `REPORTS/` if the refresh required manual steps worth preserving.
+- Add operational notes under `docs/exec/` if the refresh required manual steps worth preserving.
 
 ## 6. Run the full quality gate
 

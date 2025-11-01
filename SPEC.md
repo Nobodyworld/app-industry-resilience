@@ -60,7 +60,7 @@ Each major directory now contains a `README.md` describing its scope:
 - [`extensions/`](extensions/README.md) – manifest-driven plugins.
 - [`data/`](data/README.md) – sample datasets for offline usage.
 - [`assets/`](assets/README.md) – static assets for UI/docs.
-- [`REPORTS/`](REPORTS/README.md) – archived stewardship reports.
+- Executive summaries live in [`docs/exec/`](docs/exec/README.md); see the handbook for canonical stewardship reports.
 
 ## 6. Documentation
 

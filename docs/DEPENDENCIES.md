@@ -32,7 +32,7 @@ This document records the vetted runtime and development dependencies for the Id
 
 ## Review process
 
-1. Run `pip-audit` monthly (triggered via `make security`). Document any findings in `REPORTS/` and raise issues for remediation.
+1. Run `pip-audit` monthly (triggered via `make security`). Document any findings in `docs/exec/` and raise issues for remediation.
 2. For quarterly reviews, check upstream release notes for major runtime dependencies (Streamlit, pandas, requests). Smoke-test upgrades locally before bumping versions.
 3. Update this file whenever a dependency is added, removed, or upgraded outside its review window.
 4. Capture exceptions (e.g., pinning due to upstream regression) in `CHANGELOG.md` and note the revisit date.
