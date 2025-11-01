@@ -74,7 +74,7 @@ Maintain this plan per `.agent/PLANS.md`. Each milestone below represents a revi
 
 ### Workstream T2.1 – Strict Typing *(Tags: testing, reliability, DX)*
 - **Task T2.1.1 – Enable `mypy --strict` and resolve violations**
-  - **Goal:** Catch regressions early by embracing strict typing across `src/` and `agents/`.
+  - **Goal:** Catch regressions early by embracing strict typing across `src/` and `src/agents/`.
   - **Acceptance Criteria:** `pyproject.toml` updated with strict settings; targeted `# type: ignore` documented with issue numbers; CI passes without `ignore_missing_imports` blanket.
   - **Blast Radius:** Wide; may touch most modules to refine types or introduce helper abstractions.
   - **Rollback Plan:** Temporarily relax to `--strict-optional` subset or revert until blockers resolved.

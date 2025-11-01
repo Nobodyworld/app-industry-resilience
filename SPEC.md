@@ -1,161 +1,94 @@
-<!-- Detected primary: pwa -->
-# URGENT: Repo Standardization Plan (Template)
+# Idiot Index Specification
 
-Use this template to create a repo-local `URGENT.md` when we begin alignment work. Copy into a repo after direction and Master Versions are finalized. Keep tasks ONLY in `TASKLIST.md`.
+_Last updated: 2025-10-31_
 
-- Repo: app-economics-idiot-index
-- Maintainers: <owners or CODEOWNERS>
-- Contacts: <slack/email>
-- Last Updated: <YYYY-MM-DD>
+The Idiot Index project delivers a Streamlit dashboard and headless API for analysing industry cost efficiency. This specification captures the canonical requirements for maintaining and extending the repository after the restructuring.
 
-## Summary
-## Repo Snapshot
-- **Stack**: Python
-- **Package Manager**: poetry
-- **Lock Files**: 
-- **CI Present**: Yes
-- **Tests Present**: Yes
-- **Binary Files**: None detected
-- **Defaults Status**: 
+## 1. Architecture Overview
 
-### Repo-Specific Tasks
+- **Presentation**: `app.py` (Streamlit UI) and the FastAPI-compatible service under `src/interfaces/api`.
+- **Domain Services**: `src/application/idiot_index_service.py` orchestrates data retrieval, normalisation, analytics, and leaderboard generation.
+- **Data Access**: Adapters in `src/adapters/` provide BEA, Census ASM, and sample dataset connectors with caching via `src/cache.py`.
+- **Analytics**: `src/core/analytics` offers composite health scoring, resilience metrics, and cohort aggregations consumed by both UI and API layers.
+- **Observability**: Extensions under `src/extensions/` plus infrastructure modules handle metrics, tracing, and snapshot replication.
+- **Agent Surface**: `src/agents/` exposes curated tooling for automation clients, delegating to the application layer while enforcing schema metadata.
 
-## Outputs
-- Paste check-only results (lint/format/tests) into the PR.
-- Check off items in TASKLIST.md as you complete them.
+Refer to [`docs/handbook/ARCHITECTURE.md`](docs/handbook/ARCHITECTURE.md) for diagrams and rationale.
 
-## Fallback
-- If central version targets are unavailable, capture current versions and note 'version snapshot only; awaiting org targets' in the PR.
+## 2. Supported Workflows
 
-- Stack classification (choose one primary):
-  - [ ] Tauri (Rust + TS + React + Vite)
-  - [ ] Electron (Node + TS + React)
-  - [ ] React + Vite (SPA/PWA)
-  - [ ] Next.js (SSR/ISR)
-  - [ ] Python service/app
-  - [ ] Rust CLI/service
-  - [ ] Other: <describe>
-- Current CI: <describe workflows/checks>
-- Current tests: <frameworks and coverage notes>
+| Workflow | Entry Point | Notes |
+| --- | --- | --- |
+| Streamlit dashboard | `streamlit run app.py` | Uses cached sample data by default; BEA and ASM integrations activate when API keys are supplied. |
+| Headless API | `make api` or `python scripts/run_api.py` | Serves a minimal FastAPI-compatible app on port 9000 with health and observability endpoints. |
+| Scenario planning CLI | `python scripts/run_scenario.py` | Applies shocks to current datasets and emits summary tables. |
+| Observability snapshotting | `python scripts/observability_snapshot.py` | Persists local and remote snapshots with optional replication extensions. |
+| Agent integrations | `src/agents/` | Provides dataclass schemas and tool metadata for conversational agents. |
 
-## Phase 0 — Audit (read-only)
-- Git state clean and fetched: [ ]
-- Language(s) and runtime(s): <list>
-- Package manager(s): <npm/yarn/pnpm/pip/poetry/go mod/etc>
-- Build tooling: <list>
-- Lint/format/test: <tools + status>
-- CI/CD: <workflows + gates>
-- Releases/versioning: <semver/tags/changelog>
-- Security: <secret scanning, SAST/DAST, deps scanning>
-- Docs: <README, docs/, ADRs>
-- License & NOTICE: <files>
-- Special notes: <generated code, LFS, submodules, binaries>
+## 3. Quality Gates
 
-## Phase 1 — Defaults (no functional changes)
-- [.editorconfig] Add/verify: [ ]
-- [.gitattributes] Add/verify: [ ]
-- [.gitignore] Language-appropriate: [ ]
-- [CODEOWNERS] Define or confirm: [ ]
-- [CONTRIBUTING.md] Add/refresh: [ ]
-- [SECURITY.md] Add/refresh: [ ]
-- [PR/Issue templates] Add/refresh: [ ]
-- [CI check-only] Lint/format/test baseline: [ ]
-- [Pre-commit] Whitespace/EOL/secret scan (check-only): [ ]
-- [README] Standard sections present: [ ]
+All contributions must pass `make quality-gate`, which executes:
 
-## Version Alignment Plan
-- Refer to the organization-wide Master Versions Record (maintained centrally) for target versions.
-- Node (dev tooling):
-  - [ ] Align TypeScript/ESLint/Prettier/@typescript-eslint/vitest to org targets.
-  - [ ] Re-run lint/format in check-only mode.
-- Node (runtime, if applicable):
-  - [ ] Review `react`, `vite`, `next`, `zod` against targets, plan upgrades if safe.
-- Python:
-  - [ ] Align `numpy`, `pandas`, `pydantic`, `fastapi`, `uvicorn`, `requests`, `pyyaml`, `matplotlib`, `scikit-learn`, `prometheus-client`, `torch`, `torchvision`, `streamlit`.
-  - [ ] Decide pinned vs compatible specifiers; prefer pinned + lockfile where feasible.
-- Rust:
-  - [ ] Align key crates (`tauri`, `tokio`, `serde`, `anyhow`) if present.
+1. Formatting checks (Black in check mode).
+2. Linting (Ruff).
+3. Type checking (mypy).
+4. Pytest with coverage enforcement.
+5. Security scans (`pip-audit` and `detect-secrets`).
 
-### Repo-specific deltas vs the organization version targets
-- Example: `numpy` current: <x>, target: <y>, action: <pin/upgrade/hold>
-- Example: `typescript` current: <x>, target: <y>, action: <pin/upgrade/hold>
+Use `make format`, `make lint`, `make typecheck`, or `make test` for targeted debugging.
 
-## Risks & Constraints
-- Potential secret exposure, licensing, binary/LFS concerns, line-endings changes, large diffs. Mitigations: check-only first, small PRs, opt-in auto-fixes later.
-- Upgrade risk: run full tests in CI; stage upgrades in small batches.
+## 4. Configuration
 
-## Decisions & ADRs
-- <Link or inline notes>
+- Configuration values are centralised in `src/config.py` with environment variable overrides. Key settings include API credentials, rate limiter backend, observability replication targets, and dtype overrides.
+- `.env` files are not committed; developers should export variables locally when required.
+- JSON/TOML configuration files:
+  - `extensions/manifest.json` – declares available extensions.
+  - `MASTER-VERSIONS.json` – records dependency alignment snapshots.
+  - `pyproject.toml` – Python packaging metadata.
+  - `codex_chain.json` – automation hints for Codex agents.
 
-## Timeline & Owners
-- Target window: <dates>
-- Responsible: <name>
-- Reviewers: <names>
+Validate changes to these files by loading them in tests or via `python -m json.tool <file>` / `python -m tomllib <file>`.
 
-## Definition of Done (Phase 1)
-- Defaults added, CI check-only green.
-- Version alignment plan approved (no functional changes yet).
-- No behavioral changes introduced.
+## 5. Repository Layout
 
-## Upgrade Playbook (Concise)
+Each major directory now contains a `README.md` describing its scope:
 
-- Pre-flight
-  - [ ] Create branch `chore/align-versions`
-  - [ ] Ensure clean git state and fetched remotes
-  - [ ] Open directory `TASKLIST.md` and list upgrade tasks; no other TODO docs
+- [`src/`](src/README.md) – source code, organised by layer.
+- [`tests/`](tests/README.md) – pytest suites.
+- [`scripts/`](scripts/README.md) – automation helpers.
+- [`docs/`](docs/README.md) – documentation hub.
+- [`extensions/`](extensions/README.md) – manifest-driven plugins.
+- [`data/`](data/README.md) – sample datasets for offline usage.
+- [`assets/`](assets/README.md) – static assets for UI/docs.
+- [`REPORTS/`](REPORTS/README.md) – archived stewardship reports.
 
-- Node (TypeScript/React/Vite/Next)
-  - [ ] Pin dev tooling to the centrally maintained version targets (TypeScript, ESLint, Prettier, @typescript-eslint, Vitest)
-  - [ ] Install; run `lint` and `test` in check-only mode; fix config only (no large code changes)
-  - [ ] Upgrade runtime libs as needed (react, react-dom, next, vite, zod, router, etc.) to targets
-  - [ ] Run `build` and smoke `dev`; address minor type breaks; avoid behavior changes
+## 6. Documentation
 
-- Python
-  - [ ] Update requirements/pyproject to targets; refresh lock if used
-  - [ ] Run tests; fix minimal type/compat issues (pydantic/fastapi/numpy)
-  - [ ] Record blockers in `TASKLIST.md`
+- The root [`README.md`](README.md) provides onboarding, command references, and environment configuration tips.
+- [`docs/handbook/`](docs/handbook/README.md) hosts canonical guides for architecture, automation, releases, and security.
+- [`docs/execplans/`](docs/execplans/README.md) archives historical execution plans, including the repository cleanup and validation pass described in the latest entry of [`CHANGELOG.md`](CHANGELOG.md).
+- [`docs/exec/`](docs/exec/README.md) captures stakeholder-facing summaries and status reports.
 
-- Rust
-  - [ ] Update crate versions; run `cargo check`, `cargo test`
-  - [ ] Fix warnings and minor API changes only
+Keep these documents up to date whenever workflows or architecture change.
 
-- Wrap-up
-  - [ ] Ensure CI check-only passes (lint/format/test/security/license)
-  - [ ] Update repo `README` only if necessary
-  - [ ] Summarize changes and deltas vs the organization version targets in PR body
+## 7. Testing Strategy
 
-## Agent Quickstart
+- Unit and integration tests live under `tests/` and mirror the structure of `src/`.
+- Agent tooling tests ensure schemas stay in sync with the application layer.
+- Observability and replication tests rely on local stubs; avoid calling real cloud APIs in CI.
+- Coverage reports are generated automatically during `make quality-gate`; minimum thresholds are enforced to catch regressions.
 
-- Do not change behavior; planning and check-only tasks first.
-- Always sync first: run the Preflight commands below.
-- Prefer small, reviewable changes with clear checklists.
+## 8. Extension Ecosystem
 
-### Preflight
-```
-git status --porcelain
-git fetch --all --prune
-```
+- New connectors, instrumentation modules, or replication backends must be registered in `extensions/manifest.json` and implement the appropriate contract under `src/extensions/`.
+- Use `python scripts/scaffold_extension.py --name <snake_case_name>` to bootstrap new modules.
+- Verify catalog output with `make extensions-catalog` and `make connectors-catalog`.
 
-### Branching & Commits
-- Branch: `chore/standards-setup`
-- Commits: Conventional Commits (e.g., `chore: add .editorconfig`)
+## 9. Release & Reporting Requirements
 
-### Commands - React + Vite (Node)
-```
-# Run basic checks suitable for most repositories
-```
+- Update [`CHANGELOG.md`](CHANGELOG.md) for every meaningful change.
+- Track task completion in [`TASKLIST.md`](TASKLIST.md) using the provided format.
+- Provide execution context in [`docs/execplans/`](docs/execplans/README.md) when undertaking significant refactors.
+- Adhere to coding conventions in [`STYLE-GUIDE.md`](STYLE-GUIDE.md) and document any deviations in an ADR or the changelog.
 
-### Version Alignment
-- Consult the organization-wide version targets (central record) when proposing upgrades.
-- Prefer conservative, compatible updates; propose plan before changing major versions.
-
-### PR Checklist (Planning-Only)
-- [ ] Defaults verified/added (.editorconfig, .gitattributes, .gitignore, CODEOWNERS, CONTRIBUTING.md, SECURITY.md)
-- [ ] CI run locally (check-only) with results pasted in PR
-- [ ] Version deltas summarized vs organization targets
-- [ ] No functional changes made
-
-## Binary Artifacts
-- Do not commit binaries (executables, archives, large models, images/datasets).
-- If any are tracked, propose relocating to object storage or Git LFS and add ignore rules.
-- List any found binaries in the PR body and add a plan to remove them (planning-only change first).
+This specification should be treated as the authoritative reference for repository expectations. Revisit and update it as architecture or processes evolve.

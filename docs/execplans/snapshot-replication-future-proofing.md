@@ -58,7 +58,7 @@ Observable outcomes:
 
 ## Context and Orientation
 
-Snapshot replication is orchestrated from `src/infrastructure/observability/replication.py`, where `build_snapshot_replicator` constructs either a no-op or `S3SnapshotReplicator`. The `src/extensions/builtins/snapshot_persistence.py` instrumentation extension invokes this builder to upload snapshots after persistence. Configuration is parsed in `src/core/config.py`, tests live in `tests/test_config.py` and `tests/test_observability_replication.py`, and automation/CLI entry points (notably `scripts/observability_snapshot.py`) call into the same builder. Documentation for observability lives across `docs/OBSERVABILITY_SNAPSHOTS.md`, `ARCHITECTURE_OVERVIEW.md`, `EXTENSION_GUIDE.md`, and automation guides such as `AUTOMATION.md`.
+Snapshot replication is orchestrated from `src/infrastructure/observability/replication.py`, where `build_snapshot_replicator` constructs either a no-op or `S3SnapshotReplicator`. The `src/extensions/builtins/snapshot_persistence.py` instrumentation extension invokes this builder to upload snapshots after persistence. Configuration is parsed in `src/core/config.py`, tests live in `tests/test_config.py` and `tests/test_observability_replication.py`, and automation/CLI entry points (notably `scripts/observability_snapshot.py`) call into the same builder. Documentation for observability lives across `docs/OBSERVABILITY_SNAPSHOTS.md`, `docs/handbook/ARCHITECTURE_OVERVIEW.md`, `docs/handbook/EXTENSION_GUIDE.md`, and automation guides such as `docs/handbook/AUTOMATION.md`.
 
 The extension system is implemented in `src/extensions/manager.py` with contracts in `src/extensions/contracts.py` and built-in modules under `src/extensions/builtins/`. Any new extension type must hook into this manager so manifest-driven loading remains consistent for humans and agents.
 
@@ -80,7 +80,7 @@ Finally, refresh documentation and automation artefacts (docs mentioned above, R
 2. Update `src/extensions/contracts.py` and `src/extensions/manager.py` for the replication extension contract, adjusting `get_extension_manager` initialisation and adding tests under `tests/test_extensions.py`.
 3. Enhance `src/infrastructure/observability/replication.py` with extension-aware builder logic and helper exports, plus new unit tests in `tests/test_observability_replication.py`.
 4. Update `src/extensions/builtins/snapshot_persistence.py` to emit replication events and ensure replicator closure. Create `src/extensions/builtins/snapshot_replication.py` with S3/debug replication extensions and instrumentation, updating the manifest and writing targeted tests.
-5. Refresh CLI/tests (`scripts/observability_snapshot.py`, `tests/test_scripts.py`) and documentation assets (README, docs/OBSERVABILITY_SNAPSHOTS.md, docs/ARCHITECTURE_OVERVIEW.md, EXTENSION_GUIDE.md, AUTOMATION.md, STATUS.md, STEWARDS_REPORT.md, RELEASE_NOTES.md, CHANGELOG.md) to reflect the modular replication layer, telemetry, and future-proofing guidance.
+5. Refresh CLI/tests (`scripts/observability_snapshot.py`, `tests/test_scripts.py`) and documentation assets (README, docs/OBSERVABILITY_SNAPSHOTS.md, docs/handbook/ARCHITECTURE_OVERVIEW.md, docs/handbook/EXTENSION_GUIDE.md, docs/handbook/AUTOMATION.md, docs/handbook/STATUS.md, docs/handbook/STEWARDS_REPORT.md, docs/handbook/RELEASE_NOTES.md, CHANGELOG.md) to reflect the modular replication layer, telemetry, and future-proofing guidance.
 6. Run `make quality-gate` and capture any artefacts or surprises for inclusion in this ExecPlan.
 
 ## Validation and Acceptance

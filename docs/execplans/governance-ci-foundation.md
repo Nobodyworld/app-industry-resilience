@@ -40,13 +40,13 @@ Completed. Governance docs, code owners, and templates are in place. Offline-saf
 
 ## Context and Orientation
 
-The repository hosts a Streamlit application under app.py with supporting domain code in src/. Tests live in tests/. Existing automation includes .github/workflows/ci.yml with flake8, mypy, and pytest steps across Python 3.9–3.11. requirements-dev.txt already lists black, flake8, mypy, pytest-cov, and types-requests. No pre-commit hooks, commit message linting, or standardized templates exist. Governance docs like CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, SUPPORT.md, and CODEOWNERS are absent. There is no EditorConfig or Renovate configuration yet. PLAN.md and REPORT.md describe modernization goals that call for governance, automation, linting, and supply-chain hardening.
+The repository hosts a Streamlit application under app.py with supporting domain code in src/. Tests live in tests/. Existing automation includes .github/workflows/ci.yml with flake8, mypy, and pytest steps across Python 3.9–3.11. requirements-dev.txt already lists black, flake8, mypy, pytest-cov, and types-requests. No pre-commit hooks, commit message linting, or standardized templates exist. Governance docs like CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/handbook/SECURITY.md, docs/handbook/SUPPORT.md, and CODEOWNERS are absent. There is no EditorConfig or Renovate configuration yet. docs/handbook/PLAN.md and docs/handbook/REPORT.md describe modernization goals that call for governance, automation, linting, and supply-chain hardening.
 
 We will adopt Ruff as the single linting tool while keeping Black for formatting; Ruff will enforce comprehensive lint rules and manage import sorting. Pre-commit will orchestrate Black, Ruff, mypy, pytest (as needed), commitlint, and other checks. The CI workflow will be updated to run the same pre-commit hooks, ensuring parity. We'll also add Makefile targets to simplify running checks locally.
 
 ## Plan of Work
 
-Begin by drafting governance documents (CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, SUPPORT.md) and CODEOWNERS that align with repository stewardship assumptions. Introduce .editorconfig at the root to enforce indentation and whitespace standards for Python, Markdown, YAML, and JSON files.
+Begin by drafting governance documents (CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/handbook/SECURITY.md, docs/handbook/SUPPORT.md) and CODEOWNERS that align with repository stewardship assumptions. Introduce .editorconfig at the root to enforce indentation and whitespace standards for Python, Markdown, YAML, and JSON files.
 
 Create pyproject.toml to centralize tool configurations: define Black target version, Ruff rules (linting and import sorting), mypy strictness (initially warn for missing imports but enable strict optional checks), and coverage settings. Reference requirements files to ensure dependencies include ruff, pre-commit, commitizen (for changelog automation), and commitlint. Update requirements-dev.txt accordingly and add a dedicated constraints file if needed.
 
@@ -77,7 +77,7 @@ Work from repository root `/workspace/idiot-index-app`.
 9. Add .github templates and CODEOWNERS.
 10. Update README.md to mention new workflow and prerequisites.
 11. Run `pip install -r requirements.txt -r requirements-dev.txt`, `pre-commit install`, `pre-commit run --all-files`, and `pytest` to validate.
-12. Update STATUS.md with summary per governance instructions.
+12. Update docs/handbook/STATUS.md with summary per governance instructions.
 
 ## Validation and Acceptance
 

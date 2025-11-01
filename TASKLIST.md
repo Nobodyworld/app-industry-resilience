@@ -26,3 +26,4 @@ Completion note (indented, one line):
 - [x] Wire reusable CI (workflow_call) | owner: automation | added: 2025-10-29 | closed: 2025-10-30 – new `quality-gate` workflow in place and CI wired to it.
 - [x] Fill URGENT.md from template | owner: automation | added: 2025-10-29 | closed: 2025-10-30 – repository plan populated with current state.
 - [x] Compare dependencies to MASTER-VERSIONS.json | owner: automation | added: 2025-10-29 | closed: 2025-10-30 – targets captured in `MASTER-VERSIONS.json` with alignment report.
+- [x] Consolidate docs and relocate agent toolkit | owner: automation | added: 2025-10-30 | closed: 2025-10-30 – documentation moved into `docs/handbook/`, agent toolkit now under `src/agents`, and README highlights the structure.

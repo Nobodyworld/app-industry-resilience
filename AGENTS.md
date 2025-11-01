@@ -9,7 +9,7 @@ This repository welcomes code-writing agents as long as they follow the guardrai
 3. **Keep telemetry intact.** The observability layer under `src/infrastructure/observability` powers Prometheus metrics, the `/observability/status` endpoint, and trace correlation. Do not remove or bypass instrumentation without updating the docs and dashboards.
 4. **Prefer instrumentation extensions.** When adding metrics or health checks, register an `InstrumentationExtension` through the `ExtensionManager` instead of editing core services directly.
 5. **Publish connectors via extensions.** Register new integrations as `ConnectorExtension` modules so `/meta/connectors`, Streamlit, and observability digests stay accurate. Verify catalog output with `make connectors-catalog`.
-6. **Document deviations.** If an agent changes behaviour or relaxes a guard, explain the rationale in the pull request body and update the relevant guides (README, EXTENSION_GUIDE.md, RELEASE_NOTES.md).
+6. **Document deviations.** If an agent changes behaviour or relaxes a guard, explain the rationale in the pull request body and update the relevant guides (README, docs/handbook/EXTENSION_GUIDE.md, docs/handbook/RELEASE_NOTES.md).
 
 ## Safe Operating Checklist
 

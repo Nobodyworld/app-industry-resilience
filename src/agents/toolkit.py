@@ -2,22 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import MISSING, dataclass, fields, is_dataclass
 from enum import Enum
-from typing import (
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Set,
-    Tuple,
-    Type,
-    Union,
-    get_args,
-    get_origin,
-    get_type_hints,
-)
+from typing import Any, Union, cast, get_args, get_origin, get_type_hints
 
 
 @dataclass(frozen=True)
@@ -26,13 +14,13 @@ class ToolMetadata:
 
     name: str
     description: str
-    input_model: Type[Any]
-    output_model: Type[Any]
-    input_schema: Dict[str, Any]
-    output_schema: Dict[str, Any]
+    input_model: type[Any]
+    output_model: type[Any]
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any]
 
 
-_TOOL_REGISTRY: Dict[str, ToolMetadata] = {}
+_TOOL_REGISTRY: dict[str, ToolMetadata] = {}
 
 
 def tool(name: str, description: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
@@ -61,13 +49,14 @@ def tool(name: str, description: str) -> Callable[[Callable[..., Any]], Callable
             output_schema=_schema_for_dataclass(output_model),
         )
         _TOOL_REGISTRY[name] = metadata
-        setattr(func, "__tool_metadata__", metadata)
+        func_with_metadata = cast(Any, func)
+        func_with_metadata.__tool_metadata__ = metadata
         return func
 
     return decorator
 
 
-def list_tools() -> List[ToolMetadata]:
+def list_tools() -> list[ToolMetadata]:
     """Return metadata for all registered tools."""
 
     return list(_TOOL_REGISTRY.values())
@@ -88,7 +77,7 @@ def tool_names() -> Iterable[str]:
     return _TOOL_REGISTRY.keys()
 
 
-def _schema_for_dataclass(cls: Type[Any]) -> Dict[str, Any]:
+def _schema_for_dataclass(cls: type[Any]) -> dict[str, Any]:
     """Return a JSON schema dictionary for the provided dataclass type.
 
     The schema is intentionally minimal, focusing on field names, basic typing,
@@ -99,8 +88,8 @@ def _schema_for_dataclass(cls: Type[Any]) -> Dict[str, Any]:
     if not is_dataclass(cls):  # pragma: no cover - defensive guard
         raise TypeError(f"{cls!r} is not a dataclass.")
 
-    properties: Dict[str, Any] = {}
-    required: List[str] = []
+    properties: dict[str, Any] = {}
+    required: list[str] = []
 
     for field in fields(cls):
         schema = _schema_for_annotation(field.type)
@@ -111,24 +100,24 @@ def _schema_for_dataclass(cls: Type[Any]) -> Dict[str, Any]:
         if field.default is MISSING and field.default_factory is MISSING:
             required.append(field.name)
 
-    schema: Dict[str, Any] = {"type": "object", "properties": properties}
+    schema_dict: dict[str, Any] = {"type": "object", "properties": properties}
     if required:
-        schema["required"] = required
-    return schema
+        schema_dict["required"] = required
+    return schema_dict
 
 
-def _schema_for_annotation(annotation: Any) -> Dict[str, Any]:
+def _schema_for_annotation(annotation: Any) -> dict[str, Any]:
     """Translate a Python typing annotation into a JSON schema fragment."""
     origin = get_origin(annotation)
-    if origin in {list, List, tuple, Tuple, Iterable}:
+    if origin in {list, tuple, Iterable}:
         args = get_args(annotation) or (Any,)
         return {"type": "array", "items": _schema_for_annotation(args[0])}
 
-    if origin in {set, Set}:
+    if origin is set:
         args = get_args(annotation) or (Any,)
         return {"type": "array", "uniqueItems": True, "items": _schema_for_annotation(args[0])}
 
-    if origin in {dict, Dict}:
+    if origin is dict:
         key_type, value_type = get_args(annotation) or (Any, Any)
         return {
             "type": "object",
@@ -150,7 +139,7 @@ def _schema_for_annotation(annotation: Any) -> Dict[str, Any]:
         return {"type": "string", "enum": [member.value for member in annotation]}
 
     if is_dataclass(annotation):
-        return _schema_for_dataclass(annotation)
+        return _schema_for_dataclass(cast(type[Any], annotation))
 
     python_type_to_json = {
         str: "string",

@@ -1,12 +1,12 @@
 # Agent Interface
 
-The Idiot Index app ships with a lightweight agent toolkit under `agents/`. Tools are registered via `agents.toolkit.tool` which records dataclass-based request/response schemas for automation platforms.
+The Idiot Index app ships with a lightweight agent toolkit under `src/agents/`. Tools are registered via `src.agents.toolkit.tool` which records dataclass-based request/response schemas for automation platforms.
 
 ## Available Tools
 
 ### `compute_idiot_index_summary`
 - **Purpose:** Load Idiot Index data from the sample dataset, BEA, or Census ASM, then compute key metrics and a leaderboard.
-- **Module:** `agents.idiot_index`
+- **Module:** `src.agents.idiot_index`
 - **Request model:** `IdiotIndexRequest`
 - **Response model:** `IdiotIndexResponse`
 
@@ -28,12 +28,12 @@ The Idiot Index app ships with a lightweight agent toolkit under `agents/`. Tool
 | `health_score_average` | number | Composite health score (0–100) for the filtered dataset. |
 | `health_risk_band` | string | Risk band label (`excellent`, `healthy`, `watch`, or `critical`). |
 
-The JSON schemas for the request and response models are accessible at runtime via `agents.get_tool("compute_idiot_index_summary").input_schema` and `.output_schema`.
+The JSON schemas for the request and response models are accessible at runtime via `src.agents.get_tool("compute_idiot_index_summary").input_schema` and `.output_schema`.
 
 ## Example Usage
 
 ```python
-from agents import IdiotIndexRequest, compute_idiot_index_summary
+from src.agents import IdiotIndexRequest, compute_idiot_index_summary
 
 request = IdiotIndexRequest(year=2021, source="sample", top_n=5)
 response = compute_idiot_index_summary(request)
@@ -45,7 +45,7 @@ for industry in response.top_industries:
 ### Inspecting JSON Schema programmatically
 
 ```python
-from agents import get_tool
+from src.agents import get_tool
 
 tool = get_tool("compute_idiot_index_summary")
 print(tool.input_schema)
@@ -60,7 +60,7 @@ The repo ships with a helper script that mirrors the agent call:
 
 ```bash
 python - <<'PY'
-from agents import IdiotIndexRequest, compute_idiot_index_summary
+from src.agents import IdiotIndexRequest, compute_idiot_index_summary
 
 payload = IdiotIndexRequest(year=2020, source="sample", top_n=3)
 summary = compute_idiot_index_summary(payload)
@@ -91,7 +91,7 @@ Applications embedding the toolkit should catch `ValueError` for actionable user
 
 ### Integration checklist
 
-- [ ] Import request/response dataclasses from `agents` to keep type hints stable.
+- [ ] Import request/response dataclasses from `src.agents` to keep type hints stable.
 - [ ] Validate API keys are present before invoking live sources (BEA or Census).
 - [ ] Handle pagination in long-running conversations by storing `IdiotIndexRequest` copies if you expect to reuse them.
 - [ ] Leverage the JSON schema metadata to configure third-party agent platforms.

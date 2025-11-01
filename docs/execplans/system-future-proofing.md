@@ -13,7 +13,7 @@ Observable outcomes:
 * The headless API exposes `/metrics` and `/healthz` endpoints with structured metrics and trace correlation IDs logged for each request.
 * A new extension registry loads contributions declared in `extensions/` and via configuration. A sample `manufacturing_cost_driver` plugin adds a computed insight to Idiot Index responses without touching core services.
 * `make quality-gate` (and the CI workflow) runs lint, type checks, tests with coverage enforcement, security scans, and metrics export validation in sequence.
-* Contributors find `EXTENSION_GUIDE.md`, `AGENTS.md`, and updated `ARCHITECTURE_OVERVIEW.md` describing extension seams, incident response, and migration notes.
+* Contributors find `docs/handbook/EXTENSION_GUIDE.md`, `AGENTS.md`, and updated `docs/handbook/ARCHITECTURE_OVERVIEW.md` describing extension seams, incident response, and migration notes.
 
 ## Progress
 
@@ -49,13 +49,13 @@ Observable outcomes:
 
 The observability and extensibility goals for Stage 3 are complete. Metrics, tracing, and the new health probe provide
 actionable telemetry across the API and CLI surfaces, while the extension system remains stable through documentation and
-tests. Automation guidance now lives in `AUTOMATION.md`, and the quality gate enforces lint/type/test/security parity
+tests. Automation guidance now lives in `docs/handbook/AUTOMATION.md`, and the quality gate enforces lint/type/test/security parity
 locally and in CI. Remaining opportunities include expanding extension scaffolds for scenario plugins and evaluating
 multi-tenant configuration strategies documented in future roadmap work.
 
 ## Context and Orientation
 
-The repository already exposes a headless API under `src/interfaces/api/app.py`, application services in `src/application`, and infrastructure utilities under `src/infrastructure`. Logging is centralised in `src/infrastructure/logging_config.py` but lacks metrics/tracing and Prometheus export. There is no explicit plugin system; metrics and scenario logic are hard-coded within `src/application/idiot_index_service.py` and `src/application/scenario_planner.py`. Developer automation scripts live in `scripts/`, while quality gates run via `make check`. Documentation spans `README.md`, `docs/ARCHITECTURE_OVERVIEW.md`, and workflow guides. Stage 3 requires layering observability, modular extensions, and automation scaffolds without breaking existing behaviour.
+The repository already exposes a headless API under `src/interfaces/api/app.py`, application services in `src/application`, and infrastructure utilities under `src/infrastructure`. Logging is centralised in `src/infrastructure/logging_config.py` but lacks metrics/tracing and Prometheus export. There is no explicit plugin system; metrics and scenario logic are hard-coded within `src/application/idiot_index_service.py` and `src/application/scenario_planner.py`. Developer automation scripts live in `scripts/`, while quality gates run via `make check`. Documentation spans `README.md`, `docs/handbook/ARCHITECTURE_OVERVIEW.md`, and workflow guides. Stage 3 requires layering observability, modular extensions, and automation scaffolds without breaking existing behaviour.
 
 ## Plan of Work
 
@@ -72,7 +72,7 @@ The repository already exposes a headless API under `src/interfaces/api/app.py`,
 
 3. **Developer and agent enablement**
    * Add CLI scaffolding under `scripts/` for generating new plugins or service modules (e.g., `scripts/scaffold_extension.py`). Provide cookiecutter-like template using built-in string formatting.
-   * Update documentation: new `EXTENSION_GUIDE.md`, refreshed `ARCHITECTURE_OVERVIEW.md` with observability layers and extension seams, new `AGENTS.md` at repo root explaining safe automation usage, and incident response guides in docs.
+   * Update documentation: new `docs/handbook/EXTENSION_GUIDE.md`, refreshed `docs/handbook/ARCHITECTURE_OVERVIEW.md` with observability layers and extension seams, new `AGENTS.md` at repo root explaining safe automation usage, and incident response guides in docs.
    * Enhance `CONTRIBUTING.md` with branching model, quality gate command, telemetry expectations, and linking to scaffolding script.
 
 4. **Continuous improvement and future-proofing**

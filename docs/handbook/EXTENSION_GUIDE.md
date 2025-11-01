@@ -55,7 +55,7 @@ The Idiot Index platform exposes a formal extension layer so new analytics, conn
 ## Safe Deployment Checklist
 
 - Keep extension modules pure Python with deterministic behaviour; avoid blocking I/O in hooks.
-- Document new modules in `docs/ARCHITECTURE_OVERVIEW.md` or team-specific runbooks.
+- Document new modules in `docs/handbook/ARCHITECTURE_OVERVIEW.md` or team-specific runbooks.
 - Update `CHANGELOG.md` and `RELEASE_NOTES.md` when extensions introduce user-visible insights.
 - When instrumenting operations, prefer descriptive event names (e.g. `service.<domain>.execute`) so future extensions can subscribe selectively.
 

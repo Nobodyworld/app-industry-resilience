@@ -11,6 +11,14 @@ Thanks for investing time in the Idiot Index project! This guide explains how to
 - **Run the full quality suite** (`make quality-gate`) before opening a pull request.
 - **Document significant work with an ExecPlan.** Place plans under `.agent/execplans/` so reviewers can trace decisions.
 
+## Repository Layout
+
+- `app.py` – Streamlit entrypoint that wires the UI to the application layer.
+- `src/` – Production code, including the agent toolkit under `src/agents`, application services, core logic, adapters, interfaces, and infrastructure packages.
+- `docs/` – Reference material and runbooks. Long-form governance and release docs now live under `docs/handbook/` to keep the repository root focused on metadata.
+- `docs/execplans/` – Historical ExecPlans documenting major refactors and investigations.
+- `extensions/`, `scripts/`, `tests/`, `assets/`, `data/` – Extension modules, automation helpers, test suites, static assets, and sample datasets respectively.
+
 ## Prerequisites
 
 - Python 3.11 or newer.
@@ -100,6 +108,6 @@ Release automation is planned but not yet wired to production deployment. For no
 
 - Open a GitHub Discussion or issue using the provided templates.
 - Tag `@idiot-index/maintainers` in pull requests for review.
-- For security-sensitive disclosures, follow the instructions in `SECURITY.md` instead of filing a public issue.
+- For security-sensitive disclosures, follow the instructions in `docs/handbook/SECURITY.md` instead of filing a public issue.
 
 We appreciate every contribution that makes the Idiot Index easier to run, safer to operate, and more insightful for end users!

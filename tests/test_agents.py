@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from agents import (
+from src.agents import (
     DataSource,
     IdiotIndexRequest,
     IdiotIndexResponse,

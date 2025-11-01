@@ -89,10 +89,20 @@
 - Introduced the `/analytics/health` API endpoint, updated `/evaluate`/`/scenario` payloads, and added the `scripts/analytics_health.py` CLI alongside a `make analytics` target.
 - Relaxed dependency pins to track latest compatible releases and refreshed documentation (README, architecture, API guides, new `docs/ANALYTICS_HEALTH.md`).
 
+# 2025-10-31 – Post-refactor validation & documentation indexes
+- Added README indexes to every top-level directory so contributors can discover code, docs, assets, and extensions without scanning the tree.
+- Refreshed `SPEC.md`, `STYLE-GUIDE.md`, and root `README.md` to document the new structure and cross-link canonical references.
+- Validated configuration files, reinforced directory naming conventions, and confirmed quality gates after the restructuring.
+
+## 2025-10-30 – Repository cleanup and restructuring
+- Grouped governance, planning, and release documentation under `docs/handbook/` and refreshed cross-references in ExecPlans, reports, and automation guides.
+- Moved the agent toolkit to `src/agents`, updating imports, tests, and agent-facing documentation to reflect the new package path.
+- Highlighted the new project layout in README and CONTRIBUTING, and captured the work in `TASKLIST.md`.
+
 ## 2025-10-27
-- Completed Stage 4 steward audit with `STEWARDS_REPORT.md`, adding measured coverage/complexity/dependency/latency metrics and
+- Completed Stage 4 steward audit with `docs/handbook/STEWARDS_REPORT.md`, adding measured coverage/complexity/dependency/latency metrics and
   a refreshed roadmap.
-- Delivered `scripts/audit_metrics.py`, the `make audit` target, and `AUTOMATION_ROLES.md` so agents can gather stewardship data
+- Delivered `scripts/audit_metrics.py`, the `make audit` target, and `docs/handbook/AUTOMATION_ROLES.md` so agents can gather stewardship data
   and coordinate responsibilities.
 - Simplified API telemetry span handling, tagged observability/audit make targets as `# agent-safe-task`, and ensured every
   script bootstraps the repo root for direct execution.
@@ -102,7 +112,7 @@
   `scripts/check_health.py` CLI.
 - Updated the headless API to expose component-level health metadata and telemetry counts while maintaining backward
   compatibility for the `telemetry` field.
-- Documented automation workflows in `AUTOMATION.md`, refreshed README/architecture/API guides, and expanded the
+- Documented automation workflows in `docs/handbook/AUTOMATION.md`, refreshed README/architecture/API guides, and expanded the
   incident-response playbook with the CLI workflow.
 
 ## 2025-02-18

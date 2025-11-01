@@ -44,7 +44,7 @@ Give decision-makers the ability to stress test industries against shocks and sp
 
 - Resilience metrics now include resilience score, materials dependency, and shock sensitivity, with safeguards for zero denominators and cached reuse.
 - The Scenario Planner service, CLI, and Streamlit Scenario Lab enable percentage-based shocks with shareable URLs, comparison tables, and delta charts.
-- Infrastructure additions (scenario Make target, cache prefetch script, Docker `PREFETCH_ARGS`) and documentation updates (`README.md`, `ARCHITECTURE.md`, `docs/SCENARIO_LAB.md`) round out automation guidance.
+- Infrastructure additions (scenario Make target, cache prefetch script, Docker `PREFETCH_ARGS`) and documentation updates (`README.md`, `docs/handbook/ARCHITECTURE.md`, `docs/SCENARIO_LAB.md`) round out automation guidance.
 - Automated tests cover metric computations, scenario planner logic, CLI utilities, and UI helpers; `pytest` passes end-to-end.
 
 ## Context and Orientation
@@ -68,7 +68,7 @@ Scenario modelling will reuse idiomatic layers: core computations remain in `src
    Create a cache prefetch script (e.g., `scripts/prefetch_data.py`) leveraging `ScenarioPlanner` or `IdiotIndexService` to warm caches for configured years/sources. Optionally expose environment-driven concurrency using thread pools. Update `Dockerfile` and `Makefile` to include optional prefetch and CLI steps, documenting usage. Add logging instrumentation (leveraging existing `logging_config`) in new scripts.
 
 5. **Documentation & Tests**
-   Update `README.md`, `ARCHITECTURE.md`, and add a focused doc (`docs/SCENARIO_LAB.md`) explaining the scenario workflow, CLI usage, and resilience metrics definitions. Expand tests: unit tests for new metrics, scenario planner adjustments (including multi-industry, multi-adjustment cases), Streamlit helpers (pure functions), CLI invocation (via `subprocess` or direct function), and infrastructure scripts (prefetch logic). Ensure sample dataset includes values enabling realistic assertions.
+   Update `README.md`, `docs/handbook/ARCHITECTURE.md`, and add a focused doc (`docs/SCENARIO_LAB.md`) explaining the scenario workflow, CLI usage, and resilience metrics definitions. Expand tests: unit tests for new metrics, scenario planner adjustments (including multi-industry, multi-adjustment cases), Streamlit helpers (pure functions), CLI invocation (via `subprocess` or direct function), and infrastructure scripts (prefetch logic). Ensure sample dataset includes values enabling realistic assertions.
 
 6. **Validation & Retrospective**
    Run `pytest` (and any targeted linting if new modules demand it), capture results, and update this plan’s progress, discoveries, decisions, and retrospective entries summarising outcomes and future follow-ups.

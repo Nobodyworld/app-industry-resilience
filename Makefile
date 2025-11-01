@@ -126,7 +126,7 @@ sbom:
 docs:
 	@echo "Core documentation links:"
 	@echo "  README.md"
-	@echo "  docs/ARCHITECTURE_OVERVIEW.md"
+	@echo "  docs/handbook/ARCHITECTURE_OVERVIEW.md"
 	@echo "  docs/ANALYTICS_HEALTH.md"
 	@echo "  docs/API_REFERENCE.md"
 	@echo "  docs/WORKFLOWS_DATA_REFRESH.md"

@@ -43,11 +43,11 @@ We will strengthen the automation baseline so that every pull request runs suppl
 
 ## Outcomes & Retrospective
 
-Implemented supply-chain hardening without introducing network-only dependencies. Local tooling (`make security`, `make sbom`) now produces tangible artifacts even when `pre-commit` is unavailable, and CI emits gitleaks, pip-audit, and SBOM artifacts for every push. README/CONTRIBUTING document the new expectations, PLAN marks Milestone G1.2.4 complete, and STATUS captures progress. Remaining follow-up is to pursue strict typing (Milestone 2) and expand test coverage per PLAN.
+Implemented supply-chain hardening without introducing network-only dependencies. Local tooling (`make security`, `make sbom`) now produces tangible artifacts even when `pre-commit` is unavailable, and CI emits gitleaks, pip-audit, and SBOM artifacts for every push. README/CONTRIBUTING document the new expectations, docs/handbook/PLAN.md marks Milestone G1.2.4 complete, and docs/handbook/STATUS.md captures progress. Remaining follow-up is to pursue strict typing (Milestone 2) and expand test coverage per the plan.
 
 ## Context and Orientation
 
-Current tooling already standardises formatting (`black`), linting (`ruff`), typing (`mypy`), and tests (pytest). `make check` runs `pre-commit` hooks then pytest with coverage. The fallback script at `scripts/run_quality_checks.py` mimics these when the `pre-commit` binary is absent, but today it only targets the `scripts/` directory for Python checks. CI (`.github/workflows/ci.yml`) installs dependencies, runs `make check`, and uploads coverage to Codecov. No secret scanning, SBOM generation, or vulnerability auditing exists yet. Docs such as `README.md` and `CONTRIBUTING.md` describe `make check` but lack references to security tooling. `PLAN.md` still lists Milestone G1.2.4 as pending.
+Current tooling already standardises formatting (`black`), linting (`ruff`), typing (`mypy`), and tests (pytest). `make check` runs `pre-commit` hooks then pytest with coverage. The fallback script at `scripts/run_quality_checks.py` mimics these when the `pre-commit` binary is absent, but today it only targets the `scripts/` directory for Python checks. CI (`.github/workflows/ci.yml`) installs dependencies, runs `make check`, and uploads coverage to Codecov. No secret scanning, SBOM generation, or vulnerability auditing exists yet. Docs such as `README.md` and `CONTRIBUTING.md` describe `make check` but lack references to security tooling. `docs/handbook/PLAN.md` still lists Milestone G1.2.4 as pending.
 
 We need to add:
 1. Tooling dependencies (`detect-secrets`, `pip-audit`) in `requirements-dev.txt` and ensure they are invoked through the Makefile.
@@ -56,7 +56,7 @@ We need to add:
 4. Updated `scripts/run_quality_checks.py` so fallback runs cover `app.py`, `src`, and `tests` plus the new security checks when available.
 5. Updated `.pre-commit-config.yaml` to include a `detect-secrets` hook referencing the baseline and a lightweight large-file check.
 6. CI changes: run security scans (`pip-audit`, `detect-secrets --baseline`, `gitleaks` action) and generate/upload the SBOM artifact.
-7. Documentation refresh: `README.md`, `CONTRIBUTING.md`, `PLAN.md`, and `STATUS.md` should mention the new workflows and mark task completion.
+7. Documentation refresh: `README.md`, `CONTRIBUTING.md`, `docs/handbook/PLAN.md`, and `docs/handbook/STATUS.md` should mention the new workflows and mark task completion.
 
 ## Plan of Work
 
@@ -66,7 +66,7 @@ Next, enhance the Makefile with three new targets: `security` (run `pip-audit` f
 
 Then, adjust `.github/workflows/ci.yml`. Split into two jobs: `quality` (existing tests) and `security` (pip-audit + detect-secrets). Add a reusable step to generate the SBOM via the Makefile and upload it using `actions/upload-artifact`. Integrate `gitleaks/gitleaks-action@v2` in the security job. Ensure job dependencies mean `security` runs in parallel but coverage upload still occurs. Share dependency installation steps through a composite or repeated commands for clarity.
 
-Finally, document the new flow: update `README.md` and `CONTRIBUTING.md` to describe `make security` and `make sbom`. Amend `PLAN.md` to mark Task G1.2.4 as completed (or in-progress) and describe the new reality. Append a STATUS entry summarising the enhancements and call out next steps (strict typing milestone). When everything passes locally, commit changes and prepare for PR.
+Finally, document the new flow: update `README.md` and `CONTRIBUTING.md` to describe `make security` and `make sbom`. Amend `docs/handbook/PLAN.md` to mark Task G1.2.4 as completed (or in-progress) and describe the new reality. Append a docs/handbook/STATUS.md entry summarising the enhancements and call out next steps (strict typing milestone). When everything passes locally, commit changes and prepare for PR.
 
 ## Concrete Steps
 
@@ -77,7 +77,7 @@ Finally, document the new flow: update `README.md` and `CONTRIBUTING.md` to desc
 5. Modify `scripts/run_quality_checks.py` to lint all project paths and invoke security tools when installed.
 6. Expand the Makefile with `security`, `sbom`, and helper targets; hook `security` into `check`.
 7. Update `.github/workflows/ci.yml` with the security job, gitleaks step, and SBOM artifact upload.
-8. Refresh `README.md`, `CONTRIBUTING.md`, `PLAN.md`, and `STATUS.md` to reflect new tooling and progress.
+8. Refresh `README.md`, `CONTRIBUTING.md`, `docs/handbook/PLAN.md`, and `docs/handbook/STATUS.md` to reflect new tooling and progress.
 9. Run `make check` locally to validate the quality gate.
 10. Commit all changes with a Conventional Commit message and proceed to PR creation.
 
