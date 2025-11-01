@@ -1,6 +1,6 @@
 # Global Style Guide
 
-Last Updated: October 31, 2025
+Last Updated: November 1, 2025
 
 This document is a concise, drop-in style and process guide for any repository in this organization. It emphasizes reliability, maintainability, reproducibility, and security. Use this as a baseline and tailor via ADRs where justified.
 
@@ -23,6 +23,8 @@ This document is a concise, drop-in style and process guide for any repository i
   - `scripts/` — developer tooling (idempotent, cross‑platform when possible)
   - `assets/` — small static assets (icons, images) needed at build/runtime
   - `data/` — small sample/test data only (large datasets belong in storage)
+- Directory indexes
+  - Each top-level directory must include a short `README.md` (or equivalent index file) that explains its purpose and links to key sub-resources.
 - Naming
   - Directories: `kebab-case` (e.g., `ui-components`)
   - Files (JS/TS/Go/Rust): `camelCase.ts|.go|.rs` where idiomatic; Python: `snake_case.py`

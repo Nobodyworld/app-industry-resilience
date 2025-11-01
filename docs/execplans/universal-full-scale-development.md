@@ -31,7 +31,7 @@ Operators can already persist observability snapshots locally and replicate them
 
 ## Context and Orientation
 
-Observability persistence lives under `src/infrastructure/observability/`. `storage.py` defines `ObservabilitySnapshot` and `SnapshotStorage`, while `replication.py` currently supports local-only and S3 replication via `SnapshotReplicator` implementations. Automatic persistence is wired through `src/extensions/builtins/snapshot_persistence.py`, invoked by both the Streamlit UI (`app.py` → `src/interfaces/streamlit/helpers.py`) and automation scripts (`scripts/observability_snapshot.py`). Configuration for remote replication originates in `src/core/config.py` (`SnapshotRemoteStorageConfig`) with validation in `validate_config` and coverage in `tests/test_config.py`. Observability UI helpers aggregate snapshot history in `src/interfaces/streamlit/helpers.py` with rendering in `components.py`. Tests for replication reside in `tests/test_observability_replication.py`, CLI coverage in `tests/test_scripts.py`, and UI helpers in `tests/test_ui_helpers.py`. Documentation of remote shipping spans `README.md`, `docs/OBSERVABILITY_SNAPSHOTS.md`, `EXTENSION_GUIDE.md`, `AUTOMATION.md`, `STATUS.md`, `CHANGELOG.md`, and `RELEASE_NOTES.md`.
+Observability persistence lives under `src/infrastructure/observability/`. `storage.py` defines `ObservabilitySnapshot` and `SnapshotStorage`, while `replication.py` currently supports local-only and S3 replication via `SnapshotReplicator` implementations. Automatic persistence is wired through `src/extensions/builtins/snapshot_persistence.py`, invoked by both the Streamlit UI (`app.py` → `src/interfaces/streamlit/helpers.py`) and automation scripts (`scripts/observability_snapshot.py`). Configuration for remote replication originates in `src/core/config.py` (`SnapshotRemoteStorageConfig`) with validation in `validate_config` and coverage in `tests/test_config.py`. Observability UI helpers aggregate snapshot history in `src/interfaces/streamlit/helpers.py` with rendering in `components.py`. Tests for replication reside in `tests/test_observability_replication.py`, CLI coverage in `tests/test_scripts.py`, and UI helpers in `tests/test_ui_helpers.py`. Documentation of remote shipping spans `README.md`, `docs/OBSERVABILITY_SNAPSHOTS.md`, `docs/handbook/EXTENSION_GUIDE.md`, `docs/handbook/AUTOMATION.md`, `docs/handbook/STATUS.md`, `CHANGELOG.md`, and `docs/handbook/RELEASE_NOTES.md`.
 
 ## Plan of Work
 
@@ -43,14 +43,14 @@ Then, enrich observability summarisation: enhance `summarise_observability_snaps
 
 After code changes, expand the automated suite: add configuration tests for the new backends (`tests/test_config.py`), replication tests using stub SDKs (`tests/test_observability_replication.py`), UI helper assertions for replication metadata (`tests/test_ui_helpers.py`), and CLI messaging coverage (`tests/test_scripts.py`). Where necessary, inject lightweight stubs for missing SDKs to keep tests self-contained.
 
-Finally, refresh documentation artefacts (README, docs/OBSERVABILITY_SNAPSHOTS.md, EXTENSION_GUIDE.md, AUTOMATION.md, STATUS.md, RELEASE_NOTES.md, CHANGELOG.md, STEWARDS_REPORT.md) to describe the multi-cloud capabilities, configuration environment variables, and operator workflows. Close out by running `make quality-gate`, updating this plan’s Progress/Decisions/Outcomes, and preparing the PR summary.
+Finally, refresh documentation artefacts (README, docs/OBSERVABILITY_SNAPSHOTS.md, docs/handbook/EXTENSION_GUIDE.md, docs/handbook/AUTOMATION.md, docs/handbook/STATUS.md, docs/handbook/RELEASE_NOTES.md, CHANGELOG.md, docs/handbook/STEWARDS_REPORT.md) to describe the multi-cloud capabilities, configuration environment variables, and operator workflows. Close out by running `make quality-gate`, updating this plan’s Progress/Decisions/Outcomes, and preparing the PR summary.
 
 ## Concrete Steps
 
 1. Edit `src/core/config.py` and related tests to parse/validate GCS and Azure backend settings; ensure summaries hide secrets.
 2. Implement GCS/Azure replicators and builders in `src/infrastructure/observability/replication.py`, updating exports and tests.
 3. Enhance Streamlit helpers/components and the observability CLI for replication status reporting with accompanying tests.
-4. Update documentation sets (README, docs/OBSERVABILITY_SNAPSHOTS.md, EXTENSION_GUIDE.md, AUTOMATION.md, STATUS.md, RELEASE_NOTES.md, CHANGELOG.md, STEWARDS_REPORT.md) to reflect new capabilities.
+4. Update documentation sets (README, docs/OBSERVABILITY_SNAPSHOTS.md, docs/handbook/EXTENSION_GUIDE.md, docs/handbook/AUTOMATION.md, docs/handbook/STATUS.md, docs/handbook/RELEASE_NOTES.md, CHANGELOG.md, docs/handbook/STEWARDS_REPORT.md) to reflect new capabilities.
 5. Execute `make quality-gate` from the repository root and capture relevant output snippets for this ExecPlan and PR summary.
 
 ## Validation and Acceptance

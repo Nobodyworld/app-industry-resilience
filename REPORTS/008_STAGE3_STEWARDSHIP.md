@@ -13,8 +13,8 @@
 - Delivered `scripts/diagnostics_bundle.py` and a `make diagnostics` target for one-shot incident bundles combining health, digest, events, and snapshot metadata. 【F:scripts/diagnostics_bundle.py†L1-L146】【F:Makefile†L1-L158】
 
 ## Documentation Updates
-- Refreshed README, API, architecture, and observability guides to cover the new events endpoint, snapshot metrics, and diagnostics workflow. 【F:README.md†L137-L171】【F:docs/API_HEADLESS.md†L170-L216】【F:docs/ARCHITECTURE_OVERVIEW.md†L34-L108】【F:docs/OBSERVABILITY_SNAPSHOTS.md†L17-L60】
-- Updated EXTENSION_GUIDE.md and AUTOMATION.md with guidance on the snapshot monitor extension and diagnostics bundle usage. 【F:EXTENSION_GUIDE.md†L56-L60】【F:AUTOMATION.md†L52-L57】
+- Refreshed README, API, architecture, and observability guides to cover the new events endpoint, snapshot metrics, and diagnostics workflow. 【F:README.md†L137-L171】【F:docs/API_HEADLESS.md†L170-L216】【F:docs/handbook/ARCHITECTURE_OVERVIEW.md†L34-L108】【F:docs/OBSERVABILITY_SNAPSHOTS.md†L17-L60】
+- Updated EXTENSION_GUIDE.md and AUTOMATION.md with guidance on the snapshot monitor extension and diagnostics bundle usage. 【F:docs/handbook/EXTENSION_GUIDE.md†L56-L60】【F:docs/handbook/AUTOMATION.md†L52-L57】
 
 ## Remaining Follow-Ups
 - Monitor downstream automation for the new `/observability/events` contract and ensure external clients upgrade stubs if they rely on FastAPI tooling. (P2)

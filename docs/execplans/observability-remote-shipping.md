@@ -69,8 +69,8 @@ Remote replication requires a new configuration surface (environment variables),
    - README quickstart: mention remote snapshot shipping env variables.
    - `docs/OBSERVABILITY_SNAPSHOTS.md`: add section describing S3 backend, configuration steps, CLI interactions, verification tips.
    - `EXTENSION_GUIDE.md` instrumentation extension section referencing replicator.
-   - `AUTOMATION.md`: update guidance for agents/operators.
-   - `CHANGELOG.md`, `RELEASE_NOTES.md`, `STATUS.md`, `STEWARDS_REPORT.md` (observability metrics/risks), `docs/ARCHITECTURE_OVERVIEW.md` if necessary, and `AUTOMATION_ROLES.md`/`REPORTS` if they reference snapshot operations.
+   - `docs/handbook/AUTOMATION.md`: update guidance for agents/operators.
+   - `CHANGELOG.md`, `docs/handbook/RELEASE_NOTES.md`, `docs/handbook/STATUS.md`, `docs/handbook/STEWARDS_REPORT.md` (observability metrics/risks), `docs/handbook/ARCHITECTURE_OVERVIEW.md` if necessary, and `docs/handbook/AUTOMATION_ROLES.md`/`REPORTS` if they reference snapshot operations.
    - Provide sample `.env` snippet maybe? ensure `Makefile` unaffected but mention new env in docs.
 
 5. Tooling & validation:

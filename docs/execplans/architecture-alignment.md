@@ -11,7 +11,7 @@ The Idiot Index app currently spreads orchestration logic across the Streamlit e
 After implementation a contributor should be able to:
 
 - Import a single service from `src.application` to run the Idiot Index computation for any data source without touching Streamlit or agent modules.
-- Observe that both `app.py` and `agents/idiot_index.py` delegate to that service while focusing on presentation- or schema-specific responsibilities.
+- Observe that both `app.py` and `src/agents/idiot_index.py` delegate to that service while focusing on presentation- or schema-specific responsibilities.
 - Run the test suite to validate behaviour, including new unit tests covering the application layer.
 
 ## Progress
@@ -41,10 +41,10 @@ After implementation a contributor should be able to:
 The repository already documents a layered architecture (`core`, `adapters`, `infrastructure`, `interfaces`, `agents`), but orchestration logic that should live in an "application" layer is duplicated:
 
 - `app.py` contains functions to fetch BEA/Census/sample data, normalise, compute metrics, and derive UI state. It imports adapters and core utilities directly, blurring presentation and orchestration concerns.
-- `agents/idiot_index.py` reimplements similar fetching, normalisation, and filtering logic for headless usage. It depends on adapters and core modules in parallel to the UI, increasing maintenance cost.
+- `src/agents/idiot_index.py` reimplements similar fetching, normalisation, and filtering logic for headless usage. It depends on adapters and core modules in parallel to the UI, increasing maintenance cost.
 - There is no shared interface for data retrieval; dependency direction flows from UI/agents directly to adapters and infrastructure.
 
-The goal is to introduce `src/application/` to host orchestrators that sit between domain logic (`src/core`) and external surfaces (`app.py`, `agents/`). This aligns with Clean Architecture by keeping the UI and automation layers thin and directing all use cases through clearly defined interfaces. New tests should target this application layer to guarantee behaviour without exercising Streamlit.
+The goal is to introduce `src/application/` to host orchestrators that sit between domain logic (`src/core`) and external surfaces (`app.py`, `src/agents/`). This aligns with Clean Architecture by keeping the UI and automation layers thin and directing all use cases through clearly defined interfaces. New tests should target this application layer to guarantee behaviour without exercising Streamlit.
 
 ## Plan of Work
 
@@ -55,10 +55,10 @@ The goal is to introduce `src/application/` to host orchestrators that sit betwe
    - Pure functions `evaluate_idiot_index` (or similar) that accept sanitised parameters plus optional dependency injection hooks for data fetchers and sample loader. The function should rely on core utilities (`load_config`, `SecurityUtils`, `compute_metrics`, `normalize_columns`, `format_for_display`) and capture logging hooks by delegating to infrastructure functions passed as callables to avoid hard dependencies.
    - Helper functions (e.g., `_load_dataset`, `_filter_frame`, `_build_leaderboard`) kept private to maintain clarity and ensure reusability in tests.
 3. **Unit tests for the application layer.** Add `tests/test_application.py` (or similar) to exercise the service in isolation using pandas fixtures and stub fetchers. Validate behaviour for sample datasets, search filtering, leaderboard trimming, and metadata propagation. Ensure tests assert dependency injection behaviour (e.g., custom fetcher invoked, search sanitised).
-4. **Refactor agents to consume the service.** Update `agents/idiot_index.py` to import `DataSource` and the new service. Replace duplicated fetch/filter/metric logic with calls to the application layer, adapting the returned `IdiotIndexSummary` into existing agent dataclasses (`IndustrySnapshot`, `IdiotIndexResponse`). Ensure metadata mapping (notes, averages) remains intact. Retain dataclass metadata for schema generation.
+4. **Refactor agents to consume the service.** Update `src/agents/idiot_index.py` to import `DataSource` and the new service. Replace duplicated fetch/filter/metric logic with calls to the application layer, adapting the returned `IdiotIndexSummary` into existing agent dataclasses (`IndustrySnapshot`, `IdiotIndexResponse`). Ensure metadata mapping (notes, averages) remains intact. Retain dataclass metadata for schema generation.
 5. **Refactor Streamlit entrypoint.** Update `app.py` to use the new service for BEA/Census/Sample paths. Remove redundant helper functions (`try_fetch_*`, etc.) where they become thin wrappers. Ensure UI-specific logic (Session State management, download preparation, charts) stays within Streamlit layer, while data acquisition/metrics rely on the shared service. Confirm file upload handling still performs security checks before handing data to the service (the service may receive a pre-loaded dataframe for uploads).
 6. **Fix existing layering blemishes.** Address syntax issues uncovered during review, notably the missing module docstring opening quotes in `src/interfaces/streamlit/bootstrap.py` and missing `json` import/docstring in `src/core/cache.py`. Verify other compatibility shims remain intact.
-7. **Documentation alignment.** If necessary, update `ARCHITECTURE.md` and/or `README.md` to mention the new application layer and how UI/agents depend on it.
+7. **Documentation alignment.** If necessary, update `docs/handbook/ARCHITECTURE.md` and/or `README.md` to mention the new application layer and how UI/agents depend on it.
 8. **Validation.** Run `make check` to execute linting, tests, and type checks. Capture relevant excerpts for documentation.
 
 ## Concrete Steps
@@ -69,7 +69,7 @@ The goal is to introduce `src/application/` to host orchestrators that sit betwe
    - Search filtering and leaderboard trimming.
    - Propagation of metadata and benchmark calculation.
    - Dependency injection (custom fetcher for BEA/Census raising when API keys absent).
-3. Update `agents/idiot_index.py` to reuse the new service. Remove duplicate `_load_dataset` and `_filter_dataset` helpers, mapping service results into agent responses. Ensure exported API remains unchanged for callers.
+3. Update `src/agents/idiot_index.py` to reuse the new service. Remove duplicate `_load_dataset` and `_filter_dataset` helpers, mapping service results into agent responses. Ensure exported API remains unchanged for callers.
 4. Refactor `app.py` to construct a `DataSource` enum based on sidebar selection and delegate to the service. For uploaded CSVs, normalise columns and pass the dataframe to a helper that invokes the service with a "custom" dataset path (e.g., new service function to accept existing dataframe). Keep UI state, downloads, and charts unchanged otherwise.
 5. Correct layering blemishes: add the missing opening triple quotes to `src/interfaces/streamlit/bootstrap.py` and import `json` at the top of `src/core/cache.py`, adding a module docstring clarifying intent.
 6. Update architecture documentation if needed to mention the new application layer.
@@ -84,7 +84,7 @@ The goal is to introduce `src/application/` to host orchestrators that sit betwe
 ## Idempotence and Recovery
 
 - New modules and tests are additive; rerunning the steps is safe.
-- Refactors should maintain backwards-compatible imports. If regressions appear, revert the commits touching `app.py` or `agents/idiot_index.py` while leaving the new application layer in place for incremental adoption.
+- Refactors should maintain backwards-compatible imports. If regressions appear, revert the commits touching `app.py` or `src/agents/idiot_index.py` while leaving the new application layer in place for incremental adoption.
 
 ## Artifacts and Notes
 

@@ -9,8 +9,8 @@ on Streamlit UI components.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import List, Sequence
 
 from src.application import DataSource, NormalizationOptions, evaluate_idiot_index
 from src.application.idiot_index_service import IndustryMetrics, LoggerHooks
@@ -88,7 +88,7 @@ class IdiotIndexResponse:
         default=None,
         metadata={"description": "Average Idiot Index across the filtered dataset."},
     )
-    top_industries: List[IndustrySnapshot] = field(
+    top_industries: list[IndustrySnapshot] = field(
         default_factory=list,
         metadata={"description": "Leaderboard of industries sorted by Idiot Index."},
     )
@@ -102,7 +102,9 @@ class IdiotIndexResponse:
     )
     health_risk_band: str | None = field(
         default=None,
-        metadata={"description": "Risk band label for the filtered dataset (excellent/healthy/watch/critical)."},
+        metadata={
+            "description": "Risk band label for the filtered dataset (excellent/healthy/watch/critical)."
+        },
     )
 
 
@@ -136,9 +138,7 @@ def compute_idiot_index_summary(payload: IdiotIndexRequest) -> IdiotIndexRespons
         top_n=payload.top_n,
         logger_hooks=LoggerHooks(
             log_performance=log_performance,
-            log_data_processing=lambda operation, count: log_data_processing(
-                operation, count
-            ),
+            log_data_processing=lambda operation, count: log_data_processing(operation, count),
         ),
         normalization_options=AGENT_NORMALIZATION,
     )
@@ -166,4 +166,3 @@ __all__ = [
 AGENT_NORMALIZATION = NormalizationOptions(
     dtype_overrides=dict(load_config().normalization_dtype_overrides)
 )
-

@@ -42,9 +42,9 @@ Cross-cutting concerns such as logging configuration and rate limiting. Logging 
 
 UI presentation components. The Streamlit implementation lives in `src/interfaces/streamlit/`, exposing sidebar orchestration (`bootstrap.py`), layout helpers (`components.py`), and download preparation/state utilities (`helpers.py`). Compatibility wrappers continue to exist under `src/ui/` so legacy imports remain valid.
 
-### Agents (`agents/`)
+### Agents (`src/agents/`)
 
-Agent-ready surfaces defined with dataclasses and lightweight schema metadata in `agents/idiot_index.py`. Tools are registered via `agents/toolkit.py`, which builds JSON Schema definitions so automation platforms can validate payloads before execution.
+Agent-ready surfaces defined with dataclasses and lightweight schema metadata in `src/agents/idiot_index.py`. Tools are registered via `src/agents/toolkit.py`, which builds JSON Schema definitions so automation platforms can validate payloads before execution.
 
 ### Entry Point (`app.py`)
 

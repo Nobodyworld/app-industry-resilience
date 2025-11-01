@@ -221,7 +221,7 @@ See [docs/API_HEADLESS.md](docs/API_HEADLESS.md) for payload schemas and sample 
 
 ## Architecture
 
-The project is organised into dedicated layers (`core`, `adapters`, `application`, `infrastructure`, `interfaces`, and `agents`) to keep domain logic decoupled from presentation and automation surfaces.
+The project is organised into dedicated layers (`core`, `adapters`, `application`, `infrastructure`, `interfaces`, and `src/agents`) to keep domain logic decoupled from presentation and automation surfaces.
 
 ```
 Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + metrics)
@@ -229,14 +229,14 @@ Data sources (BEA, Census, CSV) ──▶ adapters ──▶ core (normalize + m
                                               └──▶ application (orchestrate Idiot Index use cases)
                                                         │
                                                         ├──▶ interfaces/streamlit (app.py)
-                                                        └──▶ agents (toolkit + schemas)
+                                                        └──▶ src/agents (toolkit + schemas)
 ```
 
 ### Observability & Extensions
 
 - The headless API is instrumented with `src/interfaces/api/telemetry`, exposing Prometheus metrics at `/metrics`, `/observability/status`, the richer `/observability/digest`, and the snapshot catalogue endpoints under `/observability/snapshots` for historical exports.
 - Streamlit's dashboard includes an Observability tab that visualises stored snapshots (event totals, error trends, and last-error payloads). Snapshots persist under `build/observability_snapshots` by default and respect the `OBSERVABILITY_SNAPSHOT_DIR` environment variable. Retention and auto-capture cadence are controlled via `OBSERVABILITY_SNAPSHOT_RETENTION_COUNT`, `OBSERVABILITY_SNAPSHOT_RETENTION_DAYS`, and `OBSERVABILITY_SNAPSHOT_MIN_INTERVAL_SECONDS`.
-- Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [EXTENSION_GUIDE.md](EXTENSION_GUIDE.md) for scaffolding and testing guidance. The built-in `data_quality` instrumentation extension demonstrates how to subscribe to dataset/scenario profile events, emit gauges, and contribute health checks, while the `snapshot_replication` package wires both S3 and debug replication extensions together with a metrics/health observer that tracks the `observability.snapshot.replication` events emitted by `snapshot_persistence` on startup/shutdown and whenever instrumentation emits `warn`/`error` events. Retention and auto-capture cadence remain governed by the `OBSERVABILITY_SNAPSHOT_RETENTION_*` knobs.
+- Reusable analytics live under `src/extensions` and are orchestrated by `ExtensionManager`. Modules declared in `extensions/manifest.json` load automatically; refer to [docs/handbook/EXTENSION_GUIDE.md](docs/handbook/EXTENSION_GUIDE.md) for scaffolding and testing guidance. The built-in `data_quality` instrumentation extension demonstrates how to subscribe to dataset/scenario profile events, emit gauges, and contribute health checks, while the `snapshot_replication` package wires both S3 and debug replication extensions together with a metrics/health observer that tracks the `observability.snapshot.replication` events emitted by `snapshot_persistence` on startup/shutdown and whenever instrumentation emits `warn`/`error` events. Retention and auto-capture cadence remain governed by the `OBSERVABILITY_SNAPSHOT_RETENTION_*` knobs.
 - Connector extensions share the same lifecycle: `ConnectorRegistry` (see `src/extensions/connectors.py`) catalogues data/automation integrations, publishes health/metrics through the observability registry, and surfaces them via `/meta/connectors`, `make connectors-catalog`, and the Streamlit sidebar. The built-in catalog ships entries for the bundled sample CSV, BEA API, and Census ASM sources; custom connectors can be shipped as extensions without modifying core services.
 
 Each layer exposes public APIs via `__init__.py` shims so imports stay stable. The flow when a user opens the dashboard looks like this:
@@ -246,7 +246,7 @@ Each layer exposes public APIs via `__init__.py` shims so imports stay stable. T
 3. **Normalise & compute** – `src.core.normalize` standardises column names before `src.core.metrics.compute_metrics` derives Idiot Index, value-added %, and related measures.
 4. **Application orchestration** – `src.application` bundles dataset loading, normalisation, metric computation, and leaderboard derivation into testable services (`IdiotIndexService` and the convenience `evaluate_idiot_index`) that power both UI and automation flows. The service accepts injected fetchers/config so other entrypoints can reuse the pipeline without touching Streamlit internals.
 5. **Render narrative** – Streamlit components under `src.interfaces.streamlit` build the hero header, signal cards, tables, charts, and deep-dive story, exposing the same helpers used by automated tests.
-6. **Share or automate** – downloads are prepared through `src.interfaces.streamlit.helpers`, while the agent toolkit (`agents/`) reuses the application services for headless clients. See [ARCHITECTURE.md](ARCHITECTURE.md) for an expanded breakdown of each module and data contract.
+6. **Share or automate** – downloads are prepared through `src.interfaces.streamlit.helpers`, while the agent toolkit (`src/agents/`) reuses the application services for headless clients. See [docs/handbook/ARCHITECTURE.md](docs/handbook/ARCHITECTURE.md) for an expanded breakdown of each module and data contract.
 
 ### Typical workflows
 
@@ -256,10 +256,11 @@ Each layer exposes public APIs via `__init__.py` shims so imports stay stable. T
 
 Deeper context lives in the `/docs` directory:
 
-- [Architecture overview](docs/ARCHITECTURE_OVERVIEW.md) summarises system boundaries, caching flows, and fault domains.
+- [Architecture overview](docs/handbook/ARCHITECTURE_OVERVIEW.md) summarises system boundaries, caching flows, and fault domains.
 - [API reference](docs/API_REFERENCE.md) enumerates service entrypoints, adapter helpers, and expected responses.
 - [Data refresh workflow](docs/WORKFLOWS_DATA_REFRESH.md) guides rotating API keys, syncing assets, and validating new datasets.
 - [Dependency register](docs/DEPENDENCIES.md) tracks runtime and tooling libraries with license and review cadence notes.
+- Handbook-style governance and release guides (plan, status, report, automation, release notes, security, support) live under `docs/handbook/` to keep the repository root focused on entrypoints and metadata.
 
 ### Key metrics
 
@@ -271,12 +272,12 @@ The `src/core.metrics` module documents the calculations in depth, while the age
 
 ## Agent integrations
 
-Automated clients can call the Idiot Index pipeline through the agent toolkit under `agents/`. The primary tool, `compute_idiot_index_summary`, exposes validated dataclass payloads and JSON schemas for integration. See [docs/AI_INTERFACE.md](docs/AI_INTERFACE.md) for invocation details and schema definitions.
+Automated clients can call the Idiot Index pipeline through the agent toolkit under `src/agents/`. The primary tool, `compute_idiot_index_summary`, exposes validated dataclass payloads and JSON schemas for integration. See [docs/AI_INTERFACE.md](docs/AI_INTERFACE.md) for invocation details and schema definitions.
 
 ## Programmatic usage example
 
 ```python
-from agents import IdiotIndexRequest, compute_idiot_index_summary
+from src.agents import IdiotIndexRequest, compute_idiot_index_summary
 
 payload = IdiotIndexRequest(year=2022, source="sample", top_n=3)
 result = compute_idiot_index_summary(payload)
@@ -361,7 +362,7 @@ At minimum, provide: `industry_code`, `industry_name`, `year`, and either:
 - **Slow dashboard** – enable caching via `.env` (`CACHE_ENABLED=true`) to persist API responses between sessions.
 - **Excel downloads missing** – install `xlsxwriter` (already included in `requirements.txt`) or rely on CSV/JSON outputs if the optional dependency is unavailable.
 
-For architecture deep dives, see [ARCHITECTURE.md](ARCHITECTURE.md). For agent schemas and JSON examples, see [docs/AI_INTERFACE.md](docs/AI_INTERFACE.md).
+For architecture deep dives, see [docs/handbook/ARCHITECTURE.md](docs/handbook/ARCHITECTURE.md). For agent schemas and JSON examples, see [docs/AI_INTERFACE.md](docs/AI_INTERFACE.md).
 
 ## Export
 
@@ -632,3 +633,18 @@ Log entries include:
 You asked for a no‑nonsense tool to interrogate cost structure by industry. This gives you the lever:
 pull fresh official stats, compute the ratio, and then challenge the assumptions.
 
+
+## Repository layout
+
+The repository follows a layered structure with lightweight indexes in each directory:
+
+- [`src/`](src/README.md) – application code organised by adapters, core domain logic, infrastructure, interfaces, and agent wrappers.
+- [`tests/`](tests/README.md) – pytest suites mirroring the source layout with coverage for analytics, observability, and agent tooling.
+- [`scripts/`](scripts/README.md) – developer and operator automation including quality gates, observability utilities, and scaffolding helpers.
+- [`docs/`](docs/README.md) – long-form documentation, execution plans, and handbook references.
+- [`extensions/`](extensions/README.md) – manifest-driven plugin catalog used by the ExtensionManager.
+- [`data/`](data/README.md) – offline sample dataset powering the demo and regression tests.
+- [`assets/`](assets/README.md) – lightweight imagery and UI assets referenced by Streamlit components and docs.
+- [`REPORTS/`](REPORTS/README.md) – archived stewardship and phase reports linked from the handbook and exec plans.
+
+Refer to [`SPEC.md`](SPEC.md) for the canonical requirements snapshot and [`STYLE-GUIDE.md`](STYLE-GUIDE.md) for coding conventions.
