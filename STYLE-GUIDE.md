@@ -1,6 +1,6 @@
 # Global Style Guide
 
-Last Updated: November 1, 2025
+Last Updated: October 31, 2025
 
 This document is a concise, drop-in style and process guide for any repository in this organization. It emphasizes reliability, maintainability, reproducibility, and security. Use this as a baseline and tailor via ADRs where justified.
 
