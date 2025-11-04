@@ -1,3 +1,5 @@
+"""Tests for application services including Idiot Index evaluation and scenario planning."""
+
 from __future__ import annotations
 
 import pandas as pd

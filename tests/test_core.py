@@ -1,3 +1,5 @@
+"""Tests for core domain logic including configuration, metrics, normalization, and utilities."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

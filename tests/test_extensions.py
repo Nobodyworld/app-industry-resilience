@@ -1,3 +1,5 @@
+"""Tests for extension system including summary, scenario, and instrumentation extensions."""
+
 from __future__ import annotations
 
 import json

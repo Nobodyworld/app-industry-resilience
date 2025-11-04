@@ -1,3 +1,5 @@
+"""Tests for headless API endpoints including evaluation, scenario planning, and health checks."""
+
 from __future__ import annotations
 
 import json

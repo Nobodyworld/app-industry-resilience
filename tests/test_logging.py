@@ -1,3 +1,5 @@
+"""Tests for logging configuration and structured output formatting."""
+
 from __future__ import annotations
 
 import io

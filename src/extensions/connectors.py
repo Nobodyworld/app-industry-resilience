@@ -60,9 +60,11 @@ class ConnectorRegistry:
 
     @property
     def connectors(self) -> Mapping[str, ConnectorRegistration]:
+        """Get a read-only view of all registered connectors."""
         return dict(self._connectors)
 
     def register(self, registration: ConnectorRegistration) -> None:
+        """Register a new connector with validation and metrics refresh."""
         identifier = registration.identifier.strip()
         if not identifier:
             raise ValueError("Connector identifier must not be empty.")
@@ -72,6 +74,7 @@ class ConnectorRegistry:
         self._refresh_metrics()
 
     def attach_observability(self, registry: ObservabilityRegistry) -> None:
+        """Attach observability hooks for connector metrics and health checks."""
         if self._observability is registry:
             return
         self._observability = registry
@@ -82,6 +85,7 @@ class ConnectorRegistry:
         )
 
         def _catalog_health() -> HealthComponent:
+            """Generate health component for the entire connector catalog."""
             components = tuple(self._connector_health_components())
             status: HealthStatus = "pass"
             if any(component.status == "fail" for component in components):
@@ -103,6 +107,7 @@ class ConnectorRegistry:
         self._refresh_metrics()
 
     def summary(self, *, include_health: bool = False) -> dict[str, Any]:
+        """Generate a summary of all registered connectors with optional health status."""
         connectors = []
         health_map: dict[str, Mapping[str, Any] | None] = {}
         if include_health:
@@ -136,6 +141,7 @@ class ConnectorRegistry:
         }
 
     def _refresh_metrics(self) -> None:
+        """Update observability metrics to reflect current connector registrations."""
         if self._gauge is None:
             return
         counts = Counter(reg.kind for reg in self._connectors.values())
@@ -147,6 +153,7 @@ class ConnectorRegistry:
                 self._gauge.set(0.0, labels={"kind": kind})
 
     def _connector_health_components(self) -> Sequence[HealthComponent]:
+        """Generate health components for all registered connectors."""
         components: list[HealthComponent] = []
         for registration in self._connectors.values():
             name = self._health_component_name(registration)
@@ -177,6 +184,7 @@ class ConnectorRegistry:
 
     @staticmethod
     def _health_component_name(registration: ConnectorRegistration) -> str:
+        """Generate a standardized health component name for a connector."""
         return f"connector:{registration.identifier}"
 
 

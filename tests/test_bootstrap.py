@@ -1,3 +1,5 @@
+"""Tests for Streamlit bootstrap utilities and configuration loading."""
+
 import pytest
 
 import src.interfaces.streamlit.bootstrap as bootstrap_module

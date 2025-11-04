@@ -1,3 +1,14 @@
+"""Census ASM adapter responsible for fetching and normalising external datasets.
+
+This module orchestrates requests to the Census Bureau's Annual Survey of Manufactures (ASM)
+endpoint. It validates caller inputs, fetches manufacturing statistics including shipments,
+cost of materials, and value added, and caches the result for reuse across requests.
+
+Public helpers raise :class:`RuntimeError` when invalid inputs are supplied or
+when Census data cannot be retrieved. All network access is wrapped in
+``safe_get_json`` to ensure retries and consistent error reporting.
+"""
+
 from __future__ import annotations
 
 import pandas as pd
@@ -13,6 +24,7 @@ from ..core import (
 )
 from ..infrastructure import api_limiter
 
+
 ASM_BASE = "https://api.census.gov/data/2021/asm"
 
 
@@ -22,6 +34,24 @@ def fetch_asm_manufacturing(
     *,
     normalization: NormalizationOptions | None = None,
 ) -> pd.DataFrame:
+    """Fetch manufacturing statistics for a specific year.
+
+    Retrieves shipments (gross output), cost of materials, and value added
+    from the Census Annual Survey of Manufactures for the specified year.
+
+    Args:
+        api_key: Census API key provided by the caller.
+        year: Year to retrieve manufacturing data for.
+        normalization: Optional normalization options to override column aliases
+            or pandas dtypes.
+
+    Returns:
+        Pandas DataFrame containing Census ASM data with normalized columns.
+
+    Raises:
+        RuntimeError: If the API key or year are invalid, or if the Census API
+            cannot be reached successfully after retries.
+    """
     config = load_config()
     key_result = SecurityUtils.validate_api_key(api_key, "Census")
     if not key_result.ok:

@@ -59,24 +59,29 @@ class ExtensionManager:
     _connectors_initialised: bool = field(default=False, init=False, repr=False)
 
     def register_summary_extension(self, extension: SummaryExtension) -> None:
+        """Register a summary extension for enriching Idiot Index results."""
         self.logger.debug("Registering summary extension", extra={"extension": extension.name})
         self.summary_extensions.append(extension)
 
     def register_scenario_extension(self, extension: ScenarioExtension) -> None:
+        """Register a scenario extension for enriching scenario planning results."""
         self.logger.debug("Registering scenario extension", extra={"extension": extension.name})
         self.scenario_extensions.append(extension)
 
     def register_instrumentation_extension(self, extension: InstrumentationExtension) -> None:
+        """Register an instrumentation extension for observability hooks."""
         self.logger.debug(
             "Registering instrumentation extension", extra={"extension": extension.name}
         )
         self.instrumentation_extensions.append(extension)
 
     def register_replication_extension(self, extension: ReplicationExtension) -> None:
+        """Register a replication extension for snapshot storage backends."""
         self.logger.debug("Registering replication extension", extra={"extension": extension.name})
         self.replication_extensions.append(extension)
 
     def register_connector_extension(self, extension: ConnectorExtension) -> None:
+        """Register a connector extension for data source integrations."""
         self.logger.debug("Registering connector extension", extra={"extension": extension.name})
         self.connector_extensions.append(extension)
 
@@ -103,6 +108,7 @@ class ExtensionManager:
         extension: object,
         kind: Literal["summary", "scenario", "instrumentation", "replication", "connector"],
     ) -> ExtensionDescriptor:
+        """Generate extension descriptor from an extension instance."""
         name = getattr(extension, "name", extension.__class__.__name__)
         module = extension.__class__.__module__
         raw_doc = inspect.getdoc(extension) or inspect.getdoc(extension.__class__)
@@ -110,6 +116,7 @@ class ExtensionManager:
         return ExtensionDescriptor(name=name, kind=kind, module=module, description=description)
 
     def apply_summary_extensions(self, summary) -> ExtensionContributions:
+        """Apply all registered summary extensions to enrich Idiot Index results."""
         notes: list[str] = []
         metadata: dict[str, object] = {}
         for extension in self.summary_extensions:
@@ -127,6 +134,7 @@ class ExtensionManager:
         return ExtensionContributions(notes=tuple(notes), metadata=metadata)
 
     def apply_scenario_extensions(self, result) -> ExtensionContributions:
+        """Apply all registered scenario extensions to enrich scenario results."""
         notes: list[str] = []
         metadata: dict[str, object] = {}
         for extension in self.scenario_extensions:
@@ -146,6 +154,7 @@ class ExtensionManager:
     def apply_instrumentation_extensions(
         self, registry: ObservabilityRegistry
     ) -> None:  # pragma: no cover - thin orchestrator
+        """Apply all registered instrumentation extensions to the observability registry."""
         self.initialise_connectors()
         for extension in self.instrumentation_extensions:
             applied = self._instrumentation_registry_cache.setdefault(extension.name, set())
@@ -164,6 +173,7 @@ class ExtensionManager:
         registry.attach_connector_registry(self.connector_registry)
 
     def initialise_connectors(self) -> None:
+        """Initialize all registered connector extensions."""
         if self._connectors_initialised:
             return
         for extension in self.connector_extensions:
@@ -178,6 +188,7 @@ class ExtensionManager:
         self._connectors_initialised = True
 
     def connector_catalog(self) -> list[dict[str, object]]:
+        """Return the connector catalog with health status."""
         self.initialise_connectors()
         summary = self.connector_registry.summary(include_health=True)
         items = cast("list[dict[str, object]]", summary["items"])
@@ -204,6 +215,7 @@ class ExtensionManager:
 
 
 def _parse_manifest(path: Path) -> list[str]:
+    """Parse extension modules from the manifest JSON file."""
     if not path.exists():
         return []
     try:
@@ -216,6 +228,7 @@ def _parse_manifest(path: Path) -> list[str]:
 
 
 def _modules_from_env() -> list[str]:
+    """Parse extension modules from the environment variable."""
     raw = os.getenv(ENV_VAR, "").strip()
     if not raw:
         return []
@@ -223,6 +236,7 @@ def _modules_from_env() -> list[str]:
 
 
 def discover_extension_modules() -> list[str]:
+    """Discover extension modules from manifest and environment."""
     modules = _parse_manifest(MANIFEST_PATH)
     modules.extend(_modules_from_env())
     return modules
@@ -231,6 +245,7 @@ def discover_extension_modules() -> list[str]:
 def load_extensions(
     manager: ExtensionManager, modules: Sequence[str] | None = None
 ) -> ExtensionManager:
+    """Load and register extension modules with the manager."""
     resolved_modules = list(modules) if modules is not None else discover_extension_modules()
     for module_path in resolved_modules:
         try:
@@ -264,6 +279,7 @@ _MANAGER_SINGLETON: ExtensionManager | None = None
 
 
 def get_extension_manager() -> ExtensionManager:
+    """Get the singleton extension manager instance."""
     global _MANAGER_SINGLETON
     if _MANAGER_SINGLETON is None:
         manager = ExtensionManager()

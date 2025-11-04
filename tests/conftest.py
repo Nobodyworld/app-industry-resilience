@@ -1,3 +1,5 @@
+"""Pytest configuration and shared fixtures for the Idiot Index test suite."""
+
 from __future__ import annotations
 
 import sys
