@@ -1,4 +1,4 @@
-"""Tests for logging configuration and structured output formatting."""
+"""Tests for logging configuration and utilities."""
 
 from __future__ import annotations
 
@@ -8,13 +8,14 @@ import logging
 from collections import namedtuple
 from dataclasses import dataclass
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
 from src.infrastructure import logging_config
 
 
-def _configure_json_logger(**formatter_kwargs: object) -> tuple[io.StringIO, logging.Handler]:
+def _configure_json_logger(**formatter_kwargs) -> tuple[io.StringIO, logging.Handler]:
     logging_config.logger = logging_config.setup_logging(structured=True, log_file=None)
     buffer = io.StringIO()
     handler = logging.StreamHandler(buffer)
@@ -23,7 +24,7 @@ def _configure_json_logger(**formatter_kwargs: object) -> tuple[io.StringIO, log
     return buffer, handler
 
 
-def _configure_text_logger(**formatter_kwargs: object) -> tuple[io.StringIO, logging.Handler]:
+def _configure_text_logger(**formatter_kwargs) -> tuple[io.StringIO, logging.Handler]:
     logging_config.logger = logging_config.setup_logging(structured=False, log_file=None)
     buffer = io.StringIO()
     handler = logging.StreamHandler(buffer)
@@ -153,7 +154,7 @@ def test_redactor_handles_non_string_keys() -> None:
         "details": {"password": "unsafe"},
     }
     try:
-        logging_config.log_api_call("TestService", "endpoint", payload)
+        logging_config.log_api_call("TestService", "endpoint", cast(dict[str, object], payload))
     finally:
         logging_config.logger.removeHandler(handler)
 

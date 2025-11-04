@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import pandas as pd
@@ -144,7 +145,7 @@ for warning in bootstrap_state.warnings:
     st.sidebar.warning(warning)
 
 with st.sidebar.expander("Configuration summary", expanded=False):
-    config_summary = get_config_summary(APP_CONFIG)
+    config_summary = cast(dict[str, Any], get_config_summary(APP_CONFIG))
     handler_summary = SecurityUtils.rate_limit_handler_summary()
     config_summary.setdefault("rate_limit_backend", {})["handler"] = handler_summary
     st.json(config_summary)
@@ -390,7 +391,7 @@ with industries_tab:
         placeholder="Start typing to focus the table…",
         key="search_query",
     )
-    sanitized = SecurityUtils.sanitize_string_input(search_value.strip())
+    sanitized = SecurityUtils.sanitize_string_input(search_value.strip() if search_value else "")
     df_view = df_display.copy()
     if sanitized:
         query_lower = sanitized.lower()
@@ -671,7 +672,7 @@ if adjustment_active:
     scenario_table = build_scenario_comparison_table(
         scenario_result, focus_codes=focus_codes or None
     )
-    top_deltas = scenario_summary["top"].copy()
+    top_deltas = cast(pd.DataFrame, scenario_summary["top"]).copy()
     chart_source = scenario_result.deltas
     if focus_codes:
         chart_source = chart_source[chart_source["industry_code"].isin(focus_codes)]
@@ -704,13 +705,15 @@ download_artifacts = prepare_download_artifacts(
 )
 render_download_panel(download_artifacts)
 
-share_mapping = encode_query_params(
-    focus="true" if focus_mode else "false",
-    search=current_query_raw or None,
-    industry=selected_code if selected_code else None,
-    compare=comparison_selection if comparison_selection else None,
-    year=str(year_clean) if year_clean is not None else None,
-    mode=data_mode_slug,
+share_mapping: dict[str, list[str]] = dict(
+    encode_query_params(
+        focus="true" if focus_mode else "false",
+        search=current_query_raw or None,
+        industry=selected_code if selected_code else None,
+        compare=comparison_selection if comparison_selection else None,
+        year=str(year_clean) if year_clean is not None else None,
+        mode=data_mode_slug,
+    )
 )
 
 

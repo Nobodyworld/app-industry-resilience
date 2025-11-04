@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Any, Sequence
 
 try:  # pragma: no cover - import side effect for script execution
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 except ModuleNotFoundError:  # pragma: no cover - execution fallback
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 
 from src.core.config import get_config_summary, load_config
 from src.extensions.manager import get_extension_manager
@@ -143,3 +143,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
+

@@ -22,7 +22,7 @@ from src.core import AppConfig, Cache, CacheConfig, Environment, RateLimitConfig
 def test_fetch_bea(mock_get_json, _cache) -> None:
     """Gross output and intermediate inputs are merged with metadata."""
 
-    health_response = {"BEAAPI": {"Results": {"Data": []}}}
+    health_response: dict = {"BEAAPI": {"Results": {"Data": []}}}
     go_response = {
         "BEAAPI": {
             "Results": {
@@ -73,7 +73,7 @@ def test_fetch_bea_multi_year_caches(mock_get_json, tmp_path) -> None:
     def fake_cache(_config):
         return cache
 
-    health_response = {"BEAAPI": {"Results": {"Data": []}}}
+    health_response: dict = {"BEAAPI": {"Results": {"Data": []}}}
 
     def build_response(year: int, value: str) -> dict:
         return {
@@ -134,7 +134,7 @@ def test_ensure_years_rejects_invalid_values() -> None:
     """Non-numeric year inputs are rejected early."""
 
     with pytest.raises(BEAClientError) as excinfo:
-        _ensure_years(["2020", "twenty"])
+        _ensure_years(["2020", "twenty"])  # type: ignore
     assert "Invalid BEA year value" in str(excinfo.value)
 
 

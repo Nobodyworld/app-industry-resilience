@@ -80,7 +80,7 @@ def test_extension_failures_are_logged_and_ignored(sample_summary: IdiotIndexSum
     class BrokenExtension:
         name = "broken"
 
-        def contribute(self, summary):  # type: ignore[override]
+        def contribute(self, summary):
             raise RuntimeError("boom")
 
     manager = load_extensions(
@@ -200,10 +200,10 @@ def test_snapshot_persistence_extension_persists_and_prunes(tmp_path, monkeypatc
             self.calls: list[Path] = []
             self.closed = False
 
-        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+        def replicate(self, snapshot, path) -> None:
             self.calls.append(path)
 
-        def close(self) -> None:  # type: ignore[no-untyped-def]
+        def close(self) -> None:
             self.closed = True
 
     stub_replicator = StubReplicator()

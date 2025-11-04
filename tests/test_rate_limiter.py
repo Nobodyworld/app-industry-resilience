@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from typing import Any
 
 import pytest
 
@@ -16,7 +17,7 @@ from src.infrastructure.rate_limiter import (
 )
 
 try:  # pragma: no cover - exercised in environments with fakeredis
-    import fakeredis  # type: ignore[import-untyped]
+    import fakeredis
 except ModuleNotFoundError:  # pragma: no cover - runtime fallback exercised in CI
     fakeredis = None
 
@@ -57,7 +58,7 @@ class StubRedis:
 
 
 @pytest.fixture
-def redis_client() -> object:
+def redis_client() -> Any:
     if fakeredis is not None:
         client = fakeredis.FakeRedis()
         client.flushall()
@@ -66,15 +67,15 @@ def redis_client() -> object:
 
 
 @pytest.fixture(autouse=True)
-def reset_rate_limiter_state() -> None:
+def reset_rate_limiter_state() -> Generator[None]:
     """Ensure singleton state does not leak between tests."""
 
-    previous_handler = SecurityUtils._rate_limit_handler  # type: ignore[attr-defined]
-    previous_backend = SecurityUtils._rate_limit_backend  # type: ignore[attr-defined]
+    previous_handler = SecurityUtils._rate_limit_handler
+    previous_backend = SecurityUtils._rate_limit_backend
     yield
     _reset_for_tests()
-    SecurityUtils._rate_limit_handler = previous_handler  # type: ignore[attr-defined]
-    SecurityUtils._rate_limit_backend = previous_backend  # type: ignore[attr-defined]
+    SecurityUtils._rate_limit_handler = previous_handler
+    SecurityUtils._rate_limit_backend = previous_backend
 
 
 def test_in_memory_service_blocks_after_consuming_tokens() -> None:
@@ -91,7 +92,7 @@ def test_in_memory_service_blocks_after_consuming_tokens() -> None:
     assert third.retry_after_seconds is not None
 
 
-def test_redis_backend_shares_tokens_across_services(redis_client: object) -> None:
+def test_redis_backend_shares_tokens_across_services(redis_client: Any) -> None:
     backend = RedisTokenBucket(
         client=redis_client,
         key_prefix="idiot-index-test",
@@ -147,7 +148,7 @@ def test_token_bucket_wait_blocks_until_available(monkeypatch: pytest.MonkeyPatc
 
 def test_redis_backend_reports_fallback_when_errors() -> None:
     client = StubRedis()
-    backend = RedisTokenBucket(client=client, key_prefix="idiot-index-test", ttl_seconds=60)
+    backend = RedisTokenBucket(client=client, key_prefix="idiot-index-test", ttl_seconds=60)  # type: ignore[arg-type]
     rule = RateLimitRule.per_window(1, 60, scope="api:test")
 
     assert backend.acquire("key", rule).allowed is True

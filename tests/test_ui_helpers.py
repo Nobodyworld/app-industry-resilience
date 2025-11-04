@@ -70,9 +70,9 @@ def test_build_comparison_table_and_trend() -> None:
 def test_calculate_benchmark_returns_deltas() -> None:
     frame = _sample_frame()
     stats = calculate_benchmark(frame, "111")
-    assert stats["idiot_index_avg"] > 0
+    assert stats["idiot_index_avg"] is not None and stats["idiot_index_avg"] > 0
     assert stats["idiot_index_delta"] is not None
-    assert stats["resilience_score_avg"] > 0
+    assert stats["resilience_score_avg"] is not None and stats["resilience_score_avg"] > 0
     assert stats["materials_dependency_ratio_delta"] is not None
     assert stats["shock_sensitivity_index_delta"] is not None
 
@@ -92,7 +92,7 @@ def test_scenario_helpers_produce_comparison_tables() -> None:
 
     summary = summarise_scenario_deltas(result, top_n=1)
     assert "baseline" in summary and "delta" in summary
-    assert not summary["top"].empty
+    assert not summary["top"].empty  # type: ignore[attr-defined]
 
     comparison_table = build_scenario_comparison_table(result, focus_codes=["111"])
     assert "idiot_index_delta" in comparison_table.columns

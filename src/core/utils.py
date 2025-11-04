@@ -8,7 +8,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-import requests  # type: ignore[import-untyped]
+import requests
 
 
 class HTTPRequestError(RuntimeError):

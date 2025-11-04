@@ -24,7 +24,6 @@ from ..core import (
 )
 from ..infrastructure import api_limiter
 
-
 ASM_BASE = "https://api.census.gov/data/2021/asm"
 
 

@@ -32,7 +32,8 @@ def test_load_config_from_mapping(tmp_path) -> None:
     summary = get_config_summary(config)
     assert summary["bea_key_set"] is True
     snapshot_summary = summary["observability_snapshot"]
-    assert snapshot_summary["dir"].endswith("build/observability_snapshots")
+    expected_suffix = str(Path("build/observability_snapshots"))
+    assert snapshot_summary["dir"].endswith(expected_suffix)
     assert snapshot_summary["retention_count"] == 20
     assert snapshot_summary["retention_days"] == 30
     assert snapshot_summary["min_interval_seconds"] == 600.0

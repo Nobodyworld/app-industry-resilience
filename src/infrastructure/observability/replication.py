@@ -39,8 +39,9 @@ try:  # pragma: no cover - optional dependency
     from google.cloud import storage as gcs_storage
 
     _HAS_GCS = True
+    _GoogleAPIError: type[BaseException] = GoogleAPIError
 except Exception:  # pragma: no cover - gcs optional
-    GoogleAPIError = Exception
+    _GoogleAPIError = Exception
     gcs_storage = None
     _HAS_GCS = False
 
@@ -162,7 +163,7 @@ class GCSnapshotReplicator:
                     content_type="application/json",
                     timeout=self.timeout_seconds,
                 )
-            except (GoogleAPIError, OSError, AttributeError) as exc:
+            except (_GoogleAPIError, OSError, AttributeError) as exc:
                 last_error = exc
                 log_extra = {
                     "bucket": self.bucket,

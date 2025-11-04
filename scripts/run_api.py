@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 try:
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 except ModuleNotFoundError:  # pragma: no cover - allow `python scripts/run_api.py`
     import sys
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 
 import argparse
 import os
@@ -52,7 +52,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         daemon_threads = True
 
     with make_server(args.host, args.port, app, server_class=_ThreadingWSGIServer) as server:
-        host, port = server.server_address
+        server_address = server.server_address
+        if isinstance(server_address, tuple) and len(server_address) >= 2:
+            host, port = server_address[0], server_address[1]
+        else:
+            host, port = "localhost", args.port
+        # Ensure host and port are strings
+        host = host.decode() if isinstance(host, bytes) else str(host)
+        port = port if isinstance(port, int) else int(port)
         if host in {"0.0.0.0", "::"}:
             try:
                 host = socket.gethostbyname(socket.gethostname())
@@ -69,3 +76,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
+

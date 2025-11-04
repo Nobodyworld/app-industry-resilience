@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 import pytest
@@ -19,7 +20,7 @@ client = TestClient(app)
 def _sample_records(limit: int = 5) -> list[dict[str, object]]:
     data_path = Path("data") / "sample_industries.csv"
     frame = pd.read_csv(data_path).head(limit)
-    return json.loads(frame.to_json(orient="records"))
+    return cast(list[dict[str, object]], json.loads(frame.to_json(orient="records")))
 
 
 def test_health_endpoint_reports_ok() -> None:
@@ -239,7 +240,7 @@ def test_scenario_endpoint_returns_delta_metrics() -> None:
 
 
 def test_scenario_rejects_empty_dataset() -> None:
-    scenario_payload = {
+    scenario_payload: dict[str, list] = {
         "base_records": [],
         "adjustments": [],
     }

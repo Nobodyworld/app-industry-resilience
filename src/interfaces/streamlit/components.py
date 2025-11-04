@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TypeAlias, cast
+from typing import cast
 
 import pandas as pd
 
@@ -730,4 +730,4 @@ def build_data_story(
     return " ".join(story_parts)
 
 
-MetricValue: TypeAlias = int | float | str | None
+type MetricValue = int | float | str | None

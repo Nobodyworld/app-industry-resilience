@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 try:
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 except ModuleNotFoundError:  # pragma: no cover - allow direct execution
     import sys
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 
 import argparse
 import logging
@@ -91,3 +91,4 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
+

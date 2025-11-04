@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 try:
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 except ModuleNotFoundError:  # pragma: no cover - allow direct execution
     import sys
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # type: ignore  # noqa: F401
+    from scripts import _bootstrap  # noqa: F401
 
 import argparse
 import json
@@ -77,11 +77,12 @@ def main() -> None:
     )
 
     payload = _summary_to_dict(summary)
-    json_kwargs = {"ensure_ascii": False}
     if args.pretty:
-        json_kwargs["indent"] = 2
-    print(json.dumps(payload, **json_kwargs))
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        print(json.dumps(payload, ensure_ascii=False))
 
 
 if __name__ == "__main__":
     main()
+

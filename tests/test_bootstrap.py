@@ -1,5 +1,7 @@
 """Tests for Streamlit bootstrap utilities and configuration loading."""
 
+from collections.abc import Generator
+
 import pytest
 
 import src.interfaces.streamlit.bootstrap as bootstrap_module
@@ -8,7 +10,7 @@ from src.interfaces.streamlit.bootstrap import BootstrapError
 
 
 @pytest.fixture(autouse=True)
-def clear_bootstrap_cache() -> None:
+def clear_bootstrap_cache() -> Generator[None]:
     reset_bootstrap_state()
     yield
     reset_bootstrap_state()
