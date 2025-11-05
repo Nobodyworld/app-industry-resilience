@@ -41,6 +41,7 @@ try:  # pragma: no cover - optional dependency
     _HAS_GCS = True
     _GoogleAPIError: type[BaseException] = GoogleAPIError
 except Exception:  # pragma: no cover - gcs optional
+    GoogleAPIError = Exception
     _GoogleAPIError = Exception
     gcs_storage = None
     _HAS_GCS = False

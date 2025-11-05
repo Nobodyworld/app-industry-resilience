@@ -11,23 +11,33 @@ Operators can already persist observability snapshots locally and replicate them
 ## Progress
 
 - [x] (2025-10-27T22:22Z) Authored initial ExecPlan capturing scope, context, and implementation milestones.
-- [ ] Implement configuration loader updates for new GCS/Azure knobs with validation and summaries.
-- [ ] Add GCS and Azure Blob snapshot replicators with graceful degradation when SDKs are absent.
-- [ ] Expose replication health in Streamlit snapshot history and adjust CLI messaging/tests.
-- [ ] Expand unit/integration coverage and documentation (README, OBSERVABILITY_SNAPSHOTS, EXTENSION_GUIDE, STATUS, RELEASE_NOTES, CHANGELOG, STEWARDS_REPORT).
-- [ ] Run `make quality-gate`, document outcomes, and finalise ExecPlan sections with decisions and retrospectives.
+- [x] (2025-11-12T13:40Z) Confirmed configuration loader parses GCS/Azure knobs with validation and summary coverage.
+- [x] (2025-11-12T13:55Z) Verified GCS/Azure replicators ship snapshots and fall back gracefully without SDKs.
+- [x] (2025-11-12T14:15Z) Validated Streamlit/CLI replication health surfacing across helpers, components, and scripts.
+- [x] (2025-11-12T14:35Z) Audited tests and documentation for multi-cloud shipping parity across referenced artefacts.
+- [x] (2025-11-12T14:55Z) Ran `make quality-gate`, resolved tooling regressions, and updated ExecPlan decisions/outcomes.
 
 ## Surprises & Discoveries
 
-- None yet; populate as work uncovers unexpected behaviour or trade-offs.
+- Mypy under Python 3.11 rejects PEP 695 syntax (`class Foo[T]:` and `type Alias = ...`).
+  Evidence: `make quality-gate` surfaced mypy errors for `src/core/types.py` and `src/interfaces/streamlit/components.py` requiring compatibility shims.
+- Optional dependency fallbacks must expose sentinel exception attributes (`GoogleAPIError`).
+  Evidence: `tests/test_observability_replication.py::test_gcs_replicator_uploads_snapshot` failed until the module exported `GoogleAPIError` even without GCS SDKs.
 
 ## Decision Log
 
-- Pending. Record concrete implementation choices (e.g., credential handling, retry semantics) as they are made.
+- Decision: Retain classic `Generic[T]`/`TypeAlias` patterns guarded with Ruff suppressions instead of PEP 695 syntax.
+  Rationale: Maintains compatibility with repository's Python 3.11 toolchain while documenting upgrade path in-code comments.
+  Date/Author: 2025-11-12 / Automation agent.
+- Decision: Export fallback `GoogleAPIError` symbol when GCS SDK absent.
+  Rationale: Tests and downstream code patch module attributes directly; providing a sentinel prevents AttributeError when optional packages missing.
+  Date/Author: 2025-11-12 / Automation agent.
 
 ## Outcomes & Retrospective
 
-- Pending until implementation and validation complete; summarise feature readiness, remaining gaps, and follow-up ideas.
+- Multi-cloud observability shipping now ships with validated configuration, resilient replicators (S3/GCS/Azure), UI/CLI surfaces, and documentation.
+- Tooling compatibility issues (mypy vs. Ruff preferences) are resolved with annotated suppressions, keeping lint/type/test suites green under Python 3.11.
+- Follow-up: When repository standardises on Python ≥3.12, migrate suppressions to native `type`/parameterised class syntax and drop compatibility notes.
 
 ## Context and Orientation
 

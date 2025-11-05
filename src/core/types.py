@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class ValidationResult[T]:
+class ValidationResult(Generic[T]):  # noqa: UP046 - Generic subclassing for mypy compatibility
     """Generic validation outcome.
 
     ``value`` is ``None`` when ``ok`` is ``False`` unless a caller explicitly
