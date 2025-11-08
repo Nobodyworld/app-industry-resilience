@@ -73,8 +73,8 @@ coverage:
 	@if python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('pytest_cov') else 1)" >/dev/null 2>&1; then \
 		pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=$(COVERAGE_THRESHOLD); \
 	else \
-		echo 'pytest-cov not installed; using trace-based coverage fallback'; \
-		$(PYTHON) scripts/run_tests_with_trace.py --threshold=$(COVERAGE_THRESHOLD); \
+	@echo 'pytest-cov not installed; using trace-based coverage fallback'; \
+		$(PYTHON) src/scripts/run_tests_with_trace.py --threshold=$(COVERAGE_THRESHOLD); \
 	fi
 
 pre-commit:
@@ -82,7 +82,7 @@ pre-commit:
 	pre-commit run --all-files --show-diff-on-failure --color=always; \
 	else \
 	echo "pre-commit not found; running local quality checks"; \
-	${PYTHON} scripts/run_quality_checks.py; \
+	${PYTHON} src/scripts/run_quality_checks.py; \
 	fi
 
 quality-gate:
@@ -93,7 +93,7 @@ quality-gate:
 		pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=$(COVERAGE_THRESHOLD); \
 	else \
 		echo 'pytest-cov not installed; using trace-based coverage fallback'; \
-		$(PYTHON) scripts/run_tests_with_trace.py --threshold=$(COVERAGE_THRESHOLD); \
+		$(PYTHON) src/scripts/run_tests_with_trace.py --threshold=$(COVERAGE_THRESHOLD); \
 	fi
 	$(MAKE) security
 
@@ -106,8 +106,7 @@ security:
 	else \
 	echo 'pip-audit not installed; skipping vulnerability scan'; \
 	fi
-	@if command -v detect-secrets-hook >/dev/null 2>&1; then \
-	detect-secrets-hook --baseline .secrets.baseline; \
+	detect-secrets-hook --baseline config/.secrets.baseline; \
 	elif python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('detect_secrets') else 1)" >/dev/null 2>&1; then \
 	$(PYTHON) -m detect_secrets scan --all-files --json --output $(REPORT_DIR)/.detect-secrets.scan.json; \
 	echo 'detect-secrets baseline comparison requires manual review (hook binary unavailable).'; \
@@ -117,8 +116,8 @@ security:
 
 sbom:
 	@mkdir -p $(SBOM_DIR)
-	@if [ -x scripts/generate_sbom.py ]; then \
-	$(PYTHON) scripts/generate_sbom.py --output $(SBOM_FILE) $(SBOM_REQUIREMENTS); \
+	@if [ -x src/scripts/generate_sbom.py ]; then \
+	$(PYTHON) src/scripts/generate_sbom.py --output $(SBOM_FILE) $(SBOM_REQUIREMENTS); \
 	else \
 	echo 'generate_sbom.py missing or not executable'; \
 	fi
@@ -134,17 +133,17 @@ docs:
 	@echo "  docs/CONNECTORS.md"
 
 scenario:
-	${PYTHON} scripts/run_scenario.py ${ARGS}
+	${PYTHON} src/scripts/run_scenario.py ${ARGS}
 
 prefetch-cache:
-	${PYTHON} scripts/prefetch_data.py ${ARGS}
+	${PYTHON} src/scripts/prefetch_data.py ${ARGS}
 
 analytics:
-	${PYTHON} scripts/analytics_health.py ${ARGS}
+	${PYTHON} src/scripts/analytics_health.py ${ARGS}
 
 # agent-safe-task: produces observability metrics for agents and operators
 observability:
-	${PYTHON} scripts/observability_snapshot.py ${ARGS}
+	${PYTHON} src/scripts/observability_snapshot.py ${ARGS}
 
 # agent-safe-task: persists observability snapshots to disk
 observability-snapshot:
@@ -152,26 +151,26 @@ observability-snapshot:
 
 # agent-safe-task: streams observability events for incident response
 observability-tail:
-	${PYTHON} scripts/observability_tail.py ${ARGS}
+	${PYTHON} src/scripts/observability_tail.py ${ARGS}
 
 # agent-safe-task: captures health/digest/events/snapshot metadata in one bundle
 diagnostics:
-	${PYTHON} scripts/diagnostics_bundle.py ${ARGS}
+	${PYTHON} src/scripts/diagnostics_bundle.py ${ARGS}
 
 # agent-safe-task: inventories extension metadata for automation
 extensions-catalog:
-	${PYTHON} scripts/extensions_catalog.py ${ARGS}
+	${PYTHON} src/scripts/extensions_catalog.py ${ARGS}
 
 # agent-safe-task: inventories connector metadata for automation
 connectors-catalog:
-	${PYTHON} scripts/connectors_catalog.py ${ARGS}
+	${PYTHON} src/scripts/connectors_catalog.py ${ARGS}
 
 # agent-safe-task: generates stewardship metrics for automated audits
 audit:
-	${PYTHON} scripts/audit_metrics.py ${ARGS}
+	${PYTHON} src/scripts/audit_metrics.py ${ARGS}
 
 api:
-	${PYTHON} scripts/run_api.py ${ARGS}
+	${PYTHON} src/scripts/run_api.py ${ARGS}
 
 clean:
 	rm -rf .mypy_cache .pytest_cache .ruff_cache .coverage coverage.xml htmlcov node_modules

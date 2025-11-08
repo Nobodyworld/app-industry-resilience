@@ -3,12 +3,12 @@ repos:
     hooks:
       - id: check-trailing-whitespace
         name: Check trailing whitespace
-        entry: python scripts/check_trailing_whitespace.py
+        entry: python src/scripts/check_trailing_whitespace.py
         language: system
         files: "\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$"
       - id: ensure-eof-newline
         name: Ensure EOF newline
-        entry: python scripts/check_trailing_whitespace.py --check-eof
+        entry: python src/scripts/check_trailing_whitespace.py --check-eof
         language: system
         pass_filenames: true
         files: "\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$"
@@ -25,7 +25,7 @@ repos:
         types: [python]
       - id: codespell
         name: Codespell (offline)
-        entry: python scripts/codespell.py
+        entry: python src/scripts/codespell.py
         language: system
         files: "\.(py|md|markdown|txt|rst)$"
       - id: mypy
@@ -37,7 +37,7 @@ repos:
         require_serial: true
       - id: commitlint
         name: Conventional Commit lint
-        entry: python scripts/commitlint.py
+        entry: python src/scripts/commitlint.py
         language: system
         stages: [commit-msg]
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -51,4 +51,4 @@ repos:
       - id: detect-secrets
         args:
           - --baseline
-          - .secrets.baseline
+          - config/.secrets.baseline
