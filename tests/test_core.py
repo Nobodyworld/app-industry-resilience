@@ -220,14 +220,44 @@ def test_safe_get_json_emits_retry_events(monkeypatch) -> None:
     register_retry_observer(lambda event: None)
 
 
+@pytest.mark.parametrize("year", [2019, 2021, 2023])
 @patch("src.adapters.census_asm.get_api_cache", return_value=None)
 @patch("src.adapters.census_asm.safe_get_json")
-def test_fetch_census_manufacturing(mock_get_json, _cache):
+def test_fetch_census_manufacturing_uses_year_specific_endpoint(mock_get_json, _cache, year):
     mock_get_json.return_value = [
         ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"],
         ["311", "Food", "100", "60", "40"],
     ]
 
-    frame = fetch_asm_manufacturing("valid_api_key_12345", 2021)
+    frame = fetch_asm_manufacturing("valid_api_key_12345", year)
+
+    expected_url = f"https://api.census.gov/data/{year}/asm"
+    mock_get_json.assert_called_once()
+    call_args, call_kwargs = mock_get_json.call_args
+    assert call_args[0] == expected_url
+    assert call_kwargs["params"]["key"] == "valid_api_key_12345"
     assert frame.loc[0, "industry_code"] == "311"
     assert frame.loc[0, "gross_output"] == 100.0
+
+
+@patch("src.adapters.census_asm.get_api_cache", return_value=None)
+@patch("src.adapters.census_asm.safe_get_json")
+def test_fetch_census_manufacturing_honors_configured_endpoint_template(
+    mock_get_json, _cache, monkeypatch
+):
+    monkeypatch.setenv(
+        "CENSUS_ASM_ENDPOINT_TEMPLATE",
+        "https://alt.example.com/v{year}/asm?dataset=asm",
+    )
+    mock_get_json.return_value = [
+        ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"],
+        ["311", "Food", "100", "60", "40"],
+    ]
+
+    frame = fetch_asm_manufacturing("valid_api_key_12345", 2022)
+
+    expected_url = "https://alt.example.com/v2022/asm?dataset=asm"
+    mock_get_json.assert_called_once()
+    call_args, _ = mock_get_json.call_args
+    assert call_args[0] == expected_url
+    assert frame.loc[0, "industry_code"] == "311"

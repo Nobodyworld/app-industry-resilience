@@ -24,8 +24,6 @@ from ..core import (
 )
 from ..infrastructure import api_limiter
 
-ASM_BASE = "https://api.census.gov/data/2021/asm"
-
 
 def fetch_asm_manufacturing(
     api_key: str,
@@ -83,7 +81,14 @@ def fetch_asm_manufacturing(
 
     api_limiter.wait_for_api("census")
 
-    data = safe_get_json(ASM_BASE, params=params)
+    try:
+        asm_endpoint = config.census_asm_endpoint_template.format(year=year_result.value)
+    except KeyError as exc:  # pragma: no cover - guarded by config validation
+        raise RuntimeError(
+            "Census ASM endpoint template is misconfigured; expected '{year}' placeholder."
+        ) from exc
+
+    data = safe_get_json(asm_endpoint, params=params)
 
     if not isinstance(data, list) or len(data) < 2:
         raise RuntimeError("Census ASM API returned unexpected data format.")

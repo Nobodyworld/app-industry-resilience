@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import string
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from enum import Enum
@@ -17,6 +18,8 @@ from typing import Any
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
+
+DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE = "https://api.census.gov/data/{year}/asm"
 
 load_dotenv()
 
@@ -166,6 +169,7 @@ class AppConfig:
     census_api_key: str | None
     bea_api_version: str | None
     bea_api_base_urls: tuple[str, ...]
+    census_asm_endpoint_template: str
     rate_limits: RateLimitConfig
     cache: CacheConfig
     observability_snapshot_dir: Path
@@ -237,6 +241,12 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
         values.get("BEA_API_BASE_URLS", "https://apps.bea.gov/api/data"),
         "BEA_API_BASE_URLS",
     )
+    census_asm_endpoint_template_raw = values.get("CENSUS_ASM_ENDPOINT_TEMPLATE")
+    if census_asm_endpoint_template_raw is None:
+        census_asm_endpoint_template = DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE
+    else:
+        candidate = census_asm_endpoint_template_raw.strip()
+        census_asm_endpoint_template = candidate or DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE
 
     cache_dir = Path(values.get("CACHE_DIR", ".cache")).expanduser().resolve()
     snapshot_dir_raw = values.get("OBSERVABILITY_SNAPSHOT_DIR")
@@ -511,6 +521,7 @@ def load_config(env: Mapping[str, str] | None = None) -> AppConfig:
         census_api_key=census_api_key,
         bea_api_version=bea_api_version,
         bea_api_base_urls=bea_api_base_urls,
+        census_asm_endpoint_template=census_asm_endpoint_template,
         rate_limits=rate_limits,
         cache=CacheConfig(
             enabled=cache_enabled,
@@ -551,6 +562,18 @@ def validate_config(config: AppConfig) -> ConfigValidationResult:
             f"range {config.supported_years_census.start}-"
             f"{config.supported_years_census.stop - 1}."
         )
+
+    formatter = string.Formatter()
+    fields = {
+        field_name
+        for _, field_name, _, _ in formatter.parse(config.census_asm_endpoint_template)
+        if field_name
+    }
+    if "year" not in fields:
+        errors.append("CENSUS_ASM_ENDPOINT_TEMPLATE must include a '{year}' placeholder.")
+    extra_fields = fields - {"year"}
+    if extra_fields:
+        errors.append("CENSUS_ASM_ENDPOINT_TEMPLATE only supports the '{year}' placeholder.")
 
     if config.cache.api_ttl_seconds <= 0:
         errors.append("CACHE_TTL_API must be a positive integer of seconds.")
@@ -717,6 +740,7 @@ def get_config_summary(config: AppConfig | None = None) -> dict[str, object]:
         "max_csv_size_mb": config.max_csv_size_mb,
         "supported_years_bea": _range_to_tuple(config.supported_years_bea),
         "supported_years_census": _range_to_tuple(config.supported_years_census),
+        "census_asm_endpoint_template": config.census_asm_endpoint_template,
         "bea_key_set": bool(config.bea_api_key),
         "census_key_set": bool(config.census_api_key),
         "bea_api_version": config.bea_api_version or "default",
