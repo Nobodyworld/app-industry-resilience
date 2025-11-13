@@ -24,7 +24,13 @@ from ..core import (
 )
 from ..infrastructure import api_limiter
 
-ASM_BASE_TEMPLATE = "https://api.census.gov/data/{year}/asm"
+ASM_ENDPOINT_TEMPLATE = "https://api.census.gov/data/{year}/asm"
+
+
+def _build_census_asm_endpoint(year: int) -> str:
+    """Return the Census ASM endpoint for a validated year."""
+
+    return ASM_ENDPOINT_TEMPLATE.format(year=year)
 
 
 def fetch_asm_manufacturing(
@@ -83,7 +89,7 @@ def fetch_asm_manufacturing(
 
     api_limiter.wait_for_api("census")
 
-    asm_endpoint = ASM_BASE_TEMPLATE.format(year=year_result.value)
+    asm_endpoint = _build_census_asm_endpoint(year_result.value)
 
     data = safe_get_json(asm_endpoint, params=params)
 

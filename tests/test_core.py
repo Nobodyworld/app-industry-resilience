@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -218,6 +219,38 @@ def test_safe_get_json_emits_retry_events(monkeypatch) -> None:
     assert events[-1] == "success"
 
     register_retry_observer(lambda event: None)
+
+
+def test_fetch_asm_manufacturing_uses_year_specific_endpoint() -> None:
+    """Ensure the Census ASM adapter calls the year-specific endpoint."""
+
+    config = SimpleNamespace(supported_years_census=range(2010, 2030), cache=None)
+
+    responses = [
+        [
+            ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"],
+            ["311", "Food", "100", "60", "40"],
+        ],
+        [
+            ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"],
+            ["312", "Beverages", "200", "120", "80"],
+        ],
+    ]
+
+    with (
+        patch("src.adapters.census_asm.load_config", return_value=config),
+        patch("src.adapters.census_asm.api_limiter.wait_for_api"),
+        patch("src.adapters.census_asm.get_api_cache", return_value=None),
+        patch("src.adapters.census_asm.safe_get_json", side_effect=responses) as mock_get,
+    ):
+        years = [2020, 2023]
+        for year in years:
+            frame = fetch_asm_manufacturing("valid_api_key_12345", year)
+            assert frame["year"].iloc[0] == year
+
+    called_urls = [call.args[0] for call in mock_get.call_args_list]
+    expected_urls = [f"https://api.census.gov/data/{year}/asm" for year in years]
+    assert called_urls == expected_urls
 
 
 @patch("src.adapters.census_asm.get_api_cache", return_value=None)
