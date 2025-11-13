@@ -24,6 +24,8 @@ from ..core import (
 )
 from ..infrastructure import api_limiter
 
+ASM_BASE_TEMPLATE = "https://api.census.gov/data/{year}/asm"
+
 
 def fetch_asm_manufacturing(
     api_key: str,
