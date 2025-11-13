@@ -88,8 +88,14 @@ def fetch_asm_manufacturing(
     }
 
     api_limiter.wait_for_api("census")
-
+# TODO - fix duplication if exists
     asm_endpoint = _build_census_asm_endpoint(year_result.value)
+    try:
+        asm_endpoint = config.census_asm_endpoint_template.format(year=year_result.value)
+    except KeyError as exc:  # pragma: no cover - guarded by config validation
+        raise RuntimeError(
+            "Census ASM endpoint template is misconfigured; expected '{year}' placeholder."
+        ) from exc
 
     data = safe_get_json(asm_endpoint, params=params)
 

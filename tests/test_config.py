@@ -29,6 +29,7 @@ def test_load_config_from_mapping(tmp_path) -> None:
     assert config.cache.base_dir == tmp_path.resolve()
     assert config.observability_snapshot_dir == Path("build/observability_snapshots").resolve()
     assert config.default_year == 2020
+    assert config.census_asm_endpoint_template == "https://api.census.gov/data/{year}/asm"
     summary = get_config_summary(config)
     assert summary["bea_key_set"] is True
     snapshot_summary = summary["observability_snapshot"]
@@ -42,6 +43,13 @@ def test_load_config_from_mapping(tmp_path) -> None:
 def test_load_config_invalid_environment() -> None:
     with pytest.raises(ConfigError):
         load_config({"ENVIRONMENT": "unknown"})
+
+
+def test_load_config_allows_custom_census_template() -> None:
+    template = "https://example.com/asm/{year}?variant=beta"
+    config = load_config({"CENSUS_ASM_ENDPOINT_TEMPLATE": template})
+
+    assert config.census_asm_endpoint_template == template
 
 
 def test_validate_config_warnings_for_missing_keys(monkeypatch) -> None:
@@ -61,6 +69,23 @@ def test_validate_config_rejects_snapshot_file(tmp_path: Path) -> None:
     result = validate_config(config)
 
     assert any("OBSERVABILITY_SNAPSHOT_DIR" in error for error in result.errors)
+
+
+def test_validate_config_rejects_census_template_without_year() -> None:
+    config = load_config({"CENSUS_ASM_ENDPOINT_TEMPLATE": "https://example.com/static"})
+
+    result = validate_config(config)
+
+    assert any("CENSUS_ASM_ENDPOINT_TEMPLATE" in error for error in result.errors)
+
+
+def test_validate_config_rejects_census_template_with_extra_placeholders() -> None:
+    config = load_config({"CENSUS_ASM_ENDPOINT_TEMPLATE": "https://example.com/{region}/{year}"})
+
+    result = validate_config(config)
+
+    errors = "\n".join(result.errors)
+    assert "only supports" in errors and "{year}" in errors
 
 
 def test_validate_config_rejects_negative_snapshot_settings() -> None:
