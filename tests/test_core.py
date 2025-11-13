@@ -223,11 +223,21 @@ def test_safe_get_json_emits_retry_events(monkeypatch) -> None:
 @patch("src.adapters.census_asm.get_api_cache", return_value=None)
 @patch("src.adapters.census_asm.safe_get_json")
 def test_fetch_census_manufacturing(mock_get_json, _cache):
-    mock_get_json.return_value = [
+    sample_payload = [
         ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"],
         ["311", "Food", "100", "60", "40"],
     ]
 
-    frame = fetch_asm_manufacturing("valid_api_key_12345", 2021)
-    assert frame.loc[0, "industry_code"] == "311"
-    assert frame.loc[0, "gross_output"] == 100.0
+    for year in (2020, 2023):
+        mock_get_json.reset_mock()
+        mock_get_json.return_value = sample_payload
+
+        frame = fetch_asm_manufacturing("valid_api_key_12345", year)
+
+        called_args, called_kwargs = mock_get_json.call_args
+        assert called_args[0] == f"https://api.census.gov/data/{year}/asm"
+        assert called_kwargs["params"]["key"] == "valid_api_key_12345"
+
+        assert frame.loc[0, "industry_code"] == "311"
+        assert frame.loc[0, "gross_output"] == 100.0
+        assert frame.loc[0, "year"] == year

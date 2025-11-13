@@ -24,7 +24,7 @@ from ..core import (
 )
 from ..infrastructure import api_limiter
 
-ASM_BASE = "https://api.census.gov/data/2021/asm"
+ASM_BASE_TEMPLATE = "https://api.census.gov/data/{year}/asm"
 
 
 def fetch_asm_manufacturing(
@@ -83,7 +83,9 @@ def fetch_asm_manufacturing(
 
     api_limiter.wait_for_api("census")
 
-    data = safe_get_json(ASM_BASE, params=params)
+    asm_endpoint = ASM_BASE_TEMPLATE.format(year=year_result.value)
+
+    data = safe_get_json(asm_endpoint, params=params)
 
     if not isinstance(data, list) or len(data) < 2:
         raise RuntimeError("Census ASM API returned unexpected data format.")
