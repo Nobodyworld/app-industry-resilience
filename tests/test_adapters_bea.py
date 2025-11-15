@@ -15,6 +15,7 @@ from src.adapters.bea import (
     select_bea_endpoint,
 )
 from src.core import AppConfig, Cache, CacheConfig, Environment, RateLimitConfig
+from src.core.config import DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE
 
 
 @patch("src.adapters.bea.get_api_cache", return_value=None)
@@ -158,6 +159,7 @@ def test_select_bea_endpoint_success(mock_get_json, tmp_path: Path) -> None:
         census_api_key=None,
         bea_api_version=None,
         bea_api_base_urls=("https://apps.bea.gov/api/data", "https://fallback"),
+        census_asm_endpoint_template=DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE,
         rate_limits=RateLimitConfig(bea=10, census=10, default=5),
         cache=CacheConfig(
             enabled=False,

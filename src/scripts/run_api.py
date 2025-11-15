@@ -14,9 +14,8 @@ except ModuleNotFoundError:  # pragma: no cover - allow `python scripts/run_api.
 import argparse
 import os
 import socket
+from collections.abc import Sequence
 from socketserver import ThreadingMixIn
-from typing import Sequence
-
 from wsgiref.simple_server import WSGIServer, make_server
 
 from src.interfaces.api.app import app
@@ -76,4 +75,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

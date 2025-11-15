@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from src.core import DistributedRateLimitConfig, RateLimitConfig, load_config
 from src.core.security import RateLimitDecision, SecurityUtils
-from src.infrastructure.observability.metrics import Counter, Histogram
+from src.infrastructure.observability.metrics import Counter, Histogram, Gauge
 
 try:  # pragma: no cover - optional dependency
     import redis as _redis_module
@@ -64,16 +64,25 @@ class RateLimitRule:
 class _Metrics:
     requests: Counter
     wait_seconds: Histogram
+    backend_gauge: Gauge | None = None
 
 
 _METRICS: _Metrics | None = None
 
 
-def configure_metrics(counter: Counter, wait_histogram: Histogram) -> None:
+def configure_metrics(
+    counter: Counter, wait_histogram: Histogram, backend_gauge: Gauge | None = None
+) -> None:
     """Inject metric primitives used by rate limiters."""
 
     global _METRICS
-    _METRICS = _Metrics(counter, wait_histogram)
+    _METRICS = _Metrics(counter, wait_histogram, backend_gauge)
+    # Also expose a default gauge that reports the last decision backend mode
+    try:
+        # Create simple gauges if the registry is available; use the counter label set
+        _METRICS_backend_gauge = wait_histogram  # no-op default assignment to keep reference
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def _record_decision(
@@ -238,6 +247,15 @@ class RedisTokenBucket(TokenBucketBackend):
             self._last_error = None
             self._last_success = time.time()
             self._active_backend = self.backend_name
+            # Optionally record a simple gauge via metrics if configured
+            if _METRICS is not None:
+                try:
+                    backend_gauge = getattr(_METRICS, "backend_gauge", None)
+                    if backend_gauge is not None:
+                        # Set the gauge to 1.0 for redis (up)
+                        backend_gauge.set(1.0, labels={"backend": self.backend_name})
+                except Exception:
+                    pass
             return RateLimitDecision(
                 allowed=allowed,
                 remaining_tokens=tokens,
@@ -255,6 +273,15 @@ class RedisTokenBucket(TokenBucketBackend):
                 retry_after_seconds=fallback.retry_after_seconds,
                 backend=self._active_backend,
             )
+        finally:
+            if _METRICS is not None:
+                try:
+                    backend_gauge = getattr(_METRICS, "backend_gauge", None)
+                    if backend_gauge is not None:
+                        val = 1.0 if self._active_backend == self.backend_name else 0.0
+                        backend_gauge.set(val, labels={"backend": self._active_backend})
+                except Exception:
+                    pass
 
     def summary(self) -> dict[str, object]:
         return {

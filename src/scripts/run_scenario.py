@@ -14,9 +14,9 @@ except ModuleNotFoundError:  # pragma: no cover - allow CLI execution
 
 import argparse
 import json
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import pandas as pd
 
@@ -120,10 +120,34 @@ def main(argv: Sequence[str] | None = None) -> int:
     scenario_summary = result.scenario_summary
 
     print("Scenario summary")
-    print(format_metric("Gross output total", baseline_summary.gross_output_total, scenario_summary.gross_output_total))
-    print(format_metric("Materials cost total", baseline_summary.materials_cost_total, scenario_summary.materials_cost_total))
-    print(format_metric("Value added total", baseline_summary.value_added_total, scenario_summary.value_added_total))
-    print(format_metric("Average idiot index", baseline_summary.idiot_index_avg, scenario_summary.idiot_index_avg))
+    print(
+        format_metric(
+            "Gross output total",
+            baseline_summary.gross_output_total,
+            scenario_summary.gross_output_total,
+        )
+    )
+    print(
+        format_metric(
+            "Materials cost total",
+            baseline_summary.materials_cost_total,
+            scenario_summary.materials_cost_total,
+        )
+    )
+    print(
+        format_metric(
+            "Value added total",
+            baseline_summary.value_added_total,
+            scenario_summary.value_added_total,
+        )
+    )
+    print(
+        format_metric(
+            "Average idiot index",
+            baseline_summary.idiot_index_avg,
+            scenario_summary.idiot_index_avg,
+        )
+    )
     print(
         format_metric(
             "Average resilience score",
@@ -158,4 +182,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

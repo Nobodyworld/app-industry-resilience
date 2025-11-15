@@ -71,9 +71,7 @@ def scaffold_extension(
     extra_imports: list[str] = []
     if include_connector:
         extra_imports.append("from src.extensions.connectors import ConnectorRegistration")
-        extra_imports.append(
-            "from src.infrastructure.observability.health import HealthComponent"
-        )
+        extra_imports.append("from src.infrastructure.observability.health import HealthComponent")
 
     lines: list[str] = [
         '"""Generated extension scaffold."""',
@@ -139,7 +137,7 @@ def scaffold_extension(
                 "        def _record(event) -> None:",
                 '            counter.increment(labels={"status": event.status})',
                 "",
-                "        registry.subscribe(\"service.idiot_index.evaluate\", _record)",
+                '        registry.subscribe("service.idiot_index.evaluate", _record)',
                 "        # TODO-P3(2h): Register additional observability hooks or health checks.",
             ]
         )
@@ -153,8 +151,8 @@ def scaffold_extension(
                 '    """TODO-P2(2h): Implement connector health validation."""',
                 "    return HealthComponent(",
                 f'        name="connector:{safe_name}",',
-                "        status=\"warn\",",
-                "        summary=\"Connector health check not implemented\",",
+                '        status="warn",',
+                '        summary="Connector health check not implemented",',
                 "    )",
                 "",
                 "",
@@ -168,11 +166,11 @@ def scaffold_extension(
                 "            ConnectorRegistration(",
                 f'                identifier="{safe_name}",',
                 f"                name=\"{safe_name.replace('_', ' ').title()} Connector\",",
-                "                kind=\"data_source\",",
-                "                version=\"0.1.0\",",
-                "                description=\"TODO-P2(2h): Describe connector purpose.\",",
-                "                tags=(\"experimental\",),",
-                "                capabilities=(\"read\",),",
+                '                kind="data_source",',
+                '                version="0.1.0",',
+                '                description="TODO-P2(2h): Describe connector purpose.",',
+                '                tags=("experimental",),',
+                '                capabilities=("read",),',
                 "                metadata={},",
                 "                health_check=_connector_health,",
                 "            )",
@@ -252,4 +250,3 @@ def main() -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

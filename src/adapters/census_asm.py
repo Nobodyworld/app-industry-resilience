@@ -75,7 +75,11 @@ def fetch_asm_manufacturing(
 
     options = normalization or NormalizationOptions()
     cache = get_api_cache(config.cache) if not options.dtype_overrides else None
-    cache_key = f"census_asm_{year_result.value}"
+    # Guard the inferred value from ValidationResult; mypy will otherwise
+    # treat ``year_result.value`` as possibly None. We validated ``year_result``
+    # above (by checking ``ok``) so it's safe to coerce to ``int`` here.
+    year_value: int = int(year_result.value)  # type: ignore[arg-type]
+    cache_key = f"census_asm_{year_value}"
     if cache:
         cached_result = cache.get(cache_key)
         if cached_result is not None:
@@ -88,14 +92,20 @@ def fetch_asm_manufacturing(
     }
 
     api_limiter.wait_for_api("census")
-# TODO - fix duplication if exists
-    asm_endpoint = _build_census_asm_endpoint(year_result.value)
-    try:
-        asm_endpoint = config.census_asm_endpoint_template.format(year=year_result.value)
-    except KeyError as exc:  # pragma: no cover - guarded by config validation
-        raise RuntimeError(
-            "Census ASM endpoint template is misconfigured; expected '{year}' placeholder."
-        ) from exc
+    # TODO - fix duplication if exists
+    asm_endpoint = _build_census_asm_endpoint(year_value)
+    # Support older test fixtures which may supply a minimal config object
+    # (e.g. SimpleNamespace) that lacks the `census_asm_endpoint_template`.
+    # Use getattr so an AttributeError does not surface and fallback to the
+    # standard endpoint template instead.
+    candidate_template = getattr(config, "census_asm_endpoint_template", None)
+    if candidate_template:
+        try:
+            asm_endpoint = candidate_template.format(year=year_value)
+        except KeyError as exc:  # pragma: no cover - guarded by config validation
+            raise RuntimeError(
+                "Census ASM endpoint template is misconfigured; expected '{year}' placeholder."
+            ) from exc
 
     data = safe_get_json(asm_endpoint, params=params)
 

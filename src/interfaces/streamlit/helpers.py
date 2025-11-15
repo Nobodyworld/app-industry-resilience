@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,6 +14,7 @@ import pandas as pd
 
 from src.application.scenario_planner import ScenarioResult
 from src.core import HealthSummary
+from src.core.metrics import MetricConfig, compute_metrics
 from src.infrastructure.observability.storage import (
     ObservabilitySnapshot,
     SnapshotStorage,
@@ -104,6 +106,9 @@ def build_comparison_table(
 ) -> pd.DataFrame:
     """Return metrics for ``selected_codes`` suitable for side-by-side display."""
 
+    # Ensure dataframe contains derived metrics required by the UI helpers.
+    df = _ensure_metrics(df)
+
     if not selected_codes:
         return pd.DataFrame(
             columns=[
@@ -138,6 +143,8 @@ def build_comparison_table(
 
 def calculate_benchmark(df: pd.DataFrame, industry_code: str | None) -> Mapping[str, float | None]:
     """Compute dataset benchmark values and optional industry deltas."""
+
+    df = _ensure_metrics(df)
 
     benchmark = {
         "idiot_index_avg": df["idiot_index"].mean(skipna=True),
@@ -257,6 +264,8 @@ def prepare_trend_data(
 ) -> pd.DataFrame:
     """Return time-series data for the provided industry codes."""
 
+    df = _ensure_metrics(df)
+
     if not selected_codes:
         return pd.DataFrame(columns=["year", "industry_name", "idiot_index"])
 
@@ -289,8 +298,8 @@ def build_scenario_comparison_table(
 ) -> pd.DataFrame:
     """Return baseline vs scenario metrics with delta columns."""
 
-    baseline = result.baseline
-    scenario = result.scenario
+    baseline = _ensure_metrics(result.baseline)
+    scenario = _ensure_metrics(result.scenario)
 
     if focus_codes:
         baseline = baseline[baseline["industry_code"].isin(focus_codes)]
@@ -330,6 +339,30 @@ def build_scenario_comparison_table(
         rows.append(data)
 
     return pd.DataFrame(rows)
+
+
+def _ensure_metrics(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure the DataFrame has computed derived metrics.
+
+    If derived metric columns are missing, compute them using compute_metrics
+    with caching disabled to avoid external side effects.
+    """
+    required = {
+        "idiot_index",
+        "value_added_pct",
+        "materials_share_pct",
+        "resilience_score",
+        "materials_dependency_ratio",
+        "shock_sensitivity_index",
+    }
+    if not required.intersection(set(df.columns)):
+        # If df already has some derived columns we still prefer to compute
+        # only when none are present; compute_metrics will preserve base data.
+        logging.getLogger("idiot_index.helpers").info(
+            "Auto-computing derived metrics for DataFrame passed into UI helper"
+        )
+        return compute_metrics(df.copy(), config=MetricConfig(use_cache=False))
+    return df
 
 
 def summarise_observability_snapshot(snapshot: ObservabilitySnapshot) -> dict[str, Any]:

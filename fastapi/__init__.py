@@ -15,9 +15,10 @@ requests without relying on third-party servers.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any, Callable, Iterable
+from typing import Any
 from urllib.parse import parse_qs
 
 from pydantic import BaseModel, ValidationError

@@ -13,8 +13,8 @@ except ModuleNotFoundError:  # pragma: no cover - allow scaffolder CLI execution
 
 import argparse
 import textwrap
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 SERVICE_PACKAGE = Path("src/application/services")
 
@@ -23,7 +23,9 @@ def _ensure_package() -> None:
     SERVICE_PACKAGE.mkdir(parents=True, exist_ok=True)
     init_file = SERVICE_PACKAGE / "__init__.py"
     if not init_file.exists():
-        init_file.write_text('"""Generated service scaffolds."""\n\n__all__ = []\n', encoding="utf-8")
+        init_file.write_text(
+            '"""Generated service scaffolds."""\n\n__all__ = []\n', encoding="utf-8"
+        )
 
 
 def scaffold_service(name: str, *, force: bool) -> Path:
@@ -86,7 +88,9 @@ def scaffold_service(name: str, *, force: bool) -> Path:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate an instrumented service skeleton.")
-    parser.add_argument("--name", required=True, help="Service identifier (snake-case recommended).")
+    parser.add_argument(
+        "--name", required=True, help="Service identifier (snake-case recommended)."
+    )
     parser.add_argument("--force", action="store_true", help="Overwrite existing files when set.")
     return parser.parse_args(argv)
 
@@ -100,4 +104,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

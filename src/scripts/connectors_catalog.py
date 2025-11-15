@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from typing import Sequence
+from collections.abc import Sequence
 
 try:
     from scripts import _bootstrap  # noqa: F401
@@ -46,7 +46,7 @@ def _print_text(connectors: list[dict[str, object]]) -> None:
         return
     for connector in connectors:
         print(f"[{connector['kind']}] {connector['identifier']} – {connector['name']}")
-        description = (connector.get("description") or "").strip()
+        description = str(connector.get("description") or "").strip()
         if description:
             for paragraph in description.splitlines():
                 print(f"    {paragraph}")
@@ -76,4 +76,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

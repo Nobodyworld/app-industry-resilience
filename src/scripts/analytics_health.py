@@ -60,9 +60,7 @@ def main() -> None:
         default=5,
         help="Number of highest-risk industries to include (default: 5).",
     )
-    parser.add_argument(
-        "--pretty", action="store_true", help="Pretty-print JSON with indentation."
-    )
+    parser.add_argument("--pretty", action="store_true", help="Pretty-print JSON with indentation.")
     args = parser.parse_args()
 
     if not args.input.exists():
@@ -85,4 +83,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

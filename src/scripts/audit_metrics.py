@@ -12,15 +12,14 @@ except ModuleNotFoundError:  # pragma: no cover - direct execution fallback
     from scripts import _bootstrap  # noqa: F401
 
 import argparse
+import ast
 import json
+import statistics
 import time
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Mapping, Sequence
-
-import ast
-import statistics
 
 from src.application import DataSource, IdiotIndexService
 
@@ -87,11 +86,20 @@ def summarise_core_complexity() -> tuple[list[ComplexityReport], float]:
 def _resolve_import(module: str, node: ast.ImportFrom) -> str | None:
     package = module.split(".")
     if node.level:
-        package = package[:-node.level]
+        package = package[: -node.level]
     if node.module:
         package += node.module.split(".")
     if not package:
         return None
+    resolved = _resolve_import_helper(package)
+    return resolved
+
+
+def _resolve_import_helper(package: list[str]) -> str:
+    """Resolve and join package parts into a dotted module path.
+
+    Separated out to help mypy infer the types cleanly.
+    """
     return ".".join(part for part in package if part)
 
 
@@ -111,9 +119,10 @@ def _gather_imports(path: Path) -> tuple[str, set[str], int, int]:
                 else:
                     external_edges += 1
         elif isinstance(node, ast.ImportFrom):
-            target = _resolve_import(module, node)
-            if not target:
+            target_maybe = _resolve_import(module, node)
+            if not target_maybe:
                 continue
+            target = target_maybe
             qualified = f"{target}" if target.startswith("src") else target
             if qualified.startswith("src."):
                 internal.add(qualified)
@@ -219,9 +228,9 @@ def generate_report(*, runs: int) -> dict[str, object]:
                 "module": entry.module,
                 "complexity": round(entry.complexity, 2),
             }
-            for entry in sorted(
-                complexity_entries, key=lambda item: item.complexity, reverse=True
-            )[:5]
+            for entry in sorted(complexity_entries, key=lambda item: item.complexity, reverse=True)[
+                :5
+            ]
         ],
         "dependency_depth": dependency_report.depth,
         "cohesion_ratio": dependency_report.cohesion_ratio,
@@ -255,7 +264,9 @@ __all__ = [
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--runs", type=int, default=5, help="Number of latency measurements to perform")
+    parser.add_argument(
+        "--runs", type=int, default=5, help="Number of latency measurements to perform"
+    )
     parser.add_argument(
         "--output",
         type=Path,
@@ -272,4 +283,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

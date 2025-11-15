@@ -6,7 +6,7 @@ import argparse
 import json
 import queue
 import sys
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 try:
     from scripts import _bootstrap  # noqa: F401
@@ -112,7 +112,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.limit is not None:
         remaining = max(args.limit - emitted, 0)
 
-    event_queue: "queue.SimpleQueue[dict[str, object]]" = queue.SimpleQueue()
+    event_queue: queue.SimpleQueue[dict[str, object]] = queue.SimpleQueue()
 
     def _on_event(event: ObservationEvent) -> None:
         payload = event.as_dict()
@@ -136,4 +136,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

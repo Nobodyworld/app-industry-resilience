@@ -54,18 +54,21 @@ def compute_metrics(
     materials = work.get("materials_cost")
     intermediates = work.get("intermediate_inputs")
     if materials is None:
-        materials = pd.Series([pd.NA] * len(work), dtype="float64")
+        materials = pd.Series([float("nan")] * len(work), dtype="float64")
     if intermediates is None:
-        intermediates = pd.Series([pd.NA] * len(work), dtype="float64")
+        intermediates = pd.Series([float("nan")] * len(work), dtype="float64")
 
     denominator = materials.where(materials.notna(), intermediates)
     denominator = denominator.astype("float64")
-    denominator.replace({0.0: pd.NA}, inplace=True)
+    # Use numpy NaN for missing denominators instead of `pd.NA` which can
+    # cause object dtype downcasting when combined with other operations.
+    denominator.replace({0.0: float("nan")}, inplace=True)
 
     work["idiot_index"] = (work["gross_output"].astype("float64") / denominator).replace(
         [float("inf"), float("-inf")], pd.NA
     )
 
+    # Fill missing denominators with zeros for downstream calculations.
     fallback_inputs = denominator.fillna(0.0)
     if "value_added" not in work.columns:
         work["value_added"] = work["gross_output"].astype("float64") - fallback_inputs
@@ -85,22 +88,22 @@ def compute_metrics(
     work["materials_share_pct"] = (fallback_inputs / gross_output) * 100.0
 
     # Derived resilience metrics guard against divide-by-zero behaviour by
-    # explicitly masking invalid denominators. These values feed the scenario
-    # planner and benchmarking helpers downstream.
-    with pd.option_context("mode.use_inf_as_na", True):
-        denominator_resilience = fallback_inputs.where(fallback_inputs > 0)
-        work["resilience_score"] = work["value_added"].astype("float64") / denominator_resilience
+    # explicitly masking invalid denominators. We use explicit replacements
+    # instead of `mode.use_inf_as_na` to avoid future pandas deprecation.
+    denominator_resilience = fallback_inputs.where(fallback_inputs > 0)
+    work["resilience_score"] = work["value_added"].astype("float64") / denominator_resilience
 
-        work["materials_dependency_ratio"] = fallback_inputs / gross_output
+    work["materials_dependency_ratio"] = fallback_inputs / gross_output
 
-        total_cost_basis = work["value_added"].astype("float64") + fallback_inputs
-        shock_series = pd.Series(float("nan"), index=work.index, dtype="float64")
-        valid_shock = total_cost_basis > 0
-        shock_series.loc[valid_shock] = (
-            fallback_inputs.loc[valid_shock] / total_cost_basis.loc[valid_shock]
-        )
-        work["shock_sensitivity_index"] = shock_series
+    total_cost_basis = work["value_added"].astype("float64") + fallback_inputs
+    shock_series = pd.Series(float("nan"), index=work.index, dtype="float64")
+    valid_shock = total_cost_basis > 0
+    shock_series.loc[valid_shock] = (
+        fallback_inputs.loc[valid_shock] / total_cost_basis.loc[valid_shock]
+    )
+    work["shock_sensitivity_index"] = shock_series
 
+    # Normalise any remaining infinities to NA given pandas deprecation warnings
     work = work.replace([float("inf"), float("-inf")], pd.NA)
 
     if metric_config.use_cache and cache_instance is not None and cache_key is not None:

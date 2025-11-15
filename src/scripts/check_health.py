@@ -13,7 +13,7 @@ except ModuleNotFoundError:  # pragma: no cover - allow running via `python scri
 
 import argparse
 import json
-from typing import Sequence
+from collections.abc import Sequence
 
 from src.extensions.manager import get_extension_manager
 from src.infrastructure.observability.health import build_default_probe
@@ -48,4 +48,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

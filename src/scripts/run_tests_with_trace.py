@@ -12,14 +12,13 @@ except ModuleNotFoundError:  # pragma: no cover - allow CLI execution
     from scripts import _bootstrap  # noqa: F401
 
 import argparse
+import ast
 import json
+import sys
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from trace import Trace
-from typing import Callable, Mapping, Sequence
-
-import ast
-import sys
 
 import pytest
 
@@ -263,4 +262,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

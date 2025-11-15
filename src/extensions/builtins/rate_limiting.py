@@ -27,7 +27,12 @@ class _RateLimitingInstrumentation(InstrumentationExtension):
             "Seconds spent waiting for rate limit tokens",
             label_names=("scope", "backend"),
         )
-        configure_metrics(counter, wait_histogram)
+        backend_gauge = registry.gauge(
+            "rate_limit_backend_up",
+            "Rate limiter backend operational state",
+            label_names=("backend",),
+        )
+        configure_metrics(counter, wait_histogram, backend_gauge)
 
         retry_counter = registry.counter(
             "http_retries_total",

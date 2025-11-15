@@ -220,6 +220,7 @@ def test_safe_get_json_emits_retry_events(monkeypatch) -> None:
 
     register_retry_observer(lambda event: None)
 
+
 # TODO - fix duplication if exists
 def test_fetch_asm_manufacturing_uses_year_specific_endpoint() -> None:
     """Ensure the Census ASM adapter calls the year-specific endpoint."""
@@ -251,6 +252,7 @@ def test_fetch_asm_manufacturing_uses_year_specific_endpoint() -> None:
     called_urls = [call.args[0] for call in mock_get.call_args_list]
     expected_urls = [f"https://api.census.gov/data/{year}/asm" for year in years]
     assert called_urls == expected_urls
+
 
 # TODO - fix duplication if exists
 @pytest.mark.parametrize("year", [2019, 2021, 2023])

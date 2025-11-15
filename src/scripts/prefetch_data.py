@@ -14,7 +14,7 @@ except ModuleNotFoundError:  # pragma: no cover - allow direct execution
 
 import argparse
 import logging
-from typing import Iterable, Sequence
+from collections.abc import Iterable, Sequence
 
 from src.application import DataSource, NormalizationOptions, evaluate_idiot_index
 from src.core import AppConfig, load_config
@@ -83,7 +83,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     years = args.years or [config.default_year]
     sources = resolve_sources(args.sources)
 
-    LOGGER.info("Starting cache prefetch for sources=%s years=%s", [s.value for s in sources], years)
+    LOGGER.info(
+        "Starting cache prefetch for sources=%s years=%s", [s.value for s in sources], years
+    )
     warm_cache(config, sources=sources, years=years)
     LOGGER.info("Prefetch run complete")
     return 0
@@ -91,4 +93,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -79,4 +79,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

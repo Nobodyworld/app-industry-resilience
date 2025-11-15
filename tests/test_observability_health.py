@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.core.config import (
+    DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE,
     AppConfig,
     CacheConfig,
     ConfigValidationResult,
@@ -34,6 +35,7 @@ def configured_probe(tmp_path: Path):
         census_api_key="test",
         bea_api_version="v1",
         bea_api_base_urls=("https://example.test/api",),
+        census_asm_endpoint_template=DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE,
         rate_limits=RateLimitConfig(bea=10, census=10, default=10),
         cache=CacheConfig(
             enabled=True,

@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any
 
 
 @dataclass(slots=True)
@@ -19,4 +20,3 @@ class CORSMiddleware:  # pragma: no cover - behaviour is a no-op placeholder
 
 
 __all__ = ["CORSMiddleware"]
-

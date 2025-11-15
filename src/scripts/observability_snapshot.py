@@ -6,6 +6,7 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+from collections.abc import Mapping
 
 try:
     from scripts import _bootstrap  # noqa: F401
@@ -157,17 +158,17 @@ def _report_remote_destination(
         return
     scheme = getattr(replicator, "uri_scheme", None)
     if scheme and hasattr(replicator, "bucket"):
-        bucket = getattr(replicator, "bucket")
+        bucket = replicator.bucket
         prefix = getattr(replicator, "prefix", "")
         key = f"{prefix}{snapshot.snapshot_id}.json"
         print(f"Replicated snapshot to {scheme}://{bucket}/{key}", file=sys.stderr)
     elif scheme and hasattr(replicator, "container"):
-        container = getattr(replicator, "container")
+        container = replicator.container
         prefix = getattr(replicator, "prefix", "")
         blob = f"{prefix}{snapshot.snapshot_id}.json"
         print(f"Replicated snapshot to {scheme}://{container}/{blob}", file=sys.stderr)
     elif hasattr(replicator, "target_dir"):
-        target_dir = Path(str(getattr(replicator, "target_dir")))
+        target_dir = Path(str(replicator.target_dir))
         destination = target_dir / f"{snapshot.snapshot_id}.json"
         print(f"Replicated snapshot to {destination}", file=sys.stderr)
 
@@ -263,9 +264,7 @@ def _extract_metric_counts(snapshot: ObservabilitySnapshot) -> dict[str, int]:
     return result
 
 
-def _diff_metadata(
-    baseline: dict[str, Any], target: dict[str, Any]
-) -> dict[str, Any]:
+def _diff_metadata(baseline: Mapping[str, Any], target: Mapping[str, Any]) -> dict[str, Any]:
     base = dict(baseline)
     target_dict = dict(target)
     added = {k: target_dict[k] for k in target_dict.keys() - base.keys()}
@@ -284,4 +283,3 @@ def _get_last_error(snapshot: ObservabilitySnapshot) -> Any:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-

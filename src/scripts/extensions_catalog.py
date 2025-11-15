@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from dataclasses import asdict
-from typing import Sequence
 
 try:
     from scripts import _bootstrap  # noqa: F401
@@ -57,7 +57,7 @@ def _print_text(catalog: list[dict[str, object]]) -> None:
     for entry in catalog:
         line = f"[{entry['kind']}] {entry['name']} – {entry['module']}"
         print(line)
-        description = (entry.get("description") or "").strip()
+        description = str(entry.get("description") or "").strip()
         if description:
             for paragraph in description.splitlines():
                 print(f"    {paragraph}")
@@ -80,4 +80,3 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-
