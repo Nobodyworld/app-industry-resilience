@@ -150,3 +150,35 @@ P2 concerns:
 - Audit document created.
 - No broad implementation fixes were bundled into this audit commit.
 - Repository remains on direct-to-main path with rollback tag in place.
+
+---
+
+## Phase Progress Update (2026-06-22)
+
+### Completed direct-to-main commits after initial audit
+
+- `ci: align Python runtime policy`
+- `ci: repair security gate shell flow`
+- `refactor: replace local FastAPI and Pydantic shims`
+
+### Validation governance mode
+
+- Owner policy: GitHub Actions is intentionally disabled for most repositories.
+- This repository is therefore being validated using local and clean-clone execution as the authoritative gate for this pass.
+
+### Current blocker re-evaluation
+
+- P0-1 (local shim package identity risk): Resolved by renaming `fastapi/` -> `fastapi_compat/` and `pydantic/` -> `pydantic_compat/` with import updates.
+- P0-2 (runtime mismatch): Resolved by aligning workflow runtime declarations with Python 3.13 policy.
+- P0-3 (security target shell logic defect): Resolved by repairing `Makefile` security target condition flow.
+
+### New/remaining blockers from clean-clone validation
+
+- P0: Coverage gate failure (`--cov-fail-under=90`, measured `75.02%`).
+- P0: Secret baseline validation failure (`detect-secrets-hook --baseline config/.secrets.baseline` => `Invalid baseline`).
+- P1: Lint findings (`ruff` import order and modernization rules).
+- P1: Dependency vulnerability finding (`black==25.12.0`, fix available `26.3.1`).
+
+### Supporting validation record
+
+- See `docs/PUBLIC_RELEASE_VALIDATION.md` for full command log and outcomes.
