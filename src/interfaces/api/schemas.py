@@ -10,7 +10,7 @@ from typing import Any, Literal, cast
 import numpy as np
 import pandas as pd
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic_compat import BaseModel, ConfigDict, Field
 from src.application import (
     DataSource,
     IdiotIndexSummary,

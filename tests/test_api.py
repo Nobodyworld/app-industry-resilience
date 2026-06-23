@@ -9,7 +9,7 @@ from typing import cast
 import pandas as pd
 import pytest
 
-from fastapi.testclient import TestClient
+from fastapi_compat.testclient import TestClient
 from src.infrastructure.observability import bootstrap_observability
 from src.interfaces.api import dependencies as api_dependencies
 from src.interfaces.api.app import app

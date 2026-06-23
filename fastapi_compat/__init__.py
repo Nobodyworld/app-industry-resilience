@@ -21,7 +21,7 @@ from types import SimpleNamespace
 from typing import Any
 from urllib.parse import parse_qs
 
-from pydantic import BaseModel, ValidationError
+from pydantic_compat import BaseModel, ValidationError
 
 __all__ = [
     "Depends",

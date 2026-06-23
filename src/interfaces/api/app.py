@@ -8,8 +8,8 @@ import logging
 import os
 from typing import Any, cast
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi_compat import Depends, FastAPI, HTTPException, Query, Response, status
+from fastapi_compat.middleware.cors import CORSMiddleware
 from src.application import DataSource, IdiotIndexService, ScenarioPlanner
 from src.core import summarise_health
 from src.extensions.manager import get_extension_manager
