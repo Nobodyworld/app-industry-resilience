@@ -8,6 +8,29 @@ This isn’t an academic metric; it’s a blunt heuristic popularized in enginee
 
 ---
 
+## Verification status
+
+- Verified:
+  - Streamlit dashboard startup and offline sample-dataset workflow.
+  - Headless API test suite paths covered by `tests/test_api.py`.
+  - Clean-clone dependency install and full test run (`214 passed`).
+- Partial:
+  - Repository-wide quality gate is partially passing in clean-clone validation. `mypy` and `black --check` pass, but `ruff check` currently reports import-order and enum-modernization findings.
+  - Coverage enforcement is configured at `90%`, while clean-clone measured coverage is currently `75.02%`.
+- Experimental:
+  - Remote observability snapshot replication backends (S3, GCS, Azure) are available but environment-dependent and require external infrastructure/configuration.
+- Planned:
+  - Final release-candidate hardening pass to close lint findings, coverage deficit, and detect-secrets baseline compatibility issues on Windows.
+
+## Public-release limitations
+
+- Local validation is authoritative for this repository at this stage because GitHub Actions is intentionally disabled by owner policy in most repositories.
+- `detect-secrets-hook --baseline config/.secrets.baseline` currently fails with `Invalid baseline` in clean-clone Windows validation and needs baseline format/compatibility remediation.
+- `pip-audit` reports a vulnerability for `black==25.12.0` with an available fixed version (`26.3.1`), which must be reconciled against current version constraints before public release.
+- Coverage quality gate (`--cov-fail-under=90`) fails in clean-clone validation and currently blocks release-candidate readiness.
+
+---
+
 ## What this app does
 
 - Pulls industry data from **BEA** (Gross Output, Intermediate Inputs, Value Added) and **Census ASM** (Shipments, Cost of Materials, Value Added) when API keys are provided.
