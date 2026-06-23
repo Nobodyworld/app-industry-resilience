@@ -10,5 +10,5 @@ jobs:
   quality-gate:
     uses: ./.github/workflows/quality-gate.yml
     with:
-      python-version: "3.11"
+      python-version: "3.13"
     secrets: inherit

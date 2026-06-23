@@ -7,7 +7,7 @@ on:
         description: Python version to install before running the gate.
         required: false
         type: string
-        default: "3.11"
+        default: "3.13"
     secrets:
       token:
         description: Optional token override for checkout/artefact upload.
