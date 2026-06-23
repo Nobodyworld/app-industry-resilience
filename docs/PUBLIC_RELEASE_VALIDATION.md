@@ -7,7 +7,7 @@
 
 ## Source and clone metadata
 
-- Source URL: https://github.com/Nobodyworld/app-economics-idiot-index
+- Source URL: <https://github.com/Nobodyworld/app-economics-idiot-index>
 - Validation clone path: C:/Users/Nobod/Documents/GitHub/public-release-validation-app-economics-idiot-index
 - Validated commit: 80b144b
 - Branch: main
@@ -19,7 +19,7 @@
 
 ## Commands executed
 
-1. git clone https://github.com/Nobodyworld/app-economics-idiot-index public-release-validation-app-economics-idiot-index
+1. git clone <https://github.com/Nobodyworld/app-economics-idiot-index> public-release-validation-app-economics-idiot-index
 2. python -m venv .venv
 3. ./.venv/Scripts/python.exe -m pip install --upgrade pip
 4. ./.venv/Scripts/pip.exe install -r requirements.txt -r requirements-dev.txt

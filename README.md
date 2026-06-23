@@ -75,7 +75,7 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open the local URL it prints (usually http://localhost:8501). The app will load the **sample dataset** so you can click around immediately.
+Open the local URL it prints (usually <http://localhost:8501>). The app will load the **sample dataset** so you can click around immediately.
 
 ## Usage examples
 
@@ -321,6 +321,7 @@ CENSUS_API_KEY=your_census_api_key_here
 ```
 
 Get API keys from:
+
 - [BEA API](https://apps.bea.gov/API/signup/)
 - [Census API](https://www.census.gov/data/developers/data-sets.html)
 
@@ -347,12 +348,13 @@ Launch the app and open the “Configuration summary” expander in the sidebar 
 ## Using real data (recommended)
 
 1. Get keys:
-   - **BEA API Key**: https://apps.bea.gov/API/signup/index.cfm
-   - **Census API Key** (ASM): https://api.census.gov/data/key_signup.html
+   - **BEA API Key**: <https://apps.bea.gov/API/signup/index.cfm>
+   - **Census API Key** (ASM): <https://api.census.gov/data/key_signup.html>
 2. Put them in a `.env` file (see `.env.example`) or paste them into the sidebar at runtime.
 3. In the app sidebar, choose **Data → “BEA”** for economy‑wide aggregates or **“Census ASM”** for detailed manufacturing NAICS. Fetch, compute, explore.
 
 ### Notes on data mappings
+
 - **BEA** exposes **GDP by Industry** and **Input‑Output** datasets. We request **Gross Output** and **Intermediate Inputs** at annual cadence. BEA industry codes are close to NAICS groupings; we ship a simple `assets/naics_map.csv` for friendly names and a lightweight mapping.
 - **Census ASM** provides **Value of Shipments (RCPTOT)**, **Cost of Materials (CSTMTOT)**, **Value Added (VALADD)** for manufacturing (NAICS 31‑33). Data are annual and sometimes suppressed at very fine granularity.
 
@@ -367,7 +369,9 @@ Want to avoid APIs entirely or use proprietary data? Go to **Data → “Upload 
 ```
 industry_code,industry_name,year,gross_output,materials_cost,intermediate_inputs,value_added,source
 ```
+
 At minimum, provide: `industry_code`, `industry_name`, `year`, and either:
+
 - `gross_output` + `materials_cost`, **or**
 - `gross_output` + `intermediate_inputs` (used as materials proxy).
 
@@ -398,12 +402,14 @@ Use the "Download Results (CSV)" button to export all computed metrics.
 This application has been significantly enhanced with production-ready features:
 
 ### **Robustness & Error Handling**
+
 - **Comprehensive input validation** for all user inputs and data sources
 - **Graceful error handling** with clear user feedback instead of crashes
 - **API resilience** with retry logic and detailed error differentiation
 - **Data validation** at multiple pipeline stages to prevent invalid computations
 
 ### **Enhanced User Experience**
+
 - **Interactive Plotly charts** replacing basic visualizations
 - **Multi-industry comparisons and benchmarking** with historical trendlines and dataset averages
 - **Shareable URLs** so teams can jump straight to the same insights
@@ -412,11 +418,13 @@ This application has been significantly enhanced with production-ready features:
 - **Multi-format exports** (CSV, JSON, Excel) for both full datasets and filtered perspectives
 
 ### **Platform Resilience & Observability**
+
 - **BEA API failover and pagination handling** with NAICS enrichment and metadata capture
 - **Structured logging with redaction** plus remote shipping hooks and dynamic log-level controls
 - **Better sidebar feedback** for data loading and error states
 
 ### **Code Quality & Security**
+
 - **Typed configuration loader** with validation and sidebar warnings
 - **Deterministic caching** with TTL management and per-test isolation
 - **Hardened security utilities** covering uploads, strings, and API keys
@@ -424,6 +432,7 @@ This application has been significantly enhanced with production-ready features:
 - **Expanded automated tests** spanning config, metrics, normalization, and API clients
 
 ### **API Integration**
+
 - **Complete BEA API implementation** (previously stubbed)
 - **Enhanced Census ASM client** with better error handling
 - **HTTP client improvements** with retry logic and timeout handling
@@ -655,7 +664,6 @@ Log entries include:
 
 You asked for a no‑nonsense tool to interrogate cost structure by industry. This gives you the lever:
 pull fresh official stats, compute the ratio, and then challenge the assumptions.
-
 
 ## Repository layout
 
