@@ -49,6 +49,8 @@ This isn’t an academic metric; it’s a blunt heuristic popularized in enginee
   - Explore data with interactive Plotly charts
   - Stress test industries with the Scenario Lab to model cost/output shocks
 - Works **offline** out of the box via a bundled sample dataset.
+- Includes a reproducible, keyless Census AIES 2023 snapshot released February 26, 2026,
+  with an explicit operating-expense proxy label and data-availability timeline.
 - Computes a **composite health score** with risk banding so you can spot fragile industries at a glance.
 - **Robust error handling** with graceful degradation and clear user feedback
 - **Input validation** for all user inputs and data sources

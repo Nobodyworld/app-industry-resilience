@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from src.core import DistributedRateLimitConfig, RateLimitConfig, load_config
 from src.core.security import RateLimitDecision, SecurityUtils
-from src.infrastructure.observability.metrics import Counter, Histogram, Gauge
+from src.infrastructure.observability.metrics import Counter, Gauge, Histogram
 
 try:  # pragma: no cover - optional dependency
     import redis as _redis_module

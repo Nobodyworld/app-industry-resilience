@@ -1,5 +1,23 @@
 # Data Refresh Workflow
 
+## Current keyless Census snapshot
+
+The dashboard's default official-data path uses the Census Bureau's 2023 Annual Integrated
+Economic Survey (AIES), released February 26, 2026. It requires no API key because the refresh
+downloads the Census FTP release files directly:
+
+```bash
+make refresh-official-data
+```
+
+This regenerates `data/official_industry_snapshot.csv` from `AIES00BASIC.zip` and
+`AIES00EXP01.zip`. The resulting measure is revenue divided by total operating expenses and is
+presented as a cost-efficiency proxy. Do not combine or relabel it as BEA's strict gross-output
+divided by intermediate-inputs measure.
+
+As of June 27, 2026, BEA's quarterly industry accounts are more current (2026 Q1, released June
+25, 2026), but API access requires a configured `BEA_API_KEY`.
+
 This guide explains how to refresh the Idiot Index datasets, rotate API keys, and validate the results before publishing updates.
 
 ## 1. Prepare credentials and configuration

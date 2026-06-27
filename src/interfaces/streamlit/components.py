@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TypeAlias, cast
 
 import pandas as pd
+import plotly.express as px
 
 import streamlit as st
 from src.core import HealthSummary
@@ -225,17 +226,25 @@ def render_sidebar(
     st.sidebar.header("Data Studio")
     st.sidebar.write("Choose how the Idiot Index should listen to your data today.")
 
-    options = ["Sample (offline)", "Upload CSV", "Census ASM (Manufacturing)", "BEA (Economy-wide)"]
+    options = [
+        "Official snapshot (AIES 2023)",
+        "Sample (offline)",
+        "Upload CSV",
+        "Census ASM (legacy)",
+        "BEA (Economy-wide)",
+    ]
     data_mode = st.sidebar.selectbox("Source", options)
 
     min_year, max_year = year_bounds
+    reference_default = 2023 if data_mode == "Official snapshot (AIES 2023)" else default_year
     year_input = int(
         st.sidebar.number_input(
             "Reference year",
             min_value=min_year,
             max_value=max_year,
-            value=default_year,
+            value=reference_default,
             step=1,
+            disabled=data_mode == "Official snapshot (AIES 2023)",
         )
     )
 
@@ -256,7 +265,7 @@ def render_sidebar(
         uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
         if uploaded_file is None:
             st.sidebar.info("Drop a CSV to activate the canvas.")
-    elif data_mode == "Census ASM (Manufacturing)":
+    elif data_mode == "Census ASM (legacy)":
         key_result = security_utils.validate_api_key(census_val, "Census")
         if not key_result.ok:
             st.sidebar.error(key_result.message)
@@ -268,9 +277,15 @@ def render_sidebar(
             errors.append(key_result.message)
 
     guidance = {
+        "Official snapshot (AIES 2023)": (
+            "Latest keyless Census benchmark: survey year 2023, released February 26, 2026. "
+            "Uses total operating expenses as the denominator."
+        ),
         "Sample (offline)": "Explore the experience instantly with curated demo data.",
         "Upload CSV": "Bring your own dataset. Required columns: industry_code, industry_name, year.",
-        "Census ASM (Manufacturing)": "Connect to the U.S. Census Annual Survey of Manufactures.",
+        "Census ASM (legacy)": (
+            "Legacy manufacturing series through 2021. Census replaced ASM with AIES."
+        ),
         "BEA (Economy-wide)": "Access the Bureau of Economic Analysis industry accounts.",
     }
     st.sidebar.markdown(
@@ -325,7 +340,7 @@ def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None 
         {
             "label": "Mean Idiot Index",
             "value": f"{avg_idiot_index:.2f}" if avg_idiot_index is not None else "—",
-            "hint": "gross output ÷ materials cost",
+            "hint": "gross output ÷ available cost input",
         },
     ]
 
@@ -665,8 +680,13 @@ def render_observability_snapshots(
 
     timeline = snapshot_timeline_frame(history)
     if not timeline.empty:
-        timeline_chart = timeline.set_index("captured_at")[["event_total", "errors", "success"]]
-        st.line_chart(timeline_chart)
+        timeline_chart = px.line(
+            timeline,
+            x="captured_at",
+            y=["event_total", "errors", "success"],
+            labels={"captured_at": "Captured at", "value": "Events", "variable": "Series"},
+        )
+        st.plotly_chart(timeline_chart, use_container_width=True)
 
     table = snapshot_history_table(history)
     if not table.empty:
@@ -694,7 +714,7 @@ def build_data_story(
 
     if pd.notna(index_val):
         story_parts.append(
-            f"**{name}** carries an Idiot Index of **{index_val:.2f}**, highlighting the balance between gross output and materials cost."
+            f"**{name}** carries an Idiot Index of **{index_val:.2f}**, highlighting the balance between gross output and its available cost input."
         )
     else:
         story_parts.append(
@@ -716,7 +736,12 @@ def build_data_story(
 
     materials_share = row.get("materials_share_pct")
     if pd.notna(materials_share):
-        if materials_share > 60:
+        if materials_share > 60 and data_mode == "Official snapshot (AIES 2023)":
+            story_parts.append(
+                "Operating expenses dominate reported revenue here, indicating a narrow "
+                "operating spread under the AIES proxy."
+            )
+        elif materials_share > 60:
             story_parts.append(
                 "Materials dominate costs here, suggesting tighter margins and a closer watch on supplier dynamics."
             )

@@ -688,6 +688,7 @@ Cargo.lock
 
 # Data files
 *.csv
+!data/official_industry_snapshot.csv
 *.json
 *.parquet
 

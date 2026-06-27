@@ -3,10 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
-from collections.abc import Mapping
 
 try:
     from scripts import _bootstrap  # noqa: F401

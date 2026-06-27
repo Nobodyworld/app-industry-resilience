@@ -1,0 +1,88 @@
+industry_code,industry_name,year,gross_output,materials_cost,intermediate_inputs,source,survey,release_date,denominator_definition,value_added
+22,Utilities,2023,765860366000,,540188872000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,225671494000
+221,Utilities,2023,765860366000,,540188872000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,225671494000
+311,Food manufacturing,2023,1040310303000,,849510688000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,190799615000
+312,Beverage and tobacco product manufacturing,2023,178088456000,,99049743000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,79038713000
+313,Textile mills,2023,25447195000,,21981326000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,3465869000
+314,Textile product mills,2023,22768976000,,18944816000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,3824160000
+315,Apparel manufacturing,2023,9932010000,,8339852000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,1592158000
+316,Leather and allied product manufacturing,2023,4749575000,,4149136000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,600439000
+321,Wood product manufacturing,2023,147712767000,,119732800000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,27979967000
+322,Paper manufacturing,2023,212054707000,,171738492000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,40316215000
+323,Printing and related support activities,2023,90008178000,,73077496000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,16930682000
+324,Petroleum and coal products manufacturing,2023,768756721000,,646317403000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,122439318000
+325,Chemical manufacturing,2023,891564129000,,605736924000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,285827205000
+326,Plastics and rubber products manufacturing,2023,288976228000,,237312973000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,51663255000
+327,Nonmetallic mineral product manufacturing,2023,171186277000,,132788652000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,38397625000
+331,Primary metal manufacturing,2023,286600231000,,240547536000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,46052695000
+332,Fabricated metal product manufacturing,2023,465290391000,,380552271000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,84738120000
+333,Machinery manufacturing,2023,476234673000,,394551289000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,81683384000
+334,Computer and electronic product manufacturing,2023,374053317000,,310120764000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,63932553000
+335,"Electrical equipment, appliance, and component manufacturing",2023,0,,0,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,0
+336,Transportation equipment manufacturing,2023,1164157597000,,1011710364000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,152447233000
+337,Furniture and related product manufacturing,2023,86371572000,,72401868000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,13969704000
+339,Miscellaneous manufacturing,2023,165351926000,,128392451000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,36959475000
+42,Wholesale trade,2023,11745318223000,,1302631405000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,10442686818000
+423,"Merchant wholesalers, durable goods",2023,4936849881000,,754220596000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,4182629285000
+424,"Merchant wholesalers, nondurable goods",2023,5952040153000,,509265541000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,5442774612000
+425,Wholesale electronic markets and agents and brokers,2023,856428189000,,39145268000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,817282921000
+441,Motor vehicle and parts dealers,2023,1608512454000,,254595023000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,1353917431000
+442,Furniture and home furnishings stores,2023,129800771000,,48442927000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,81357844000
+443,Electronics and appliance stores,2023,84122439000,,25177719000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,58944720000
+444,Building material and garden equipment and supplies dealers,2023,516483315000,,129756608000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,386726707000
+445,Food and beverage stores,2023,960953432000,,273839155000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,687114277000
+446,Health and personal care stores,2023,406642563000,,100886148000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,305756415000
+447,Gasoline stations,2023,650133063000,,127521311000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,522611752000
+448,Clothing and clothing accessories stores,2023,282051475000,,107964608000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,174086867000
+451,"Sporting goods, hobby, musical instrument, and book stores",2023,92319837000,,37260983000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,55058854000
+452,General merchandise stores,2023,897428558000,,197695189000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,699733369000
+453,Miscellaneous store retailers,2023,155786748000,,67117306000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,88669442000
+454,Nonstore retailers,2023,1235029124000,,414263906000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,820765218000
+481,Air transportation,2023,306192078000,,259637271000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,46554807000
+483,Water transportation,2023,60069018000,,48716786000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,11352232000
+484,Truck transportation,2023,406651010000,,374556615000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,32094395000
+485,Transit and ground passenger transportation,2023,56287871000,,42945729000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,13342142000
+486,Pipeline transportation,2023,69765723000,,47059926000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,22705797000
+487,Scenic and sightseeing transportation,2023,5397337000,,4031678000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,1365659000
+488,Support activities for transportation,2023,249589182000,,0,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,249589182000
+492,Couriers and messengers,2023,152374453000,,98711697000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,53662756000
+493,Warehousing and storage,2023,62643216000,,155694547000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,-93051331000
+51,Information,2023,2263310331000,,1566673267000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,696637064000
+511,Publishing industries (except internet),2023,601420216000,,432158519000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,169261697000
+512,Motion picture and sound recording industries,2023,135425529000,,80986922000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,54438607000
+515,Broadcasting (except internet),2023,166449406000,,141468753000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,24980653000
+517,Telecommunications,2023,654478171000,,470733180000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,183744991000
+518,"Data processing, hosting, and related services",2023,346260327000,,208696513000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,137563814000
+519,Other information services,2023,359276682000,,232629380000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,126647302000
+52,Finance and insurance,2023,6493472850000,,3194171848000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,3299301002000
+521,Monetary authorities - central bank,2023,175877678000,,306826782000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,-130949104000
+522,Credit intermediation and related activities,2023,1981974880000,,1425316517000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,556658363000
+523,"Securities, commodity contracts, and other financial investments and related activities",2023,825124982000,,582088297000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,243036685000
+524,Insurance carriers and related activities,2023,3510495310000,,879940252000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,2630555058000
+53,Real estate and rental and leasing,2023,957219921000,,642267948000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,314951973000
+531,Real estate,2023,668156325000,,458746193000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,209410132000
+532,Rental and leasing services,2023,227442118000,,162569739000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,64872379000
+533,Lessors of nonfinancial intangible assets (except copyrighted works),2023,61621478000,,20952016000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,40669462000
+54,"Professional, scientific, and technical services",2023,2793571815000,,2334059055000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,459512760000
+541,"Professional, scientific, and technical services",2023,2793571815000,,2334059055000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,459512760000
+56,Administrative and support and waste management and remediation services,2023,1424023007000,,1200694478000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,223328529000
+561,Administrative and support services,2023,1273685712000,,1090655492000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,183030220000
+562,Waste management and remediation services,2023,150337295000,,110038986000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,40298309000
+61,Educational services,2023,94140459000,,78011901000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,16128558000
+611,Educational services,2023,94140459000,,78011901000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,16128558000
+62,Health care and social assistance,2023,3525139998000,,3226241819000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,298898179000
+621,Ambulatory health care services,2023,1478635642000,,1285300996000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,193334646000
+622,Hospitals,2023,1446704823000,,1391384758000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,55320065000
+623,Nursing and residential care facilities,2023,300157659000,,277350562000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,22807097000
+624,Social assistance,2023,299641874000,,272205503000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,27436371000
+71,"Arts, entertainment, and recreation",2023,371898490000,,314118341000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,57780149000
+711,"Performing arts, spectator sports, and related industries",2023,172592713000,,143854747000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,28737966000
+712,"Museums, historical sites, and similar institutions",2023,22837233000,,18223249000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,4613984000
+713,"Amusement, gambling, and recreation industries",2023,176468544000,,152040345000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,24428199000
+72,Accommodation and food services,2023,1252043559000,,980182030000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,271861529000
+721,Accommodation,2023,298920491000,,235390934000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,63529557000
+722,Food services and drinking places,2023,953123068000,,744791096000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,208331972000
+81,Other services (except public administration),2023,743505382000,,582948196000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,160557186000
+811,Repair and maintenance,2023,258101403000,,173833026000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,84268377000
+812,Personal and laundry services,2023,149072806000,,118310289000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,30762517000
+813,"Religious, grantmaking, civic, professional, and similar organizations",2023,336331173000,,290804881000,Census AIES (operating-expense proxy),Annual Integrated Economic Survey,2026-02-26,Total operating expenses,45526292000

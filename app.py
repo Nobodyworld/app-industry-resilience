@@ -67,6 +67,13 @@ def load_sample() -> pd.DataFrame:
     return pd.read_csv("data/sample_industries.csv")
 
 
+@st.cache_data(show_spinner=False)
+def load_official_snapshot() -> pd.DataFrame:
+    """Return the refreshed, keyless Census AIES snapshot."""
+
+    return pd.read_csv("data/official_industry_snapshot.csv")
+
+
 def process_uploaded_file(
     uploaded_file: UploadedFile, *, policy: FilePolicy
 ) -> tuple[pd.DataFrame | None, str | None]:
@@ -196,9 +203,10 @@ if year_override_raw:
 year_override = sidebar_context.normalise_year(year_override)
 
 sidebar_modes = [
+    "Official snapshot (AIES 2023)",
     "Sample (offline)",
     "Upload CSV",
-    "Census ASM (Manufacturing)",
+    "Census ASM (legacy)",
     "BEA (Economy-wide)",
 ]
 mode_raw = _last_value("mode")
@@ -224,13 +232,15 @@ if sidebar_state.halt or sidebar_state.year_clean is None:
 data_mode = sidebar_state.data_mode
 data_mode_slug = data_mode.lower().replace(" ", "-")
 year_clean = sidebar_state.year_clean
+if data_mode == "Official snapshot (AIES 2023)":
+    year_clean = 2023
 bea_key = sidebar_state.bea_key.strip()
 census_key = sidebar_state.census_key.strip()
 uploaded_file = sidebar_state.uploaded_file
 
 mode_to_source = {
     "Sample (offline)": DataSource.SAMPLE,
-    "Census ASM (Manufacturing)": DataSource.CENSUS,
+    "Census ASM (legacy)": DataSource.CENSUS,
     "BEA (Economy-wide)": DataSource.BEA,
 }
 
@@ -239,7 +249,9 @@ dataframe_override: pd.DataFrame | None = None
 service_config = APP_CONFIG
 error: str | None = None
 
-if data_mode == "Upload CSV":
+if data_mode == "Official snapshot (AIES 2023)":
+    dataframe_override = load_official_snapshot()
+elif data_mode == "Upload CSV":
     if uploaded_file is None:
         st.stop()
     dataframe_override, error = process_uploaded_file(
@@ -256,17 +268,20 @@ else:
         service_config = replace(APP_CONFIG, census_api_key=census_key)
 
 summary = None
-if data_mode == "Upload CSV":
+if data_mode in {"Official snapshot (AIES 2023)", "Upload CSV"}:
     source_for_service = DataSource.SAMPLE
 else:
     source_for_service = service_source
 
 fetch_status = st.sidebar.empty()
 spinner_message = "Computing industry metrics…"
-if data_mode == "Sample (offline)":
+if data_mode == "Official snapshot (AIES 2023)":
+    fetch_status.info("Loading the latest official Census AIES snapshot…")
+    spinner_message = "Loading Census AIES survey-year 2023 data…"
+elif data_mode == "Sample (offline)":
     fetch_status.info("Loading sample dataset…")
     spinner_message = "Loading sample dataset…"
-elif data_mode == "Census ASM (Manufacturing)":
+elif data_mode == "Census ASM (legacy)":
     fetch_status.info(f"Contacting Census ASM for {year_clean}…")
     spinner_message = f"Fetching Census ASM data for {year_clean}…"
 elif data_mode == "BEA (Economy-wide)":
@@ -287,7 +302,9 @@ try:
             top_n=50,
             normalization_options=APP_NORMALIZATION,
         )
-    if data_mode == "Census ASM (Manufacturing)":
+    if data_mode == "Official snapshot (AIES 2023)":
+        fetch_status.success("Census AIES 2023 benchmark ready (released February 26, 2026).")
+    elif data_mode == "Census ASM (legacy)":
         fetch_status.success(f"Census ASM ready for {year_clean}.")
     elif data_mode == "BEA (Economy-wide)":
         fetch_status.success(f"BEA tables ready for {year_clean}.")
@@ -318,7 +335,7 @@ if current_query:
 
 focus_mode = render_page_header(
     title="Idiot Index Intelligence Studio",
-    subtitle="Sense, compare, and narrate the balance between gross output and materials cost.",
+    subtitle="Sense, compare, and narrate the balance between gross output and cost inputs.",
     meta={
         "Source": data_mode,
         "Year": str(year_clean),
@@ -346,6 +363,47 @@ else:
         render_state_banner(
             f"{len(df_filtered):,} industries tuned · adjust the filters to tighten the narrative."
         )
+
+if data_mode == "Official snapshot (AIES 2023)":
+    st.info(
+        "**Data vintage:** 2023 Annual Integrated Economic Survey, released February 26, "
+        "2026. Revenue ÷ total operating expenses is shown as a cost-efficiency proxy; "
+        "it is not the strict BEA gross-output ÷ intermediate-inputs measure. BEA's latest "
+        "industry release covers 2026 Q1 and requires an API key."
+    )
+    st.markdown("**Official-data availability timeline (as of June 27, 2026)**")
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {
+                    "Source": "Census ASM",
+                    "Observation period": "2021",
+                    "Published": "May 31, 2023",
+                    "Status / next milestone": "Discontinued; replaced by AIES",
+                },
+                {
+                    "Source": "Census Economic Census",
+                    "Observation period": "2022",
+                    "Published": "April 10, 2025",
+                    "Status / next milestone": "Five-year manufacturing benchmark",
+                },
+                {
+                    "Source": "Census AIES",
+                    "Observation period": "2023",
+                    "Published": "February 26, 2026",
+                    "Status / next milestone": "Current annual comprehensive benchmark",
+                },
+                {
+                    "Source": "BEA GDP by Industry",
+                    "Observation period": "2026 Q1",
+                    "Published": "June 25, 2026",
+                    "Status / next milestone": "Next industry release: September 30, 2026",
+                },
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 if not focus_mode:
     render_signal_bar(df_filtered, health_summary=summary.health_summary_filtered)

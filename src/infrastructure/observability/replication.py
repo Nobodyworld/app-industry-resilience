@@ -34,15 +34,16 @@ except Exception:  # pragma: no cover - botocore optional at runtime
     _HAS_BOTOCORE = False
 
 
+GoogleAPIError: type[BaseException]
+
 try:  # pragma: no cover - optional dependency
-    from google.api_core.exceptions import GoogleAPIError
+    from google.api_core.exceptions import GoogleAPIError as GoogleAPIErrorType
     from google.cloud import storage as gcs_storage
 
     _HAS_GCS = True
-    _GoogleAPIError: type[BaseException] = GoogleAPIError
+    GoogleAPIError = GoogleAPIErrorType
 except Exception:  # pragma: no cover - gcs optional
     GoogleAPIError = Exception
-    _GoogleAPIError = Exception
     gcs_storage = None
     _HAS_GCS = False
 
@@ -164,7 +165,7 @@ class GCSnapshotReplicator:
                     content_type="application/json",
                     timeout=self.timeout_seconds,
                 )
-            except (_GoogleAPIError, OSError, AttributeError) as exc:
+            except (GoogleAPIError, OSError, AttributeError) as exc:
                 last_error = exc
                 log_extra = {
                     "bucket": self.bucket,

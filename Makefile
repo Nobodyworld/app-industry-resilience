@@ -1,4 +1,4 @@
-.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs scenario prefetch-cache analytics observability observability-snapshot audit quality-gate diagnostics
+.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs scenario prefetch-cache refresh-official-data analytics observability observability-snapshot audit quality-gate diagnostics
 
 PYTHON := python
 SKIP_PIP ?= 0
@@ -26,6 +26,7 @@ help:
 	@echo "  docs               Show key architecture and workflow documentation"
 	@echo "  scenario           Run the scenario planner CLI (pass extra args via ARGS=...)"
 	@echo "  prefetch-cache     Warm caches using the prefetch utility (pass extra args via ARGS=...)"
+	@echo "  refresh-official-data Refresh the keyless Census AIES snapshot"
 	@echo "  analytics          Generate health analytics JSON (pass extra args via ARGS=...)"
 	@echo "  observability      Print observability registry snapshot (pass extra args via ARGS=...)"
 	@echo "  observability-snapshot Persist and pretty-print a stored observability snapshot"
@@ -144,6 +145,9 @@ scenario:
 
 prefetch-cache:
 	${PYTHON} src/scripts/prefetch_data.py ${ARGS}
+
+refresh-official-data:
+	${PYTHON} src/scripts/refresh_official_data.py ${ARGS}
 
 analytics:
 	${PYTHON} src/scripts/analytics_health.py ${ARGS}
