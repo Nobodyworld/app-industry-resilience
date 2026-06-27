@@ -11,12 +11,8 @@ import requests
 
 AIES_SURVEY_YEAR = 2023
 AIES_RELEASE_DATE = "2026-02-26"
-AIES_BASIC_URL = (
-    "https://www2.census.gov/programs-surveys/aies/data/2023/AIES00BASIC.zip"
-)
-AIES_EXPENSE_URL = (
-    "https://www2.census.gov/programs-surveys/aies/data/2023/AIES00EXP01.zip"
-)
+AIES_BASIC_URL = "https://www2.census.gov/programs-surveys/aies/data/2023/AIES00BASIC.zip"
+AIES_EXPENSE_URL = "https://www2.census.gov/programs-surveys/aies/data/2023/AIES00EXP01.zip"
 
 Download = Callable[[str], bytes]
 
@@ -44,9 +40,7 @@ def build_aies_snapshot(basic: pd.DataFrame, expenses: pd.DataFrame) -> pd.DataF
     _require_columns(expenses, expense_required, "AIES operating expenses")
 
     basic_national = _national_industries(basic).loc[:, [*key_columns, "RCPT_TOT_VAL"]]
-    expense_national = _national_industries(expenses).loc[
-        :, [*key_columns, "EXPS_TOT_DVAL"]
-    ]
+    expense_national = _national_industries(expenses).loc[:, [*key_columns, "EXPS_TOT_DVAL"]]
     merged = basic_national.merge(
         expense_national,
         on=key_columns,
