@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline-friendly spell checker for common typos."""
+
 from __future__ import annotations
 
 try:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fallback quality gate when pre-commit is unavailable."""
+
 from __future__ import annotations
 
 try:

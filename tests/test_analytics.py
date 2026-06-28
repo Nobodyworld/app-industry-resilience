@@ -7,6 +7,8 @@ from src.core import (
     HealthBand,
     HealthScoreConfig,
     compute_health_scores,
+    compute_metrics,
+    MetricConfig,
     summarise_health,
 )
 
@@ -102,3 +104,22 @@ def test_summarise_health_limits_top_risks() -> None:
 def test_compute_health_scores_validates_columns() -> None:
     with pytest.raises(ValueError):
         compute_health_scores(pd.DataFrame({"industry_code": []}))
+
+
+def test_official_snapshot_bottom_risk_scores_are_reproducible() -> None:
+    frame = pd.read_csv("data/official_industry_snapshot.csv")
+    metrics = compute_metrics(frame, config=MetricConfig(use_cache=False))
+    scored = compute_health_scores(metrics)
+
+    code_key = scored["industry_code"].astype(str).str.replace(r"\.0$", "", regex=True)
+    target = scored[code_key.isin(["493", "521", "622", "623", "484"])]
+    observed = {
+        str(row["industry_code"]).replace(".0", ""): float(row["health_score"])
+        for _, row in target[["industry_code", "health_score"]].iterrows()
+    }
+
+    assert observed["493"] == pytest.approx(0.00, abs=1e-2)
+    assert observed["521"] == pytest.approx(0.00, abs=1e-2)
+    assert observed["622"] == pytest.approx(3.07, abs=1e-2)
+    assert observed["623"] == pytest.approx(6.14, abs=1e-2)
+    assert observed["484"] == pytest.approx(6.38, abs=1e-2)

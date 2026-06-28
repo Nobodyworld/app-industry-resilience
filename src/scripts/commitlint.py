@@ -5,6 +5,7 @@ This script emulates the subset of commitlint rules we enforce locally without
 requiring Node.js. It validates the commit summary for format, type, and
 subject casing/length constraints.
 """
+
 from __future__ import annotations
 
 try:

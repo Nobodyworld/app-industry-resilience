@@ -5,13 +5,13 @@ repos:
         name: Check trailing whitespace
         entry: python src/scripts/check_trailing_whitespace.py
         language: system
-        files: "\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$"
+        files: '\\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$'
       - id: ensure-eof-newline
         name: Ensure EOF newline
         entry: python src/scripts/check_trailing_whitespace.py --check-eof
         language: system
         pass_filenames: true
-        files: "\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$"
+        files: '\\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$'
       - id: black
         name: Black
         entry: python -m black
@@ -27,7 +27,7 @@ repos:
         name: Codespell (offline)
         entry: python src/scripts/codespell.py
         language: system
-        files: "\.(py|md|markdown|txt|rst)$"
+        files: '\\.(py|md|markdown|txt|rst)$'
       - id: mypy
         name: mypy
         entry: python -m mypy
@@ -46,7 +46,7 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=1024"]
   - repo: https://github.com/Yelp/detect-secrets
-    rev: v1.4.0
+    rev: v1.5.0
     hooks:
       - id: detect-secrets
         args:

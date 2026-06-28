@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate a lightweight CycloneDX SBOM from requirement files."""
+
 from __future__ import annotations
 
 try:

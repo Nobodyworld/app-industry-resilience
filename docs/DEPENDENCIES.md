@@ -18,7 +18,7 @@ This document records the vetted runtime and development dependencies for the Id
 
 | Package | Version | License | Purpose | Review cadence |
 | --- | --- | --- | --- | --- |
-| `black` | >=24.8.0,<25 | MIT | Code formatter enforcing repository style. | Quarterly |
+| `black` | >=26.3.1,<27 | MIT | Code formatter enforcing repository style; upgraded to remediate GHSA-3936-cmfr-pm3m. | Quarterly |
 | `ruff` | >=0.6.9,<1 | MIT | Fast linter covering PyFlakes, pycodestyle, and modernisation rules. | Quarterly |
 | `mypy` | >=1.11.2,<2 | MIT | Static typing checks for Python modules. | Quarterly |
 | `pytest-cov` | >=5.0.0,<6 | MIT | Coverage reporting for tests. | Quarterly |
@@ -39,8 +39,8 @@ This document records the vetted runtime and development dependencies for the Id
 
 ## Data sources
 
-- **BEA GDP by Industry** – accessed via API (https://apps.bea.gov/api/). Terms of use require attribution when publishing derived data.
-- **Census Annual Survey of Manufactures** – accessed via API (https://www.census.gov/data/developers/data-sets/asm.html). Observe Census data usage policies.
+- **BEA GDP by Industry** – accessed via API (<https://apps.bea.gov/api/>). Terms of use require attribution when publishing derived data.
+- **Census Annual Survey of Manufactures** – accessed via API (<https://www.census.gov/data/developers/data-sets/asm.html>). Observe Census data usage policies.
 - **Sample dataset** – derived from public BEA/ASM releases for offline demos; stored in `data/sample_industries.csv`.
 
 ---

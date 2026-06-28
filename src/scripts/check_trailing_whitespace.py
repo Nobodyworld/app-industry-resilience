@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Utility script to enforce trailing whitespace and EOF newline rules."""
+
 from __future__ import annotations
 
 try:
