@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 try:
-    from scripts import _bootstrap  # noqa: F401
-except ModuleNotFoundError:  # pragma: no cover - allow CLI execution
+    from src.scripts import _bootstrap  # noqa: F401
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - allow CLI execution
     import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # noqa: F401
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from src.scripts import _bootstrap  # noqa: F401
 
 import argparse
 import ast
@@ -22,7 +22,7 @@ from trace import Trace
 
 import pytest
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_REPORT_DIR = REPO_ROOT / "build" / "reports"
 DEFAULT_JSON_REPORT = DEFAULT_REPORT_DIR / "coverage-trace.json"
 DEFAULT_SUMMARY_REPORT = DEFAULT_REPORT_DIR / "coverage-trace.txt"

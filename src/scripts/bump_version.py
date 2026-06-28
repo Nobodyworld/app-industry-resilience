@@ -4,13 +4,13 @@
 from __future__ import annotations
 
 try:
-    from scripts import _bootstrap  # noqa: F401
-except ModuleNotFoundError:  # pragma: no cover - direct execution compatibility
+    from src.scripts import _bootstrap  # noqa: F401
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - direct execution compatibility
     import sys
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # noqa: F401
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from src.scripts import _bootstrap  # noqa: F401
 
 import argparse
 import datetime as dt

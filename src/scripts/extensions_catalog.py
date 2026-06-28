@@ -9,12 +9,12 @@ from collections.abc import Sequence
 from dataclasses import asdict
 
 try:
-    from scripts import _bootstrap  # noqa: F401
-except ModuleNotFoundError:  # pragma: no cover - script execution fallback
+    from src.scripts import _bootstrap  # noqa: F401
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - script execution fallback
     from pathlib import Path
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # noqa: F401
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from src.scripts import _bootstrap  # noqa: F401
 
 from src.extensions.manager import ExtensionManager, get_extension_manager
 

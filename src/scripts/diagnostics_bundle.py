@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 try:  # pragma: no cover - import side effect for script execution
-    from scripts import _bootstrap  # noqa: F401
-except ModuleNotFoundError:  # pragma: no cover - execution fallback
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-    from scripts import _bootstrap  # noqa: F401
+    from src.scripts import _bootstrap  # noqa: F401
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - execution fallback
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from src.scripts import _bootstrap  # noqa: F401
 
 from src.core.config import get_config_summary, load_config
 from src.extensions.manager import get_extension_manager
