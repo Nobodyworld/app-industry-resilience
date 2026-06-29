@@ -83,7 +83,7 @@ pre-commit:
 	pre-commit run --all-files --show-diff-on-failure --color=always; \
 	else \
 	echo "pre-commit not found; running local quality checks"; \
-	${PYTHON} src/scripts/run_quality_checks.py; \
+	${PYTHON} src/scripts/run_quality_checks.py --fast; \
 	fi
 
 quality-gate:
@@ -113,7 +113,7 @@ security:
 	@if command -v detect-secrets-hook >/dev/null 2>&1; then \
 		detect-secrets-hook --baseline config/.secrets.baseline; \
 	elif python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('detect_secrets') else 1)" >/dev/null 2>&1; then \
-		$(PYTHON) -m detect_secrets scan --all-files --json --output $(REPORT_DIR)/.detect-secrets.scan.json; \
+		$(PYTHON) -m detect_secrets scan --all-files > $(REPORT_DIR)/.detect-secrets.scan.json; \
 		echo 'detect-secrets baseline comparison requires manual review (hook binary unavailable).'; \
 	elif [ "${CI}" = "true" ] || [ "${GITHUB_ACTIONS}" = "true" ]; then \
 		echo 'detect-secrets is required in CI but was not found'; \

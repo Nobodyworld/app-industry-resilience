@@ -146,6 +146,33 @@ make quality-gate
 
 `make quality-gate` executes linting (Black in check mode + Ruff), mypy, full pytest with coverage enforcement, and the security scans (`pip-audit` + `detect-secrets`). The target mirrors the CI pipeline to keep local and remote checks aligned.
 
+Windows-friendly fast gate (no `make` required):
+
+```bash
+python src/scripts/run_quality_checks.py --fast
+```
+
+This runs Black, Ruff, mypy, and pytest in a single command with lower local overhead. Use the full mode (without `--fast`) when you also want security scans.
+
+If you want Python checks but need to skip repository-wide text-file hygiene (for example while docs cleanup is in progress), run:
+
+```bash
+python src/scripts/run_quality_checks.py --python-only
+```
+
+To reduce noisy CRLF conversion warnings in this repository, apply one-time local git settings:
+
+```bash
+git config --local core.autocrlf false
+git config --local core.eol lf
+```
+
+If line endings were previously normalized differently on your clone, follow with:
+
+```bash
+git add --renormalize .
+```
+
 Targeted commands are also available:
 
 ```bash
