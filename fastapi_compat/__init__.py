@@ -15,6 +15,7 @@ requests without relying on third-party servers.
 from __future__ import annotations
 
 import json
+from datetime import date, datetime, time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -214,7 +215,7 @@ class FastAPI:
         elif isinstance(data, str):
             body_bytes = data.encode("utf-8")
         else:
-            body_bytes = json.dumps(data).encode("utf-8")
+            body_bytes = json.dumps(data, default=_json_default).encode("utf-8")
         media_type = response.media_type
         if media_type is None:
             if isinstance(data, (str, bytes)):
@@ -296,10 +297,20 @@ def _build_kwargs(
 
 def _serialise_response(result: Any) -> Any:
     if isinstance(result, BaseModel):
-        return result.model_dump()
+        return result.model_dump(mode="json")
     if isinstance(result, Response):
         return result.data
     return result
+
+
+def _json_default(value: Any) -> Any:
+    """Serialize common Python objects for JSON responses."""
+
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json")
+    raise TypeError(f"Object of type {value.__class__.__name__} is not JSON serializable")
 
 
 def _parse_query(raw: str) -> dict[str, str]:

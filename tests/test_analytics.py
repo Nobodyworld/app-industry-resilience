@@ -6,9 +6,9 @@ import pytest
 from src.core import (
     HealthBand,
     HealthScoreConfig,
+    MetricConfig,
     compute_health_scores,
     compute_metrics,
-    MetricConfig,
     summarise_health,
 )
 
