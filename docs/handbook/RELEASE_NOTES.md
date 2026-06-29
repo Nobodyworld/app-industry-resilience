@@ -1,5 +1,18 @@
 # Release Notes
 
+## 2026-06-29 - Public release alignment
+
+### Highlights
+
+- Standardized public-facing project title to `U.S. Industry Cost Structure and Resilience Dashboard` across the Streamlit app, README, metadata, and docs index.
+- Replaced the prior proprietary license with standard Apache License 2.0 text and updated copyright attribution.
+- Added/verified release assets: `docs/DATA_DICTIONARY.md` and `docs/INDUSTRY_SHOCK_CASE_STUDY.md`.
+
+### Upgrade / Migration Notes
+
+- Public materials and metadata now reference the professional title; downstream automation that scraped old headings should update title matching.
+- License scanners should now detect Apache-2.0 from the root `LICENSE` file without custom policy exceptions.
+
 # 2025-11-12 – Connector catalog & developer tooling
 
 ### Highlights
@@ -267,5 +280,5 @@
 
 - Remove `fastapi`, `uvicorn`, and `pydantic` from any pinned dependency lists when rebasing; the repository now provides those modules internally.
 - If production deployments rely on real FastAPI/Uvicorn features (e.g., ASGI middlewares), replace the stub modules with the genuine packages in that environment by updating `PYTHONPATH` before importing the repo's code.
-- Use `python scripts/run_tests_with_trace.py --threshold 90` to reproduce the coverage report on systems without `pytest-cov`.
+- Use `python scripts/run_tests_with_trace.py --threshold 85` to reproduce runtime-gate-aligned coverage output on systems without `pytest-cov`.
 - The API CLI ignores `--reload`/`--workers` flags (preserved for compatibility). Adjust automation to avoid relying on hot reload semantics.

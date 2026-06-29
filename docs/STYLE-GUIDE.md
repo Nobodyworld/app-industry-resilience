@@ -33,10 +33,10 @@ Any deviation from “TS + React for new app UIs” requires a short ADR explain
 
 ## 1. Organization Constants
 
-- **Organization**: Nobody Production
+- **Organization**: Travis William Jones
 - **GitHub Org**: Nobodyworld
-- **Maintainer**: Nobody
-- **License**: Proprietary (see LICENSE file)
+- **Maintainer**: Travis William Jones
+- **License**: Apache License 2.0 (see LICENSE file)
 - **Solo Developer**: Yes — all repositories are maintained by a single developer
 
 ---

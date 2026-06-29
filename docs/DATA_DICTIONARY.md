@@ -1,53 +1,65 @@
 # Data Dictionary
 
-This document defines the primary columns used across the dashboard, API responses, and scenario outputs.
+This document defines the fields used by the U.S. Industry Cost Structure and Resilience Dashboard across the Streamlit UI, headless API, and scenario outputs.
 
 ## Scope
 
-- Applies to datasets rendered in the Streamlit UI and returned by the API.
-- Includes base input fields, derived metrics, and scenario-delta fields.
+- Applies to normalized datasets used for evaluation and scenario analysis.
+- Covers required and optional input fields, proxy behavior, derived metrics, and scenario output conventions.
 
-## Identifier and Context Fields
+## Required Input Fields
 
-| Column | Type | Unit | Description |
+The ingestion pipeline requires the following fields in every input row.
+
+| Field | Type | Source | Unit | Time Basis | Missing-Value Handling |
+| --- | --- | --- | --- | --- | --- |
+| `industry_code` | string | Input dataset (`sample`, `bea`, `census`, uploaded CSV, or snapshot) | N/A | Annual record key | Row rejected or validation error if absent. |
+| `industry_name` | string | Input dataset | N/A | Annual record key | Row rejected or validation error if absent. |
+| `year` | integer | Input dataset | calendar year | Point-in-time annual observation | Row rejected or validation error if absent or non-numeric. |
+
+## Optional Input Fields
+
+At least one denominator candidate (`materials_cost` or `intermediate_inputs`) should be present for robust ratio outputs.
+
+| Field | Type | Source | Unit | Time Basis | Missing-Value Handling |
+| --- | --- | --- | --- | --- | --- |
+| `gross_output` | float | BEA/Census/sample/upload | Monetary (nominal, source-provided) | Annual | If missing, dependent derived metrics become null. |
+| `materials_cost` | float | Census/sample/upload | Monetary | Annual | Preferred denominator for `idiot_index`; if missing, fallback proxy may be used. |
+| `intermediate_inputs` | float | BEA/sample/upload | Monetary | Annual | Fallback denominator when `materials_cost` is unavailable. |
+| `value_added` | float | BEA/Census/sample/upload | Monetary | Annual | Optional for margin-like metrics; missing values propagate to derived percentage fields. |
+| `source` | string | Pipeline metadata | N/A | Observation metadata | If missing, pipeline may assign source context during normalization. |
+
+## Proxy and Denominator Rules
+
+- `idiot_index` denominator precedence: `materials_cost` first, then `intermediate_inputs`.
+- If both denominator fields are missing, denominator-dependent metrics are null.
+- Zero-denominator handling: when selected denominator is `0`, ratio outputs are set to null/NA (not infinite) to avoid misleading results.
+- Census AIES workflows may include proxy-derived operating expense fields; proxy use must be interpreted as an estimate, not a direct reported value.
+
+## Derived Metrics
+
+| Field | Type | Unit | Formula / Rule |
 | --- | --- | --- | --- |
-| `industry_code` | string | N/A | Industry identifier (NAICS-style code where available). |
-| `industry_name` | string | N/A | Human-readable industry label. |
-| `year` | integer | calendar year | Observation year associated with the row. |
-| `source` | string | N/A | Data source label (for example `sample`, `bea`, `census`, or snapshot source labels). |
+| `idiot_index` | float | ratio | `gross_output / denominator` with denominator rules above. |
+| `value_added` | float | monetary | Source-provided or computed fallback depending on dataset availability. |
+| `value_added_pct` | float | percent | `(value_added / gross_output) * 100` when both values are valid and `gross_output != 0`. |
+| `materials_share_pct` | float | percent | `(materials_cost / gross_output) * 100` when values are valid and `gross_output != 0`. |
+| `materials_dependency_ratio` | float | ratio | Dependency measure derived from material/intermediate input intensity. |
+| `shock_sensitivity_index` | float | index score | Composite sensitivity estimate from scenario response factors. |
+| `resilience_score` | float | index score | Composite resilience indicator built from margin/dependency/sensitivity signals. |
+| `health_score` | float | index score | Aggregated operational health indicator used for ranking and risk banding. |
 
-## Base Economic Fields
+## Scenario Output Conventions
 
-| Column | Type | Unit | Description |
-| --- | --- | --- | --- |
-| `gross_output` | float | monetary (source currency) | Top-line output/revenue proxy used in ratio calculations. |
-| `materials_cost` | float | monetary | Materials expense used for cost intensity and efficiency metrics. |
-| `intermediate_inputs` | float | monetary | Intermediate input costs when provided by source data. |
-| `value_added` | float | monetary | Economic value retained after intermediate/material costs. |
-
-## Derived Dashboard Metrics
-
-| Column | Type | Unit | Formula / Rule |
-| --- | --- | --- | --- |
-| `idiot_index` | float | ratio | `gross_output / denominator`, where denominator prefers `materials_cost` and falls back to `intermediate_inputs` when needed. |
-| `value_added_pct` | float | percent | `(value_added / gross_output) * 100`, when both fields are available. |
-| `materials_share_pct` | float | percent | `(materials_cost / gross_output) * 100`, when both fields are available. |
-| `resilience_score` | float | index score | Composite score generated from margin, dependency, and shock sensitivity signals. |
-| `materials_dependency_ratio` | float | ratio | Dependency intensity on materials/intermediate cost inputs. |
-| `shock_sensitivity_index` | float | index score | Relative sensitivity to modeled scenario shocks. |
-| `health_score` | float | index score | Composite health indicator used for risk-banding and ranking. |
-
-## Scenario Output Fields
-
-Scenario runs typically include baseline and shocked values and/or delta rows:
+Scenario outputs can include baseline/scenario snapshots and delta fields.
 
 | Field Pattern | Meaning |
 | --- | --- |
-| `*_baseline` | Baseline metric before any applied scenario adjustment. |
-| `*_scenario` | Metric after scenario adjustments are applied. |
+| `*_baseline` | Baseline value before applied shock adjustments. |
+| `*_scenario` | Recomputed value after scenario adjustments. |
 | `*_delta` | `scenario - baseline` for the same metric. |
 
-Common delta fields include:
+Common delta fields:
 
 - `idiot_index_delta`
 - `resilience_score_delta`
@@ -55,13 +67,15 @@ Common delta fields include:
 - `shock_sensitivity_index_delta`
 - `health_score_delta`
 
-## Notes on Interpretation
+## Interpretation Limitations
 
-- A higher `idiot_index` indicates more output per cost denominator, but should be interpreted with source and denominator context.
-- `materials_share_pct` and `materials_dependency_ratio` are related but not identical; the former is a direct share, while the latter is part of a broader dependency modeling layer.
-- Scenario deltas are comparative analytics outputs and do not represent forecast certainty.
+- Metrics are heuristic diagnostics, not causal inference or forecasting guarantees.
+- Cross-source comparisons can reflect source methodology differences (coverage, definitions, revisions).
+- Monetary fields are source-native values and may not be inflation-adjusted unless explicitly transformed upstream.
+- Proxy-derived fields should be treated as approximate substitutes when direct source fields are unavailable.
+- Scenario outputs are deterministic recalculations from stated shocks and do not model second-order macroeconomic dynamics.
 
 ## Provenance and Validation
 
-- Input validation and normalization are handled in application/core layers prior to metric computation.
-- The official snapshot workflow and assumptions are documented in `data/README.md` and related operational docs.
+- Input validation and normalization occur before metric computation in application/core layers.
+- Official snapshot assumptions and refresh workflow are documented in `data/README.md` and `docs/WORKFLOWS_DATA_REFRESH.md`.

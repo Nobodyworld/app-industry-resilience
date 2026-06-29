@@ -1,7 +1,7 @@
 [project]
 name = "idiot-index-app"
 version = "0.1.0"
-description = "Streamlit application for Idiot Index analysis"
+description = "U.S. Industry Cost Structure and Resilience Dashboard"
 requires-python = ">=3.13"
 readme = "README.md"
 license = { file = "LICENSE" }

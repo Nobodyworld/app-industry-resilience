@@ -1,5 +1,7 @@
 # Documentation Index
 
+Project title: **U.S. Industry Cost Structure and Resilience Dashboard**
+
 This directory contains all long-form documentation for the Idiot Index project. The content is split into three buckets so new contributors can quickly find what they need:
 
 - `handbook/` – canonical guides covering architecture, automation, release process, security posture, and support playbooks. Start here for high-level context.

@@ -18,7 +18,7 @@ Core reference guides:
 - Verified:
   - Streamlit dashboard startup and offline sample-dataset workflow.
   - Headless API test suite paths covered by `tests/test_api.py`.
-  - Full local regression suite currently green (`218 passed`).
+  - Full local regression suite currently green (`246 passed`).
   - Local lint and type checks currently green (`ruff`, `mypy`).
 - Experimental:
   - Remote observability snapshot replication backends (S3, GCS, Azure) are available but environment-dependent and require external infrastructure/configuration.
@@ -206,7 +206,7 @@ python src/scripts/observability_tail.py --follow --limit 10  # Stream recent ob
 python src/scripts/diagnostics_bundle.py --pretty --output build/reports/diagnostics.json  # Capture config, health, events, and metrics in one bundle
 python src/scripts/extensions_catalog.py --json --pretty  # Inspect registered summary/scenario/instrumentation extensions
 python src/scripts/connectors_catalog.py --json --pretty  # Inspect registered data source and automation connectors
-python src/scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for analytics/API critical paths (override with --paths)
+python src/scripts/run_tests_with_trace.py --threshold 85  # Offline coverage helper; align threshold with runtime gate policy
 python src/scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
 ```
 

@@ -8,8 +8,8 @@ import streamlit as st
 from src.interfaces.streamlit.components import (
     build_data_story,
     render_download_panel,
-    render_observability_snapshots,
     render_insight_tabs,
+    render_observability_snapshots,
     render_page_header,
     render_scenario_controls,
     render_scenario_results,
