@@ -121,7 +121,9 @@ def process_uploaded_file(
         return None, f"Error reading CSV: {exc}"
 
 
-st.set_page_config(page_title="Idiot Index – Industry Dashboard", layout="wide")
+st.set_page_config(
+    page_title="U.S. Industry Cost Structure and Resilience Dashboard", layout="wide"
+)
 load_custom_styles()
 
 SCENARIO_PLANNER = ScenarioPlanner()
@@ -334,7 +336,7 @@ if current_query:
     ]
 
 focus_mode = render_page_header(
-    title="Idiot Index Intelligence Studio",
+    title="U.S. Industry Cost Structure and Resilience Dashboard",
     subtitle="Sense, compare, and narrate the balance between gross output and cost inputs.",
     meta={
         "Source": data_mode,

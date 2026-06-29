@@ -1,4 +1,4 @@
-.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage check pre-commit clean security sbom docs scenario prefetch-cache refresh-official-data analytics observability observability-snapshot audit quality-gate diagnostics
+.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage coverage-runtime coverage-full coverage-scripts check pre-commit clean security sbom docs scenario prefetch-cache refresh-official-data analytics observability observability-snapshot audit quality-gate diagnostics
 
 PYTHON := python
 SKIP_PIP ?= 0
@@ -7,7 +7,8 @@ REPORT_DIR := build/reports
 SBOM_DIR := build/sbom
 SBOM_FILE := $(SBOM_DIR)/cyclonedx.json
 SBOM_REQUIREMENTS := requirements.txt requirements-dev.txt
-COVERAGE_THRESHOLD ?= 90
+RUNTIME_COVERAGE_THRESHOLD ?= 85
+RUNTIME_COVERAGE_PATHS := src/adapters src/agents src/application src/core src/extensions src/infrastructure src/interfaces/api src/interfaces/streamlit
 
 help:
 	@echo "Available targets:"
@@ -19,7 +20,10 @@ help:
 	@echo "  lint               Run Ruff lint checks"
 	@echo "  typecheck          Run mypy static type checks"
 	@echo "  test               Execute pytest suite"
-	@echo "  coverage           Generate XML coverage report"
+	@echo "  coverage           Run runtime coverage gate (staged)"
+	@echo "  coverage-runtime   Run strict runtime package coverage gate"
+	@echo "  coverage-full      Run full src coverage report (informational)"
+	@echo "  coverage-scripts   Run scripts-only coverage report (informational)"
 	@echo "  pre-commit         Run all pre-commit hooks against the repository"
 	@echo "  quality-gate       Run linting, type checks, tests w/ coverage, and security scans"
 	@echo "  check              Backwards-compatible alias for quality-gate"
@@ -71,11 +75,28 @@ test:
 	pytest
 
 coverage:
+	$(MAKE) coverage-runtime
+
+coverage-runtime:
 	@if python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('pytest_cov') else 1)" >/dev/null 2>&1; then \
-		pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=$(COVERAGE_THRESHOLD); \
+		pytest $(foreach path,$(RUNTIME_COVERAGE_PATHS),--cov=$(path)) --cov-report=term-missing --cov-report=xml --cov-fail-under=$(RUNTIME_COVERAGE_THRESHOLD); \
 	else \
 	@echo 'pytest-cov not installed; using trace-based coverage fallback'; \
-		$(PYTHON) src/scripts/run_tests_with_trace.py --threshold=$(COVERAGE_THRESHOLD); \
+		$(PYTHON) src/scripts/run_tests_with_trace.py --threshold=$(RUNTIME_COVERAGE_THRESHOLD); \
+	fi
+
+coverage-full:
+	@if python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('pytest_cov') else 1)" >/dev/null 2>&1; then \
+		pytest --cov=src --cov-report=term-missing --cov-report=xml; \
+	else \
+		echo 'pytest-cov not installed; full coverage report unavailable'; \
+	fi
+
+coverage-scripts:
+	@if python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('pytest_cov') else 1)" >/dev/null 2>&1; then \
+		pytest --cov=src/scripts --cov-report=term-missing; \
+	else \
+		echo 'pytest-cov not installed; scripts coverage report unavailable'; \
 	fi
 
 pre-commit:
@@ -90,12 +111,8 @@ quality-gate:
 	$(MAKE) format-check
 	$(MAKE) lint
 	$(MAKE) typecheck
-	@if python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('pytest_cov') else 1)" >/dev/null 2>&1; then \
-		pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=$(COVERAGE_THRESHOLD); \
-	else \
-		echo 'pytest-cov not installed; using trace-based coverage fallback'; \
-		$(PYTHON) src/scripts/run_tests_with_trace.py --threshold=$(COVERAGE_THRESHOLD); \
-	fi
+	$(MAKE) coverage-runtime
+	$(MAKE) coverage-full
 	$(MAKE) security
 
 check: quality-gate

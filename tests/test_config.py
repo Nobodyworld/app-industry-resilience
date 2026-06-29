@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
+from typing import Any, Mapping, cast
 
 import pytest
 
@@ -30,9 +32,9 @@ def test_load_config_from_mapping(tmp_path) -> None:
     assert config.observability_snapshot_dir == Path("build/observability_snapshots").resolve()
     assert config.default_year == 2020
     assert config.census_asm_endpoint_template == "https://api.census.gov/data/{year}/asm"
-    summary = get_config_summary(config)
+    summary = cast(Mapping[str, Any], get_config_summary(config))
     assert summary["bea_key_set"] is True
-    snapshot_summary = summary["observability_snapshot"]
+    snapshot_summary = cast(Mapping[str, Any], summary.get("observability_snapshot", {}))
     expected_suffix = str(Path("build/observability_snapshots"))
     assert snapshot_summary["dir"].endswith(expected_suffix)
     assert snapshot_summary["retention_count"] == 20
@@ -217,9 +219,12 @@ def test_config_summary_masks_remote_secrets() -> None:
     }
 
     config = load_config(env)
-    summary = get_config_summary(config)
+    summary = cast(Mapping[str, Any], get_config_summary(config))
 
-    remote_summary = summary["observability_snapshot_remote"]
+    remote_summary = cast(
+        Mapping[str, Any],
+        summary.get("observability_snapshot_remote", {}),
+    )
     assert remote_summary["enabled"] is True
     assert remote_summary["bucket"] == "idiot-index-snapshots"
     assert remote_summary["has_access_key"] is True
@@ -296,3 +301,167 @@ def test_validate_config_accepts_plugin_backend(tmp_path: Path) -> None:
     result = validate_config(config)
 
     assert result.errors == ()
+
+
+def test_load_config_parses_distributed_redis_url_fields() -> None:
+    config = load_config(
+        {
+            "RATE_LIMIT_BACKEND": "redis",
+            "RATE_LIMIT_REDIS_URL": "rediss://alice:secret@cache.example:6380/2",
+            "RATE_LIMIT_REDIS_TIMEOUT_SECONDS": "1.5",
+            "RATE_LIMIT_REDIS_TTL_SECONDS": "120",
+        }
+    )
+
+    distributed = config.rate_limits.distributed
+    assert distributed is not None
+    assert distributed.host == "cache.example"
+    assert distributed.port == 6380
+    assert distributed.db == 2
+    assert distributed.username == "alice"
+    assert distributed.password == "secret"
+    assert distributed.ssl is True
+    assert distributed.socket_timeout == 1.5
+    assert distributed.window_seconds == 120.0
+
+
+def test_load_config_rejects_invalid_redis_db_segment() -> None:
+    with pytest.raises(ConfigError) as exc_info:
+        load_config(
+            {
+                "RATE_LIMIT_BACKEND": "redis",
+                "RATE_LIMIT_REDIS_URL": "redis://localhost/not-a-db",
+            }
+        )
+
+    assert "invalid database segment" in str(exc_info.value)
+
+
+def test_load_config_rejects_invalid_normalize_overrides_payloads() -> None:
+    with pytest.raises(ConfigError):
+        load_config({"NORMALIZE_DTYPE_OVERRIDES": "{invalid"})
+
+    with pytest.raises(ConfigError):
+        load_config({"NORMALIZE_DTYPE_OVERRIDES": "[]"})
+
+
+def test_validate_config_surfaces_invalid_limits_and_defaults(tmp_path: Path) -> None:
+    base = load_config(
+        {"CACHE_DIR": str(tmp_path), "BEA_API_KEY": "bea", "CENSUS_API_KEY": "census"}
+    )
+    config = replace(
+        base,
+        log_level="TRACE",
+        default_year=1900,
+        cache=replace(base.cache, api_ttl_seconds=0, computation_ttl_seconds=0),
+        max_csv_size_mb=0,
+        rate_limits=replace(base.rate_limits, bea=0),
+    )
+
+    result = validate_config(config)
+
+    joined_errors = "\n".join(result.errors)
+    joined_warnings = "\n".join(result.warnings)
+    assert "LOG_LEVEL" in joined_errors
+    assert "DEFAULT_YEAR" in joined_errors
+    assert "CACHE_TTL_API" in joined_errors
+    assert "CACHE_TTL_COMPUTATION" in joined_errors
+    assert "MAX_CSV_SIZE_MB" in joined_errors
+    assert "Rate limit for bea" in joined_errors
+    assert "not within Census supported range" in joined_warnings
+
+
+def test_validate_config_redis_distributed_branch_warnings_and_errors(tmp_path: Path) -> None:
+    base = load_config({"CACHE_DIR": str(tmp_path)})
+    # Build explicit distributed settings to trigger validation branches.
+    from src.core.config import DistributedRateLimitConfig, RateLimitConfig
+
+    rate_limits = RateLimitConfig(
+        bea=base.rate_limits.bea,
+        census=base.rate_limits.census,
+        default=base.rate_limits.default,
+        distributed=DistributedRateLimitConfig(
+            enabled=True,
+            host=None,
+            port=0,
+            db=0,
+            username=None,
+            password=None,
+            ssl=False,
+            socket_timeout=0,
+            key_prefix="",
+            window_seconds=0,
+        ),
+    )
+    config = replace(base, rate_limits=rate_limits)
+
+    result = validate_config(config)
+
+    errors = "\n".join(result.errors)
+    warnings = "\n".join(result.warnings)
+    assert "RATE_LIMIT_REDIS_PORT" in errors
+    assert "RATE_LIMIT_REDIS_TTL_SECONDS" in errors
+    assert "RATE_LIMIT_REDIS_KEY_PREFIX" in errors
+    assert "RATE_LIMIT_REDIS_TIMEOUT_SECONDS" in errors
+    assert "defaulting to localhost" in warnings
+
+
+def test_validate_config_remote_backend_warning_branches(tmp_path: Path) -> None:
+    base = load_config({"CACHE_DIR": str(tmp_path)})
+    seeded = load_config(
+        {
+            "OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "s3",
+            "OBSERVABILITY_SNAPSHOT_S3_BUCKET": "bucket",
+        }
+    )
+    assert seeded.observability_snapshot_remote is not None
+
+    s3_remote = replace(
+        seeded.observability_snapshot_remote,
+        max_retries=-1,
+        prefix="a//b/",
+        endpoint_url="https://s3.example.test",
+        access_key=None,
+        secret_key=None,
+    )
+    assert s3_remote is not None
+    s3_result = validate_config(replace(base, observability_snapshot_remote=s3_remote))
+    assert any("MAX_RETRIES" in error for error in s3_result.errors)
+    assert any("S3_PREFIX" in error for error in s3_result.errors)
+    assert any("IAM role" in warning for warning in s3_result.warnings)
+
+    plugin_remote = replace(s3_remote, backend="plugin:custom", options=None, max_retries=1)
+    plugin_result = validate_config(replace(base, observability_snapshot_remote=plugin_remote))
+    assert any("REMOTE_OPTIONS" in warning for warning in plugin_result.warnings)
+
+    unknown_remote = replace(s3_remote, backend="mystery-backend", options={}, max_retries=1)
+    unknown_result = validate_config(replace(base, observability_snapshot_remote=unknown_remote))
+    assert any("matching replication extension" in warning for warning in unknown_result.warnings)
+
+
+def test_load_config_normalises_remote_prefix_and_options_keys() -> None:
+    config = load_config(
+        {
+            "OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "plugin:demo",
+            "OBSERVABILITY_SNAPSHOT_REMOTE_PREFIX": " //nightly/run// ",
+            "OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS": json.dumps({"mode": "mirror"}),
+        }
+    )
+    assert config.observability_snapshot_remote is not None
+    assert config.observability_snapshot_remote.prefix == "nightly/run/"
+    assert config.observability_snapshot_remote.options == {"mode": "mirror"}
+
+
+def test_load_config_rejects_empty_remote_option_keys() -> None:
+    with pytest.raises(ConfigError):
+        load_config(
+            {
+                "OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "plugin:demo",
+                "OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS": json.dumps({"  ": 1}),
+            }
+        )
+
+
+def test_load_config_remote_backend_off_disables_remote() -> None:
+    config = load_config({"OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND": "disabled"})
+    assert config.observability_snapshot_remote is None

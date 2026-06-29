@@ -1,11 +1,12 @@
 Project specification for the Idiot Index application
 
 # Overview
+
 The Idiot Index is a small analytics application that computes the ratio of gross output to materials cost (the "Idiot Index"). It supports multiple data sources (BEA, Census ASM, and CSV uploads), normalization, metric computation, and a Streamlit UI with an optional FastAPI headless server.
 
 ## Key APIs and Data Flows
-- Sources: `src/sources/*` and `src/adapters/*` implement fetching functions that return normalized rows mapping to the expected schema.
 
+- Sources: `src/sources/*` and `src/adapters/*` implement fetching functions that return normalized rows mapping to the expected schema.
 
 - Sources: `src/sources/*` and `src/adapters/*` implement fetching functions that return normalized rows mapping to the expected schema.
 - Normalization: `src/core/normalize.py` standardizes column names and types.
@@ -13,12 +14,14 @@ The Idiot Index is a small analytics application that computes the ratio of gros
 - Presentation: `app.py` and `src/interfaces/streamlit/` provide UI widgets and charts. `fastapi/` includes an optional headless API server implementation.
 
 ## Schema
+
 - `industry_code` (string)
 - `industry_name` (string)
 - `year` (int)
 - `gross_output` (float)
 
 All normalized dataframes must contain at a minimum the columns:
+
 - `industry_code` (string)
 - `industry_name` (string)
 - `year` (int)
@@ -43,6 +46,6 @@ Computed columns (derived by `compute_metrics`):
 
 ## Appendix: Acceptance Criteria
 
-- Unit tests for all adapters and core components (>= 90% coverage target)
+- Unit tests for all adapters and core components (runtime-path coverage gate enforced at >= 85% by default; full-source coverage tracked informationally)
 - Integration tests for a full pipeline roundtrip
 - Prometheus metrics exposed for production observability

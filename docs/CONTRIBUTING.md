@@ -55,7 +55,7 @@ pre-commit install --hook-type commit-msg
    make quality-gate
    ```
 
-   `make quality-gate` runs Black (check mode), Ruff, mypy, pytest with coverage enforcement (`--cov-fail-under=90`), and the security gate (`pip-audit` + `detect-secrets`). This mirrors the CI workflow so failures are caught locally.
+   `make quality-gate` runs Black (check mode), Ruff, mypy, runtime-scoped pytest coverage enforcement (`make coverage-runtime`, default fail-under 85), an informational full `src` coverage report, and the security gate (`pip-audit` + `detect-secrets`). This mirrors the CI workflow so failures are caught locally.
 
 4. Run additional focused commands as needed:
 
@@ -73,8 +73,8 @@ pre-commit install --hook-type commit-msg
 The helper scripts invoked by these targets now auto-bootstrap the repository root onto `PYTHONPATH`, so you can run
 `python scripts/<name>.py` directly without installing the project as a package.
 
-5. Commit using Conventional Commits. The `commit-msg` hook will reject messages that do not comply.
-6. Push and open a pull request using the provided template.
+1. Commit using Conventional Commits. The `commit-msg` hook will reject messages that do not comply.
+2. Push and open a pull request using the provided template.
 
 ## Pull Request Checklist
 

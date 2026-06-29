@@ -125,7 +125,8 @@ Expected command transcripts (approximate):
     black --check app.py src tests
     ruff check app.py src tests
     python -m mypy src
-    pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=90
+   make coverage-runtime    # release-blocking gate (default fail-under 85)
+   make coverage-full       # informational full-source report
     python -m pip_audit ...
 
 ## Validation and Acceptance

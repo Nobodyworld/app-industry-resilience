@@ -10,7 +10,7 @@ Use `make quality-gate` before every commit. The target runs:
 1. Black (check mode) against `app.py`, `src/`, and `tests/`.
 2. Ruff linting with the repo-standard rule set.
 3. mypy type checks (strict optional handling for the core packages).
-4. `pytest --cov=src --cov-fail-under=90` to enforce coverage.
+4. `make coverage-runtime` to enforce runtime-path coverage (default fail-under 85), then `make coverage-full` and `make coverage-scripts` for informational reporting.
 5. `pip-audit` plus `detect-secrets` scans with JSON artefacts in `build/reports/`.
 
 If PyPI access is unavailable, generate coverage with the built-in trace harness instead:
@@ -19,7 +19,7 @@ If PyPI access is unavailable, generate coverage with the built-in trace harness
 python -m trace --count --summary --coverdir build/coverage --module pytest
 ```
 
-The steward report documents how to parse `build/coverage/*.cover` to confirm the line-rate remains above the 90% target.
+The steward report documents how to parse `build/coverage/*.cover` and CI coverage output to confirm runtime-path coverage stays above the enforced threshold and informational reports continue trending upward.
 
 If any tool is unavailable offline, the Makefile falls back to the Python helper scripts inside `scripts/` so the
 quality gate can still run in air-gapped environments.
@@ -82,7 +82,6 @@ Run `make audit` (or `python scripts/audit_metrics.py --runs 3`) to capture the 
 The command writes `build/reports/audit-metrics.json` and prints the JSON payload so agents can archive or diff the results.
 The script carries an `# agent-entrypoint` tag to signal safe automation use.
 
-
 ## Continuous Integration & Dependency Hygiene
 
 GitHub Actions mirrors the local quality gate. The workflow performs:
@@ -112,4 +111,3 @@ Following these patterns keeps local and remote automation aligned, reduces depl
 single source of truth for operational status.
 
 > **Tip:** All scripts under `scripts/` now self-bootstrap the repository root onto `PYTHONPATH`, so running `python scripts/<tool>.py` works without `pip install -e .`.
-

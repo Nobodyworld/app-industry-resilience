@@ -1,14 +1,21 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
+import pandas as pd
 import pytest
 
 from scripts import audit_metrics as audit_script
 from scripts import bump_version as bump_module
 from scripts import changelog_entry, connectors_catalog, diagnostics_bundle
 from scripts import observability_snapshot as observability_script
+from scripts import refresh_official_data as refresh_script
+from scripts import run_api as run_api_script
+from scripts import run_pytest_trace as pytest_trace_script
+from scripts import run_quality_checks as quality_script
 from scripts import run_tests_with_trace as trace_script
 from scripts import scaffold_extension as scaffold_module
 from scripts import scaffold_service as service_scaffold
@@ -342,7 +349,7 @@ def test_observability_snapshot_reports_remote_replication(monkeypatch, tmp_path
             self.bucket = "stub-bucket"
             self.prefix = "remote/"
 
-        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+        def replicate(self, snapshot, path) -> None:
             self.calls.append((snapshot.snapshot_id, path))
 
         def close(self) -> None:
@@ -370,10 +377,10 @@ def test_observability_snapshot_logs_remote_failure(monkeypatch, tmp_path, capsy
     monkeypatch.setenv("OBSERVABILITY_SNAPSHOT_DIR", str(tmp_path))
 
     class FailingReplicator:
-        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+        def replicate(self, snapshot, path) -> None:
             raise observability_script.SnapshotReplicationError("boom")
 
-        def close(self) -> None:  # type: ignore[no-untyped-def]
+        def close(self) -> None:
             pass
 
     monkeypatch.setattr(
@@ -457,12 +464,12 @@ def test_observability_snapshot_reports_debug_destination(monkeypatch, tmp_path,
             self.closed = False
             self.target_dir = tmp_path / "remote-debug"
 
-        def replicate(self, snapshot, path) -> None:  # type: ignore[no-untyped-def]
+        def replicate(self, snapshot, path) -> None:
             self.calls.append((snapshot.snapshot_id, path))
             self.target_dir.mkdir(parents=True, exist_ok=True)
             (self.target_dir / f"{snapshot.snapshot_id}.json").write_bytes(path.read_bytes())
 
-        def close(self) -> None:  # type: ignore[no-untyped-def]
+        def close(self) -> None:
             self.closed = True
 
     stub = DebugReplicator()
@@ -479,3 +486,121 @@ def test_observability_snapshot_reports_debug_destination(monkeypatch, tmp_path,
     assert stub.calls
     assert stub.closed is True
     assert "remote-debug" in captured.err
+
+
+def test_run_api_env_flag_and_parse_args(monkeypatch) -> None:
+    monkeypatch.setenv("API_RELOAD", "true")
+    monkeypatch.setenv("API_HOST", "127.0.0.1")
+    monkeypatch.setenv("API_PORT", "9010")
+    monkeypatch.setenv("API_WORKERS", "3")
+    monkeypatch.setenv("API_LOG_LEVEL", "debug")
+
+    assert run_api_script._env_flag("API_RELOAD") is True
+    args = run_api_script.parse_args([])
+    assert args.host == "127.0.0.1"
+    assert args.port == 9010
+    assert args.reload is True
+    assert args.workers == 3
+    assert args.log_level == "debug"
+
+
+def test_run_api_main_uses_stub_server(monkeypatch, capsys) -> None:
+    class StubServer:
+        def __init__(self) -> None:
+            self.server_address = (b"0.0.0.0", 9100)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def serve_forever(self) -> None:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(run_api_script, "make_server", lambda *args, **kwargs: StubServer())
+    monkeypatch.setattr(run_api_script.socket, "gethostbyname", lambda _name: "127.0.0.1")
+
+    exit_code = run_api_script.main(
+        ["--host", "0.0.0.0", "--port", "9100", "--workers", "4", "--reload"]
+    )
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "ignoring --reload" in output
+    assert "forcing workers=1" in output
+    assert "Serving API on http://127.0.0.1:9100" in output
+    assert "Shutting down" in output
+
+
+def test_run_quality_checks_fast_mode(monkeypatch) -> None:
+    commands: list[list[str]] = []
+
+    def _fake_ls(patterns):
+        if list(patterns) == ["*.py"]:
+            return ["src/app.py"]
+        return ["README.md", "src/app.py"]
+
+    monkeypatch.setattr(quality_script, "git_ls_files", _fake_ls)
+    monkeypatch.setattr(quality_script, "run", lambda cmd: commands.append(cmd))
+
+    exit_code = quality_script.main(["--fast"])
+
+    assert exit_code == 0
+    assert any(cmd[2] == "black" for cmd in commands)
+    assert any(cmd[2] == "ruff" for cmd in commands)
+    assert any(cmd[2] == "mypy" for cmd in commands)
+    assert any(cmd[2] == "pytest" for cmd in commands)
+    assert not any("codespell.py" in " ".join(cmd) for cmd in commands)
+
+
+def test_run_quality_checks_full_with_security(monkeypatch) -> None:
+    commands: list[list[str]] = []
+
+    def _fake_ls(patterns):
+        if list(patterns) == ["*.py"]:
+            return ["src/app.py"]
+        return ["README.md", "src/app.py"]
+
+    monkeypatch.setattr(quality_script, "git_ls_files", _fake_ls)
+    monkeypatch.setattr(quality_script, "run", lambda cmd: commands.append(cmd))
+    monkeypatch.setattr(quality_script, "_module_available", lambda name: name == "pip_audit")
+    monkeypatch.setattr(quality_script.shutil, "which", lambda name: "/usr/bin/detect-secrets-hook")
+
+    exit_code = quality_script.main([])
+
+    assert exit_code == 0
+    assert any("check_trailing_whitespace.py" in " ".join(cmd) for cmd in commands)
+    assert any("codespell.py" in " ".join(cmd) for cmd in commands)
+    assert any("pip_audit" in " ".join(cmd) for cmd in commands)
+    assert any(cmd[0] == "detect-secrets-hook" for cmd in commands)
+
+
+def test_refresh_official_data_main_writes_csv(monkeypatch, tmp_path, capsys) -> None:
+    frame = pd.DataFrame(
+        [
+            {"industry_code": "311", "industry_name": "Food", "year": 2023},
+            {"industry_code": "312", "industry_name": "Beverage", "year": 2024},
+        ]
+    )
+    monkeypatch.setattr(refresh_script, "fetch_latest_aies_snapshot", lambda: frame)
+    output = tmp_path / "official.csv"
+
+    exit_code = refresh_script.main(["--output", str(output)])
+    text = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert output.exists()
+    assert "Wrote 2 official AIES industry rows for 2023" in text
+
+
+def test_run_pytest_trace_main_invokes_pytest(monkeypatch) -> None:
+    chdir_calls: list[str] = []
+
+    monkeypatch.setattr(pytest_trace_script.os, "chdir", lambda path: chdir_calls.append(path))
+    monkeypatch.setitem(sys.modules, "pytest", SimpleNamespace(main=lambda: 7))
+
+    exit_code = pytest_trace_script.main()
+
+    assert exit_code == 7
+    assert chdir_calls

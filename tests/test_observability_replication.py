@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -12,8 +13,8 @@ try:  # pragma: no cover - optional dependency handling
     from botocore.session import get_session as _botocore_get_session
     from botocore.stub import ANY, Stubber
 except Exception:  # pragma: no cover - exercised when botocore unavailable
-    _botocore_get_session = None  # type: ignore[assignment]
-    ANY = Stubber = None  # type: ignore[assignment]
+    _botocore_get_session = None
+    ANY = Stubber = None
 
 from src.core import SnapshotRemoteStorageConfig
 from src.extensions.manager import ExtensionManager, load_extensions
@@ -332,7 +333,7 @@ def test_gcs_replicator_uploads_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_pa
     replicator.replicate(snapshot, snapshot_path)
     replicator.close()
 
-    client = replicator.client
+    client = cast(Any, replicator).client
     assert isinstance(client, StubGCSClient)
     assert client.project == "test"
     assert client.bucket_calls == ["idiot-index-snapshots"]
@@ -372,7 +373,7 @@ def test_azure_replicator_uploads_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_
 
     class StubBlobClient:
         def __init__(self) -> None:
-            self.uploads: list[tuple[bytes, bool, dict[str, Any], str]] = []
+            self.uploads: list[tuple[bytes, bool, dict[str, Any], str, float | None]] = []
 
         def upload_blob(
             self,
@@ -458,7 +459,7 @@ def test_azure_replicator_uploads_snapshot(monkeypatch: pytest.MonkeyPatch, tmp_
     replicator.replicate(snapshot, snapshot_path)
     replicator.close()
 
-    client = replicator.client
+    client = cast(Any, replicator).client
     assert isinstance(client, StubAzureClient)
     assert client.connection_string == "UseDevelopmentStorage=true"
     assert client.last_request == ("snapshots", "nightly/azure-snap.json")
@@ -525,3 +526,214 @@ def test_snapshot_replication_instrumentation_records_events() -> None:
     health = registry._health_checks["snapshot_replication"]()
     assert health.status == "pass"
     assert "plugin:debug" in health.details.get("backend", "")
+
+
+def test_null_replicator_is_noop(tmp_path: Path) -> None:
+    replicator = NullSnapshotReplicator()
+    snapshot = _make_snapshot("noop")
+    snapshot_path = tmp_path / "noop.json"
+    _write_snapshot(snapshot_path, snapshot)
+
+    replicator.replicate(snapshot, snapshot_path)
+    replicator.close()
+
+
+def test_replicator_close_without_client_close_method() -> None:
+    class NoCloseClient:
+        pass
+
+    from src.infrastructure.observability.replication import (
+        AzureBlobSnapshotReplicator,
+        GCSnapshotReplicator,
+        S3SnapshotReplicator,
+    )
+
+    S3SnapshotReplicator(bucket="b", prefix="", client=NoCloseClient(), max_attempts=1).close()
+    GCSnapshotReplicator(bucket="b", prefix="", client=NoCloseClient(), max_attempts=1).close()
+    AzureBlobSnapshotReplicator(
+        container="c", prefix="", client=NoCloseClient(), max_attempts=1
+    ).close()
+
+
+def test_gcs_replicator_raises_after_retries(tmp_path: Path) -> None:
+    from src.infrastructure.observability.replication import GCSnapshotReplicator
+
+    class FailingBlob:
+        metadata: dict[str, Any] = {}
+
+        def upload_from_filename(self, *_args: Any, **_kwargs: Any) -> None:
+            raise RuntimeError("upload failed")
+
+    class FailingBucket:
+        def blob(self, _key: str) -> FailingBlob:
+            return FailingBlob()
+
+    class FailingClient:
+        def bucket(self, _name: str) -> FailingBucket:
+            return FailingBucket()
+
+    replicator = GCSnapshotReplicator(
+        bucket="bucket",
+        prefix="",
+        client=FailingClient(),
+        max_attempts=2,
+    )
+
+    snapshot = _make_snapshot("gcs-fail")
+    snapshot_path = tmp_path / "gcs-fail.json"
+    _write_snapshot(snapshot_path, snapshot)
+
+    with pytest.raises(SnapshotReplicationError):
+        replicator.replicate(snapshot, snapshot_path)
+
+
+def test_azure_replicator_raises_after_retries(tmp_path: Path) -> None:
+    from src.infrastructure.observability.replication import AzureBlobSnapshotReplicator
+
+    class FailingBlobClient:
+        def upload_blob(self, *_args: Any, **_kwargs: Any) -> None:
+            raise RuntimeError("azure upload failed")
+
+    class FailingAzureClient:
+        def get_blob_client(self, *, container: str, blob: str) -> FailingBlobClient:
+            return FailingBlobClient()
+
+    replicator = AzureBlobSnapshotReplicator(
+        container="snapshots",
+        prefix="",
+        client=FailingAzureClient(),
+        max_attempts=2,
+    )
+
+    snapshot = _make_snapshot("azure-fail")
+    snapshot_path = tmp_path / "azure-fail.json"
+    _write_snapshot(snapshot_path, snapshot)
+
+    with pytest.raises(SnapshotReplicationError):
+        replicator.replicate(snapshot, snapshot_path)
+
+
+def test_create_azure_replicator_falls_back_without_connection_settings(monkeypatch) -> None:
+    from src.infrastructure.observability import replication as module
+
+    monkeypatch.setattr(module, "_HAS_AZURE", True)
+    monkeypatch.setattr(module, "BlobServiceClient", object())
+
+    config = SnapshotRemoteStorageConfig(
+        enabled=True,
+        backend="azure-blob",
+        bucket="snapshots",
+        prefix="",
+        region=None,
+        endpoint_url=None,
+        access_key=None,
+        secret_key=None,
+        session_token=None,
+        use_ssl=True,
+        force_path_style=False,
+        max_retries=1,
+        options={},
+    )
+
+    replicator = module.create_azure_snapshot_replicator(config)
+    assert isinstance(replicator, NullSnapshotReplicator)
+
+
+def test_build_gcs_client_invalid_json_and_constructor_failure(monkeypatch) -> None:
+    from src.infrastructure.observability import replication as module
+
+    class RaisingClient:
+        def __init__(self, **_kwargs: Any) -> None:
+            raise RuntimeError("boom")
+
+        @classmethod
+        def from_service_account_json(cls, *_args: Any, **_kwargs: Any):
+            raise RuntimeError("boom")
+
+        @classmethod
+        def from_service_account_info(cls, *_args: Any, **_kwargs: Any):
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(module, "gcs_storage", type("Storage", (), {"Client": RaisingClient}))
+
+    invalid_json_cfg = SnapshotRemoteStorageConfig(
+        enabled=True,
+        backend="gcs",
+        bucket="bucket",
+        prefix="",
+        region=None,
+        endpoint_url=None,
+        access_key=None,
+        secret_key=None,
+        session_token=None,
+        use_ssl=True,
+        force_path_style=False,
+        max_retries=1,
+        options={"credentials_json": "{invalid"},
+    )
+    assert module._build_gcs_client(invalid_json_cfg) is None
+
+    ctor_failure_cfg = replace(invalid_json_cfg, options={"project": "x"})
+    assert module._build_gcs_client(ctor_failure_cfg) is None
+
+
+def test_replication_helper_serialisation_and_timeout_normalisation() -> None:
+    from src.infrastructure.observability import replication as module
+
+    serialised = module._serialise_metadata(
+        {
+            "": "skip",
+            "Set Value": {"b", "a"},
+            "Map": {"bad": object()},
+            "Seq": [1, 2],
+        }
+    )
+    assert "" not in serialised
+    assert "set-value" in serialised
+    assert serialised["seq"] == "[1, 2]"
+    assert "map" in serialised
+
+    assert module._normalise_prefix(None) == ""
+    assert module._normalise_prefix(" /nightly// ") == "nightly/"
+    assert module._coerce_timeout(None, backend="gcs") is None
+    assert module._coerce_timeout("bad", backend="gcs") is None
+    assert module._coerce_timeout(0, backend="gcs") is None
+    assert module._coerce_timeout("1.5", backend="gcs") == 1.5
+
+
+def test_build_snapshot_replicator_with_custom_manager() -> None:
+    class CustomReplicator:
+        def replicate(self, snapshot: ObservabilitySnapshot, path: Path) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class ManagerStub:
+        def __init__(self, result: object | None) -> None:
+            self.result = result
+
+        def build_replication_backend(self, config: SnapshotRemoteStorageConfig):
+            return self.result
+
+    config = SnapshotRemoteStorageConfig(
+        enabled=True,
+        backend="plugin:custom",
+        bucket=None,
+        prefix="",
+        region=None,
+        endpoint_url=None,
+        access_key=None,
+        secret_key=None,
+        session_token=None,
+        use_ssl=True,
+        force_path_style=False,
+        max_retries=1,
+    )
+
+    custom = CustomReplicator()
+    resolved = build_snapshot_replicator(config, manager=cast(Any, ManagerStub(custom)))
+    assert resolved is custom
+
+    fallback = build_snapshot_replicator(config, manager=cast(Any, ManagerStub(None)))
+    assert isinstance(fallback, NullSnapshotReplicator)

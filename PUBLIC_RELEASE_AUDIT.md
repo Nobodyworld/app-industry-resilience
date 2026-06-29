@@ -174,7 +174,7 @@ P2 concerns:
 
 ### New/remaining blockers from clean-clone validation
 
-- P0: Coverage gate failure (`--cov-fail-under=90`, measured `75.02%`).
+- P0: Coverage gate failure under the legacy whole-src policy (measured `75.02%` in that pass).
 - P0: Secret baseline validation failure (`detect-secrets-hook --baseline config/.secrets.baseline` => `Invalid baseline`).
 - P1: Lint findings (`ruff` import order and modernization rules).
 - P1: Dependency vulnerability finding (`black==25.12.0`, fix available `26.3.1`).

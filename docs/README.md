@@ -8,3 +8,8 @@ This directory contains all long-form documentation for the Idiot Index project.
 - Standalone guides (e.g., `API_REFERENCE.md`, `SCENARIO_LAB.md`) – deep dives for specific features or operational workflows.
 
 Refer back to the repository root [`README.md`](../README.md) for a project overview and links to the most commonly referenced guides.
+
+Additional quick links:
+
+- [DATA_DICTIONARY.md](DATA_DICTIONARY.md) – field-level definitions, units, and formulas for dashboard datasets.
+- [INDUSTRY_SHOCK_CASE_STUDY.md](INDUSTRY_SHOCK_CASE_STUDY.md) – reproducible scenario walkthrough with interpretation guidance.

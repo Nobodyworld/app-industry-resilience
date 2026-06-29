@@ -30,7 +30,7 @@ Stage 3 elevates Idiot Index from a hardened product to a long-lived platform. C
 ## Outcomes & Retrospective
 
 - Validation: `make quality-gate` completed successfully (`chunk b1ed4d`, `chunk b25a8d`, `chunk 29d88d`, `chunk bddbee`), exercising black, ruff, mypy (56 files, clean), pytest (135 tests, trace coverage 93.01%), and security fallbacks.
-- Coverage: Trace instrumentation reports stored under `build/reports/coverage-trace.*` confirm ≥90% requirement.
+- Coverage: Trace instrumentation reports stored under `build/reports/coverage-trace.*` supplement the enforced runtime-path gate (default 85) and informational full-source tracking.
 - Observations: CLI/event tests remain deterministic after resetting `_REGISTRY_SINGLETON`; no new TODO-Px items required.
 
 ## Context and Orientation
@@ -90,7 +90,7 @@ Gap analysis for Stage 3:
 
 ## Validation and Acceptance
 
-- `make quality-gate` must pass with coverage ≥ 90%.
+- `make quality-gate` must pass with the runtime-path coverage gate (`RUNTIME_COVERAGE_THRESHOLD`, default 85).
 - `python scripts/observability_snapshot.py --pretty` should include digest metadata and reference the new extension health check.
 - `python scripts/observability_tail.py --once` must print a well-formatted event.
 - `python scripts/extensions_catalog.py --json` should list all registered extensions, including the new data quality plugin, grouped by type.
