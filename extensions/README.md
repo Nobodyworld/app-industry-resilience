@@ -4,7 +4,7 @@ Extensions expand the Idiot Index platform without modifying core services. The 
 
 To add a new extension:
 
-1. Run `python scripts/scaffold_extension.py --name <snake_case_name>`.
+1. Run `python src/scripts/scaffold_extension.py --name <snake_case_name>`.
 2. Implement the generated module under `src/extensions/`.
 3. Update `manifest.json` with the new entry and rerun `make extensions-catalog` to verify.
 

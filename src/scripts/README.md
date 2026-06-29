@@ -7,4 +7,4 @@ Scripts in this directory provide developer automation and operational helpers. 
 - `extensions_catalog.py`, `connectors_catalog.py`, and `scaffold_extension.py` – manage the extension ecosystem and scaffolding.
 - `run_api.py`, `run_scenario.py`, and `analytics_health.py` – CLI facades mirroring Streamlit features for automation contexts.
 
-All scripts self-bootstrap the repository root onto `PYTHONPATH` so they can be executed directly via `python scripts/<name>.py`.
+All scripts self-bootstrap the repository root onto `PYTHONPATH` so they can be executed directly via `python src/scripts/<name>.py`.

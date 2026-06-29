@@ -13,20 +13,14 @@ This isn’t an academic metric; it’s a blunt heuristic popularized in enginee
 - Verified:
   - Streamlit dashboard startup and offline sample-dataset workflow.
   - Headless API test suite paths covered by `tests/test_api.py`.
-  - Clean-clone dependency install and full test run (`214 passed`).
-- Partial:
-  - Repository-wide quality gate is partially passing in clean-clone validation. `mypy` and `black --check` pass, but `ruff check` currently reports import-order and enum-modernization findings.
-  - Coverage enforcement is configured at `90%`, while clean-clone measured coverage is currently `75.02%`.
+  - Full local regression suite currently green (`218 passed`).
+  - Local lint and type checks currently green (`ruff`, `mypy`).
 - Experimental:
   - Remote observability snapshot replication backends (S3, GCS, Azure) are available but environment-dependent and require external infrastructure/configuration.
-- Planned:
-  - Final release-candidate hardening pass to close lint findings, coverage deficit, and detect-secrets baseline compatibility issues on Windows.
 
 ## Public-release limitations
 
 - Local validation is authoritative for this repository at this stage because GitHub Actions is intentionally disabled by owner policy in most repositories.
-- `detect-secrets-hook --baseline config/.secrets.baseline` currently fails with `Invalid baseline` in clean-clone Windows validation and needs baseline format/compatibility remediation.
-- `pip-audit` reports a vulnerability for `black==25.12.0` with an available fixed version (`26.3.1`), which must be reconciled against current version constraints before public release.
 - Coverage quality gate (`--cov-fail-under=90`) fails in clean-clone validation and currently blocks release-candidate readiness.
 
 ---
@@ -116,7 +110,7 @@ docker build -t idiot-index-app .
 docker run -p 8501:8501 idiot-index-app
 ```
 
-Set `PREFETCH_ARGS="--sources sample --years 2019 2020"` when starting the container to warm caches before Streamlit boots. The runtime entrypoint invokes `scripts/prefetch_data.py` whenever the variable is non-empty.
+Set `PREFETCH_ARGS="--sources sample --years 2019 2020"` when starting the container to warm caches before Streamlit boots. The runtime entrypoint invokes `src/scripts/prefetch_data.py` whenever the variable is non-empty.
 
 ### Run the headless API
 
@@ -193,14 +187,14 @@ make connectors-catalog # List registered connectors and health (pass ARGS="--js
 make audit         # Capture stewardship metrics and write build/reports/audit-metrics.json
 make api             # Launch the headless API service (pass ARGS="--port 9100" for custom ports)
 make docs          # List key documentation links in the terminal
-python scripts/check_health.py --pretty  # Run the consolidated health probe without the HTTP API
-python scripts/observability_snapshot.py --store --pretty  # Persist + print a snapshot (use --list/--compare for history)
-python scripts/observability_tail.py --follow --limit 10  # Stream recent observability events for triage
-python scripts/diagnostics_bundle.py --pretty --output build/reports/diagnostics.json  # Capture config, health, events, and metrics in one bundle
-python scripts/extensions_catalog.py --json --pretty  # Inspect registered summary/scenario/instrumentation extensions
-python scripts/connectors_catalog.py --json --pretty  # Inspect registered data source and automation connectors
-python scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for analytics/API critical paths (override with --paths)
-python scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
+python src/scripts/check_health.py --pretty  # Run the consolidated health probe without the HTTP API
+python src/scripts/observability_snapshot.py --store --pretty  # Persist + print a snapshot (use --list/--compare for history)
+python src/scripts/observability_tail.py --follow --limit 10  # Stream recent observability events for triage
+python src/scripts/diagnostics_bundle.py --pretty --output build/reports/diagnostics.json  # Capture config, health, events, and metrics in one bundle
+python src/scripts/extensions_catalog.py --json --pretty  # Inspect registered summary/scenario/instrumentation extensions
+python src/scripts/connectors_catalog.py --json --pretty  # Inspect registered data source and automation connectors
+python src/scripts/run_tests_with_trace.py --threshold 90  # Offline coverage for analytics/API critical paths (override with --paths)
+python src/scripts/audit_metrics.py --runs 3  # Compute coverage/complexity/dependency metrics for the steward report
 ```
 
 To replicate observability snapshots to a remote object store in addition to local disk, set `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` and the backend-specific variables before running the app or CLI. Built-in options include:
@@ -230,7 +224,7 @@ Extensions can also provide alternative backends. For example, setting `OBSERVAB
 
 The CLI automatically reports whether replication succeeded and where the object landed (S3 URLs or debug filesystem paths), while failures log to stderr without interrupting local persistence.
 
-All helper scripts now self-bootstrap the repository root onto `PYTHONPATH`, so running `python scripts/<name>.py` works without
+All helper scripts now self-bootstrap the repository root onto `PYTHONPATH`, so running `python src/scripts/<name>.py` works without
 activating editable installs or manually exporting environment variables.
 
 Commit messages must follow the Conventional Commits spec; the provided hooks will prevent non-conforming messages.
@@ -243,7 +237,7 @@ Launch the API locally with:
 make api
 ```
 
-This invokes `scripts/run_api.py`, which serves the lightweight FastAPI-compatible app using Python's built-in WSGI server at `http://localhost:9000` by default. Key endpoints:
+This invokes `src/scripts/run_api.py`, which serves the lightweight FastAPI-compatible app using Python's built-in WSGI server at `http://localhost:9000` by default. Key endpoints:
 
 - `GET /health` – readiness probe returning service metadata, component-level status, and telemetry counts.
 - `GET /healthz` – Kubernetes-style alias that also exposes trace correlation IDs.
@@ -585,7 +579,7 @@ idiot-index-app/
 └── requirements-dev.txt # Development tooling
 ```
 
-Scenario modelling lives in `src/application/scenario_planner.py`, which powers both the Streamlit Scenario Lab and the `scripts/run_scenario.py` CLI. It reuses the normalization and metric pipeline to recompute Idiot Index derivatives after applying percentage shocks to baseline datasets.
+Scenario modelling lives in `src/application/scenario_planner.py`, which powers both the Streamlit Scenario Lab and the `src/scripts/run_scenario.py` CLI. It reuses the normalization and metric pipeline to recompute Idiot Index derivatives after applying percentage shocks to baseline datasets.
 
 ### Data Flow Pipeline
 
@@ -700,11 +694,11 @@ The repository follows a layered structure with lightweight indexes in each dire
 
 - [`src/`](src/README.md) – application code organised by adapters, core domain logic, infrastructure, interfaces, and agent wrappers.
 - [`tests/`](tests/README.md) – pytest suites mirroring the source layout with coverage for analytics, observability, and agent tooling.
-- [`scripts/`](scripts/README.md) – developer and operator automation including quality gates, observability utilities, and scaffolding helpers.
+- [`src/scripts/`](src/scripts/README.md) – developer and operator automation including quality gates, observability utilities, and scaffolding helpers.
 - [`docs/`](docs/README.md) – long-form documentation, execution plans, and handbook references.
 - [`extensions/`](extensions/README.md) – manifest-driven plugin catalog used by the ExtensionManager.
 - [`data/`](data/README.md) – offline sample dataset powering the demo and regression tests.
 - [`assets/`](assets/README.md) – lightweight imagery and UI assets referenced by Streamlit components and docs.
 - Executive reports live under [`docs/exec/`](docs/exec/README.md); see handbook/report links from exec plans for archived summaries.
 
-Refer to [`SPEC.md`](SPEC.md) for the canonical requirements snapshot and [`STYLE-GUIDE.md`](STYLE-GUIDE.md) for coding conventions.
+Refer to [`SPEC.md`](SPEC.md) for the canonical requirements snapshot and [`docs/STYLE-GUIDE.md`](docs/STYLE-GUIDE.md) for coding conventions.

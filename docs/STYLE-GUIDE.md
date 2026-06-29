@@ -33,11 +33,11 @@ Any deviation from “TS + React for new app UIs” requires a short ADR explain
 
 ## 1. Organization Constants
 
-- **Organization**: Nobody Production  
-- **GitHub Org**: Nobodyworld  
-- **Maintainer**: Nobody  
-- **License**: Proprietary (see LICENSE file)  
-- **Solo Developer**: Yes — all repositories are maintained by a single developer  
+- **Organization**: Nobody Production
+- **GitHub Org**: Nobodyworld
+- **Maintainer**: Nobody
+- **License**: Proprietary (see LICENSE file)
+- **Solo Developer**: Yes — all repositories are maintained by a single developer
 
 ---
 
@@ -141,7 +141,7 @@ Rules:
 
 Example:
 
-- `[x] Add CI for Node/TS — TK-2025-10-29-001`  
+- `[x] Add CI for Node/TS — TK-2025-10-29-001`
   - `Completed: 2025-11-01 — PR: https://github.com/org/repo/pull/123 — Added check-only lint/test workflows.`
 
 Deprecated: `REPORTS.md`, `TASK.md`, and other ad hoc task files. Do not create new ones.
@@ -342,7 +342,7 @@ Architecture & APIs:
 - Legacy projects (e.g., existing Django apps) must:
   - Mark their status in `SPEC.md` as `legacy-stack: true`.
   - Either:
-    - Be maintained as-is with minimal churn, or  
+    - Be maintained as-is with minimal churn, or
     - Have a gradual migration plan documented.
 
 ---
