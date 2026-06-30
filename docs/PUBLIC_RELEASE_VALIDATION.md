@@ -1,21 +1,21 @@
 # Public Release Validation (Clean Clone)
 
 - Repository: app-economics-idiot-index
-- Validation date: 2026-06-22
-- Validation mode: local-only (owner policy keeps GitHub Actions disabled in most repositories)
+- Validation date: 2026-06-29
+- Validation mode: local clean clone of remote main
 - Host OS: Windows
 
 ## Source and clone metadata
 
 - Source URL: <https://github.com/Nobodyworld/app-economics-idiot-index>
 - Validation clone path: C:/Users/Nobod/Documents/GitHub/public-release-validation-app-economics-idiot-index
-- Validated commit: 80b144b
+- Validated commit: 7ab43c6
 - Branch: main
 
 ## Runtime and environment
 
-- System Python: 3.14.0
-- Clean-clone venv Python: 3.14.0
+- Clean-clone Python: 3.14.0
+- Packaging policy target: Python 3.13+
 
 ## Commands executed
 
@@ -23,61 +23,46 @@
 2. python -m venv .venv
 3. ./.venv/Scripts/python.exe -m pip install --upgrade pip
 4. ./.venv/Scripts/pip.exe install -r requirements.txt -r requirements-dev.txt
-5. ./.venv/Scripts/python.exe -m pytest --version
-6. ./.venv/Scripts/python.exe -m pytest -q
-7. ./.venv/Scripts/ruff.exe check src tests app.py
-8. ./.venv/Scripts/mypy.exe src
-9. ./.venv/Scripts/black.exe --check app.py src tests
-10. ./.venv/Scripts/python.exe -m pytest --cov-report=term-missing --cov-report=xml (legacy whole-src gate run from this historical pass)
-11. ./.venv/Scripts/pip-audit.exe -r requirements.txt -r requirements-dev.txt
-12. ./.venv/Scripts/detect-secrets-hook.exe --baseline config/.secrets.baseline
+5. ./.venv/Scripts/python.exe -m pip check
+6. ./.venv/Scripts/python.exe -m ruff check app.py src tests
+7. ./.venv/Scripts/python.exe -m black --check app.py src tests
+8. ./.venv/Scripts/python.exe -m mypy src
+9. ./.venv/Scripts/python.exe -m pytest -q
+10. ./.venv/Scripts/python.exe -m pytest --cov=src/adapters --cov=src/agents --cov=src/application --cov=src/core --cov=src/extensions --cov=src/infrastructure --cov=src/interfaces/api --cov=src/interfaces/streamlit --cov-report=term-missing --cov-report=xml --cov-fail-under=85 -q
+11. ./.venv/Scripts/python.exe -m pytest --cov=src --cov-report=term-missing --cov-report=xml -q
+12. ./.venv/Scripts/python.exe -m pytest --cov=src/scripts --cov-report=term-missing -q
+13. ./.venv/Scripts/pip-audit.exe -r requirements.txt -r requirements-dev.txt
+14. ./.venv/Scripts/detect-secrets-hook.exe --baseline config/.secrets.baseline
+15. ./.venv/Scripts/python.exe src/scripts/run_scenario.py --adjust "codes=311,gross=5,materials=-3" --top 5 --output build/reports/scenario_smoke.json
+16. ./.venv/Scripts/python.exe -m streamlit run app.py --server.headless true --server.port 8501 and HTTP probe of http://127.0.0.1:8501
+17. ./.venv/Scripts/python.exe src/scripts/run_api.py --host 127.0.0.1 --port 9011 and HTTP probes of http://127.0.0.1:9011/health and http://127.0.0.1:9011/metrics
+18. Repository-only markdown link scan (excluding .venv): BROKEN_LINKS=0
+19. docker --version (container tool availability check)
 
 ## Results summary
 
 - Dependency installation: PASS
-- Build/package install smoke: PASS (no install-time failures)
-- Test run (quick): PASS (214 passed)
-- Lint (ruff): FAIL
-- Type-check (mypy): PASS
+- Dependency integrity (pip check): PASS
+- Lint (ruff): PASS
 - Format check (black --check): PASS
-- Coverage gate in this historical pass: FAIL (legacy whole-src threshold, measured 75.02)
-- Dependency audit (pip-audit): FAIL (1 known vulnerability)
-- Secret scan baseline check: FAIL (Invalid baseline)
-- Packaging artifact build: NOT EXECUTED in this validation pass
-- Application smoke test: PARTIAL (covered by test suite and dependency install; interactive Streamlit boot not run in clean clone)
+- Type-check (mypy): PASS
+- Test suite: PASS (246 passed)
+- Runtime coverage gate (policy paths): PASS (86.60%, threshold 85)
+- Full src coverage informational: PASS (80% informational)
+- Scripts coverage informational: PASS (58% informational)
+- Dependency audit (pip-audit): PASS (No known vulnerabilities found)
+- Secret scan baseline check: PASS (exit code 0)
+- Scenario workflow smoke: PASS (report written to build/reports/scenario_smoke.json)
+- Streamlit smoke: PASS (HTTP 200 on localhost)
+- API smoke: PASS (health=200, metrics=200)
+- Export smoke (CSV/JSON/XLSX): PASS (XLSX mime present)
+- Markdown links (repository-only): PASS (BROKEN_LINKS=0)
+- Docker build capability: NOT AVAILABLE ON HOST (docker CLI not installed)
 
-## Notable failing details
+## Disposition
 
-### Ruff
-
-- UP042 in src/application/idiot_index_service.py (StrEnum modernization)
-- UP042 in src/core/config.py (StrEnum modernization)
-- I001 import order in src/infrastructure/rate_limiter.py
-- I001 import order in src/scripts/observability_snapshot.py
-
-### Coverage
-
-- Command failed gate: legacy whole-src coverage invocation from this validation snapshot
-- Measured total coverage: 75.02%
-
-### pip-audit
-
-- Package: black 25.12.0
-- Finding: CVE-2026-32274
-- Fixed version listed: 26.3.1
-
-### detect-secrets
-
-- Command failed with: Invalid baseline
-- Baseline path used: config/.secrets.baseline
-
-## Remaining limitations before release candidate
-
-- Resolve lint findings in ruff.
-- Align gating with current policy: enforce runtime-path coverage via `make coverage-runtime` (default fail-under 85) and keep full `src` and scripts coverage informational.
-- Resolve detect-secrets baseline compatibility so secret checks are reproducible in clean clone on Windows.
-- Decide dependency strategy for black vulnerability remediation while preserving formatting/toolchain compatibility.
+All P0 software-quality and release-gate checks in clean clone passed for commit 7ab43c6.
 
 ## Status
 
-KEEP PRIVATE
+READY FOR PUBLIC RELEASE (host Docker build not executed because Docker is unavailable on this validator machine)
