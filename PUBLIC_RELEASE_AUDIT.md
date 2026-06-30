@@ -1,5 +1,7 @@
 # Public Release Audit
 
+> Historical/superseded record: this Phase 1 audit reflects repository state as of 2026-06-22 only. For current validation status, final SHA, and release decision, see `docs/PUBLIC_RELEASE_VALIDATION.md`.
+
 - Repository: `app-economics-idiot-index`
 - Audit date: `2026-06-22`
 - Branch audited: `main`

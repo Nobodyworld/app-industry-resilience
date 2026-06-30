@@ -66,6 +66,8 @@ Core reference guides:
 
 ## Quick start (no keys, offline demo)
 
+Requires Python 3.13 or newer.
+
 ```bash
 # 1) Create and activate a virtual environment (optional but recommended)
 python -m venv .venv

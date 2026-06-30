@@ -540,7 +540,7 @@ def dataframe_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
     for row in sanitized.to_dict(orient="records"):
         processed: dict[str, Any] = {}
         for key, value in row.items():
-            processed[key] = _coerce_json_value(value)
+            processed[str(key)] = _coerce_json_value(value)
         records.append(processed)
     return records
 
@@ -589,7 +589,7 @@ def scenario_to_response(result: ScenarioResult) -> ScenarioResponse:
     )
 
 
-def _sanitize_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+def _sanitize_metadata(metadata: Mapping[Any, Any] | None) -> dict[str, Any]:
     if not metadata:
         return {}
 
@@ -599,7 +599,7 @@ def _sanitize_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
     except TypeError:
         fallback: dict[str, Any] = {}
         for key, value in metadata.items():
-            fallback[key] = _coerce_json_value(value)
+            fallback[str(key)] = _coerce_json_value(value)
         return fallback
 
 

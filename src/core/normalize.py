@@ -6,7 +6,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -123,7 +123,7 @@ def apply_dtype_overrides(df: pd.DataFrame, overrides: Mapping[str, Any]) -> Non
 def _coerce_year(value: object) -> int:
     """Validate and coerce a single year value into an integer."""
 
-    if pd.isna(value):
+    if pd.isna(cast(Any, value)):
         raise ValueError("Year column contains null values after normalisation.")
 
     result = SecurityUtils.validate_year(value)

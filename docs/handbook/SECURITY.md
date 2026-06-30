@@ -27,5 +27,5 @@ Please do not create public GitHub issues for vulnerabilities. For questions abo
 ## Dependency monitoring
 
 - Run `make security` (pip-audit + detect-secrets) monthly or when upgrading dependencies.
-- Track runtime and development dependencies in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md). The register records license information, review cadence, and data-source obligations.
+- Track runtime and development dependencies in [DEPENDENCIES.md](../DEPENDENCIES.md). The register records license information, review cadence, and data-source obligations.
 - Document mitigations and remediation timelines for any high or critical CVEs in `docs/exec/` and reference them in `CHANGELOG.md` once resolved.

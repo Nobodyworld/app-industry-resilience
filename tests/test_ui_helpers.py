@@ -52,7 +52,8 @@ def test_prepare_download_artifacts_creates_outputs() -> None:
         item.mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         for item in artifacts
     )
-    assert len(artifacts) == (6 if has_excel else 4)
+    assert has_excel
+    assert len(artifacts) == 6
     csv_artifact = next(
         item for item in artifacts if item.mime == "text/csv" and "full" in item.file_name
     )

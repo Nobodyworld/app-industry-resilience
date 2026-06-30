@@ -50,6 +50,7 @@ Implemented supply-chain hardening without introducing network-only dependencies
 Current tooling already standardises formatting (`black`), linting (`ruff`), typing (`mypy`), and tests (pytest). `make check` runs `pre-commit` hooks then pytest with coverage. The fallback script at `scripts/run_quality_checks.py` mimics these when the `pre-commit` binary is absent, but today it only targets the `scripts/` directory for Python checks. CI (`.github/workflows/ci.yml`) installs dependencies, runs `make check`, and uploads coverage to Codecov. No secret scanning, SBOM generation, or vulnerability auditing exists yet. Docs such as `README.md` and `CONTRIBUTING.md` describe `make check` but lack references to security tooling. `docs/handbook/PLAN.md` still lists Milestone G1.2.4 as pending.
 
 We need to add:
+
 1. Tooling dependencies (`detect-secrets`, `pip-audit`) in `requirements-dev.txt` and ensure they are invoked through the Makefile.
 2. A `.secrets.baseline` file for `detect-secrets` covering the repository without flagging legitimate test data.
 3. Additional Makefile targets (`security`, `sbom`, `sbom-json`, etc.) that call the new tools with offline-friendly defaults and leverage a repository-owned SBOM generator.
@@ -95,4 +96,4 @@ To be populated with command transcripts after execution.
 
 ## Interfaces and Dependencies
 
-Security tooling relies on PyPI packages `detect-secrets` and `pip-audit`, plus the in-repo helper `scripts/generate_sbom.py`. CI introduces the `gitleaks/gitleaks-action@v2` GitHub Action. Makefile commands assume Python 3.9+ available. Targets output under `build/` to avoid polluting the repo root.
+Security tooling relies on PyPI packages `detect-secrets` and `pip-audit`, plus the in-repo helper `scripts/generate_sbom.py`. CI introduces the `gitleaks/gitleaks-action@v2` GitHub Action. Historical note: this plan assumed Python 3.9+ at the time; current policy is Python 3.13+ (see `README.md` and `pyproject.toml`). Targets output under `build/` to avoid polluting the repo root.

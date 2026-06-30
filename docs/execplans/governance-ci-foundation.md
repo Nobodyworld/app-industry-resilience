@@ -1,5 +1,7 @@
 # Establish governance, automation, and quality baselines
 
+> Historical note: version references in this ExecPlan reflect the environment at the time of writing. Current repository support policy is Python 3.13+ (see `README.md` and `pyproject.toml`).
+
 This ExecPlan is a living document. The sections `Progress`, `Surprises & Discoveries`, `Decision Log`, and `Outcomes & Retrospective` must be kept up to date as work proceeds.
 
 See .agent/PLANS.md for required structure and maintenance practices; all guidance there applies here.
@@ -40,7 +42,7 @@ Completed. Governance docs, code owners, and templates are in place. Offline-saf
 
 ## Context and Orientation
 
-The repository hosts a Streamlit application under app.py with supporting domain code in src/. Tests live in tests/. Existing automation includes .github/workflows/ci.yml with flake8, mypy, and pytest steps across Python 3.9–3.11. requirements-dev.txt already lists black, flake8, mypy, pytest-cov, and types-requests. No pre-commit hooks, commit message linting, or standardized templates exist. Governance docs like CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/handbook/SECURITY.md, docs/handbook/SUPPORT.md, and CODEOWNERS are absent. There is no EditorConfig or Renovate configuration yet. docs/handbook/PLAN.md and docs/handbook/REPORT.md describe modernization goals that call for governance, automation, linting, and supply-chain hardening.
+The repository hosts a Streamlit application under app.py with supporting domain code in src/. Tests live in tests/. Historical automation at this stage included .github/workflows/ci.yml with flake8, mypy, and pytest steps across Python 3.9–3.11. requirements-dev.txt already lists black, flake8, mypy, pytest-cov, and types-requests. No pre-commit hooks, commit message linting, or standardized templates exist. Governance docs like CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/handbook/SECURITY.md, docs/handbook/SUPPORT.md, and CODEOWNERS are absent. There is no EditorConfig or Renovate configuration yet. docs/handbook/PLAN.md and docs/handbook/REPORT.md describe modernization goals that call for governance, automation, linting, and supply-chain hardening.
 
 We will adopt Ruff as the single linting tool while keeping Black for formatting; Ruff will enforce comprehensive lint rules and manage import sorting. Pre-commit will orchestrate Black, Ruff, mypy, pytest (as needed), commitlint, and other checks. The CI workflow will be updated to run the same pre-commit hooks, ensuring parity. We'll also add Makefile targets to simplify running checks locally.
 
@@ -56,7 +58,7 @@ Configure pre-commit by creating .pre-commit-config.yaml with hooks for trailing
 
 Set up commit message linting with a lightweight Python implementation that mirrors commitlint's Conventional Commit checks. This avoids external package downloads while still enforcing the same rules via the `commit-msg` hook.
 
-Update .github/workflows/ci.yml to use Python 3.10 as primary (maybe matrix). Add caching for pip, run `pip install -r requirements.txt` and `requirements-dev`, then execute `make check`. After tests, upload coverage and lint artifacts. Also include pre-commit action to ensure consistency.
+Update .github/workflows/ci.yml to use Python 3.10 as primary (historical planning context; superseded by current Python 3.13+ policy). Add caching for pip, run `pip install -r requirements.txt` and `requirements-dev`, then execute `make check`. After tests, upload coverage and lint artifacts. Also include pre-commit action to ensure consistency.
 
 Introduce .github/ISSUE_TEMPLATE/bug_report.md, feature_request.md, and config.yml, plus PULL_REQUEST_TEMPLATE.md referencing checklists for tests, docs, and risk. Add CODEOWNERS under .github/ with default owner placeholder (e.g., `* @idiot-index/maintainers`). Document assumption.
 
@@ -107,5 +109,4 @@ Tooling versions to pin:
     codespell==2.3.0
     commitizen==3.27.0
 
-EditorConfig applies to `*.py`, `*.md`, `*.yml`, `*.json`. Pre-commit uses python3.11 environment by default.
-
+EditorConfig applies to `*.py`, `*.md`, `*.yml`, `*.json`. Pre-commit used a python3.11 environment by default at the time this plan was written.

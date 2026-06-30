@@ -430,7 +430,8 @@ def _process_bea_table(data: Sequence[Mapping[str, Any]], value_column: str) -> 
     value_series = value_series.str.replace(",", "", regex=False)
     frame[value_column] = pd.to_numeric(value_series, errors="coerce") * 1_000_000
 
-    year_series = pd.to_numeric(frame.get("Year", 0), errors="coerce").fillna(0).astype(int)
+    year_source = frame["Year"] if "Year" in frame else pd.Series(0, index=frame.index)
+    year_series = pd.to_numeric(year_source, errors="coerce").fillna(0).astype(int)
     frame["year"] = year_series
 
     return frame.loc[:, ["industry_code", "industry_name", "year", value_column]]

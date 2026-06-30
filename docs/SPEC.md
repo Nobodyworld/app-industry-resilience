@@ -13,7 +13,7 @@ The Idiot Index project delivers a Streamlit dashboard and headless API for anal
 - **Observability**: Extensions under `src/extensions/` plus infrastructure modules handle metrics, tracing, and snapshot replication.
 - **Agent Surface**: `src/agents/` exposes curated tooling for automation clients, delegating to the application layer while enforcing schema metadata.
 
-Refer to [`docs/handbook/ARCHITECTURE.md`](docs/handbook/ARCHITECTURE.md) for diagrams and rationale.
+Refer to [`ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md) for diagrams and rationale.
 
 ## 2. Supported Workflows
 
@@ -53,21 +53,21 @@ Validate changes to these files by loading them in tests or via `python -m json.
 
 Each major directory now contains a `README.md` describing its scope:
 
-- [`src/`](src/README.md) – source code, organised by layer.
-- [`tests/`](tests/README.md) – pytest suites.
-- [`scripts/`](scripts/README.md) – automation helpers.
-- [`docs/`](docs/README.md) – documentation hub.
-- [`extensions/`](extensions/README.md) – manifest-driven plugins.
-- [`data/`](data/README.md) – sample datasets for offline usage.
-- [`assets/`](assets/README.md) – static assets for UI/docs.
-- Executive summaries live in [`docs/exec/`](docs/exec/README.md); see the handbook for canonical stewardship reports.
+- [`src/`](../src/README.md) – source code, organised by layer.
+- [`tests/`](../tests/README.md) – pytest suites.
+- [`scripts/`](../src/scripts/README.md) – automation helpers.
+- [`docs/`](README.md) – documentation hub.
+- [`extensions/`](../extensions/README.md) – manifest-driven plugins.
+- [`data/`](../data/README.md) – sample datasets for offline usage.
+- [`assets/`](../assets/README.md) – static assets for UI/docs.
+- Executive summaries live in [`exec/`](exec/README.md); see the handbook for canonical stewardship reports.
 
 ## 6. Documentation
 
-- The root [`README.md`](README.md) provides onboarding, command references, and environment configuration tips.
-- [`docs/handbook/`](docs/handbook/README.md) hosts canonical guides for architecture, automation, releases, and security.
-- [`docs/execplans/`](docs/execplans/README.md) archives historical execution plans, including the repository cleanup and validation pass described in the latest entry of [`CHANGELOG.md`](CHANGELOG.md).
-- [`docs/exec/`](docs/exec/README.md) captures stakeholder-facing summaries and status reports.
+- The root [`README.md`](../README.md) provides onboarding, command references, and environment configuration tips.
+- [`handbook/`](handbook/README.md) hosts canonical guides for architecture, automation, releases, and security.
+- [`execplans/`](execplans/README.md) archives historical execution plans, including the repository cleanup and validation pass described in the latest entry of [`CHANGELOG.md`](CHANGELOG.md).
+- [`exec/`](exec/README.md) captures stakeholder-facing summaries and status reports.
 
 Keep these documents up to date whenever workflows or architecture change.
 
@@ -87,8 +87,8 @@ Keep these documents up to date whenever workflows or architecture change.
 ## 9. Release & Reporting Requirements
 
 - Update [`CHANGELOG.md`](CHANGELOG.md) for every meaningful change.
-- Track task completion in [`TASKLIST.md`](TASKLIST.md) using the provided format.
-- Provide execution context in [`docs/execplans/`](docs/execplans/README.md) when undertaking significant refactors.
+- Track task completion in [`TASKLIST.md`](../TASKLIST.md) using the provided format.
+- Provide execution context in [`execplans/`](execplans/README.md) when undertaking significant refactors.
 - Adhere to coding conventions in [`STYLE-GUIDE.md`](STYLE-GUIDE.md) and document any deviations in an ADR or the changelog.
 
 This specification should be treated as the authoritative reference for repository expectations. Revisit and update it as architecture or processes evolve.

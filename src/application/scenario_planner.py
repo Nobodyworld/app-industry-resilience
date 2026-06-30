@@ -182,7 +182,7 @@ def _extract_inputs(df: pd.DataFrame) -> pd.DataFrame:
     missing = [column for column in _INPUT_COLUMNS if column not in df.columns]
     if missing:
         raise ValueError(f"Dataframe missing required columns: {', '.join(missing)}")
-    return df.loc[:, _INPUT_COLUMNS].copy()
+    return df.loc[:, list(_INPUT_COLUMNS)].copy()
 
 
 def _apply_adjustment(df: pd.DataFrame, adjustment: ScenarioAdjustment) -> None:

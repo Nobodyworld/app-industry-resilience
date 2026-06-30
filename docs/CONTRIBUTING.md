@@ -21,7 +21,7 @@ Thanks for investing time in the Idiot Index project! This guide explains how to
 
 ## Prerequisites
 
-- Python 3.11 or newer.
+- Python 3.13 or newer.
 - `pip` and `make` available on your PATH.
 
 ## First-time Setup

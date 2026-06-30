@@ -12,7 +12,7 @@ import os
 import string
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -28,7 +28,7 @@ class ConfigError(ValueError):
     """Raised when configuration values cannot be parsed."""
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     """Normalised environment indicator."""
 
     DEVELOPMENT = "development"

@@ -9,4 +9,4 @@ Each Markdown file here captures:
 - Validation or rollout instructions
 - Follow-up actions recorded after completion
 
-The latest repository-wide plan is also referenced from the root [`CHANGELOG.md`](../../CHANGELOG.md) and [`TASKLIST.md`](../../TASKLIST.md).
+The latest repository-wide plan is also referenced from [`CHANGELOG.md`](../CHANGELOG.md) and [`TASKLIST.md`](../../TASKLIST.md).

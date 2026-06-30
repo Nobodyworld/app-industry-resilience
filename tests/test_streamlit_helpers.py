@@ -52,6 +52,10 @@ def test_prepare_download_artifacts_csv_json() -> None:
     artifacts = prepare_download_artifacts(df, df, base_name="report.csv")
     assert any(a.mime == "text/csv" for a in artifacts)
     assert any(a.mime == "application/json" for a in artifacts)
+    assert any(
+        a.mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        for a in artifacts
+    )
 
 
 def test_build_comparison_table_empty_and_with_codes() -> None:

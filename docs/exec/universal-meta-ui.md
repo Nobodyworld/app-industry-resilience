@@ -67,7 +67,7 @@ None yet.
 For deeper architectural and agent references created after this ExecPlan was executed, consult:
 
 - [README.md](../../README.md#architecture)
-- [ARCHITECTURE.md](../../handbook/ARCHITECTURE.md)
+- [ARCHITECTURE_OVERVIEW.md](../ARCHITECTURE_OVERVIEW.md)
 - [docs/AI_INTERFACE.md](../AI_INTERFACE.md)
 
 ## Interfaces and Dependencies

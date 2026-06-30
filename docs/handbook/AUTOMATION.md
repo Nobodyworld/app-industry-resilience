@@ -5,6 +5,8 @@ integration, health probes, and agent-friendly entry points.
 
 ## Local Quality Gate
 
+Current Python support policy: use Python 3.13+ for local and CI validation. Historical plans may reference older versions; treat those as archival context only.
+
 Use `make quality-gate` before every commit. The target runs:
 
 1. Black (check mode) against `app.py`, `src/`, and `tests/`.

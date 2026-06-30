@@ -146,7 +146,7 @@ def calculate_benchmark(df: pd.DataFrame, industry_code: str | None) -> Mapping[
 
     df = _ensure_metrics(df)
 
-    benchmark = {
+    benchmark: dict[str, float | None] = {
         "idiot_index_avg": df["idiot_index"].mean(skipna=True),
         "value_added_pct_avg": df["value_added_pct"].mean(skipna=True),
         "materials_share_pct_avg": df["materials_share_pct"].mean(skipna=True),
@@ -160,20 +160,44 @@ def calculate_benchmark(df: pd.DataFrame, industry_code: str | None) -> Mapping[
             "shock_sensitivity_index", pd.Series(dtype="float64")
         ).mean(skipna=True),
     }
+
+    def _optional_number(value: Any) -> float | None:
+        if value is None or pd.isna(value):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _delta(left: Any, right: Any) -> float | None:
+        left_num = _optional_number(left)
+        right_num = _optional_number(right)
+        if left_num is None or right_num is None:
+            return None
+        return left_num - right_num
+
     if industry_code and industry_code in set(df["industry_code"]):
         row = df[df["industry_code"] == industry_code].iloc[0]
         benchmark.update(
             {
-                "idiot_index_delta": row["idiot_index"] - benchmark["idiot_index_avg"],
-                "value_added_pct_delta": row["value_added_pct"] - benchmark["value_added_pct_avg"],
-                "materials_share_pct_delta": row["materials_share_pct"]
-                - benchmark["materials_share_pct_avg"],
-                "resilience_score_delta": row.get("resilience_score")
-                - benchmark["resilience_score_avg"],
-                "materials_dependency_ratio_delta": row.get("materials_dependency_ratio")
-                - benchmark["materials_dependency_ratio_avg"],
-                "shock_sensitivity_index_delta": row.get("shock_sensitivity_index")
-                - benchmark["shock_sensitivity_index_avg"],
+                "idiot_index_delta": _delta(row.get("idiot_index"), benchmark["idiot_index_avg"]),
+                "value_added_pct_delta": _delta(
+                    row.get("value_added_pct"), benchmark["value_added_pct_avg"]
+                ),
+                "materials_share_pct_delta": _delta(
+                    row.get("materials_share_pct"), benchmark["materials_share_pct_avg"]
+                ),
+                "resilience_score_delta": _delta(
+                    row.get("resilience_score"), benchmark["resilience_score_avg"]
+                ),
+                "materials_dependency_ratio_delta": _delta(
+                    row.get("materials_dependency_ratio"),
+                    benchmark["materials_dependency_ratio_avg"],
+                ),
+                "shock_sensitivity_index_delta": _delta(
+                    row.get("shock_sensitivity_index"),
+                    benchmark["shock_sensitivity_index_avg"],
+                ),
             }
         )
     else:
@@ -323,7 +347,7 @@ def build_scenario_comparison_table(
 
     rows = []
     for row in merged.itertuples():
-        data = {
+        data: dict[str, Any] = {
             "industry_code": row.industry_code,
             "industry_name": row.industry_name,
         }
@@ -450,7 +474,11 @@ def snapshot_history_table(summaries: Sequence[Mapping[str, Any]]) -> pd.DataFra
         rows.append(
             {
                 "Snapshot": summary.get("snapshot_id"),
-                "Captured": pd.to_datetime(summary.get("captured_at")),
+                "Captured": (
+                    pd.to_datetime(cast(Any, summary.get("captured_at")))
+                    if summary.get("captured_at") is not None
+                    else pd.NaT
+                ),
                 "Events": summary.get("event_total", 0),
                 "Errors": events.get("error", 0),
                 "Success": events.get("success", 0),
@@ -466,7 +494,11 @@ def snapshot_timeline_frame(summaries: Sequence[Mapping[str, Any]]) -> pd.DataFr
 
     timeline: list[dict[str, Any]] = []
     for summary in summaries:
-        captured_at = pd.to_datetime(summary.get("captured_at"))
+        captured_at = (
+            pd.to_datetime(cast(Any, summary.get("captured_at")))
+            if summary.get("captured_at") is not None
+            else pd.NaT
+        )
         events = summary.get("events", {})
         timeline.append(
             {

@@ -273,7 +273,7 @@ def _aggregate_sectors(
     sector_df = df.assign(_sector_key=sector_keys)
     aggregates: list[HealthAggregate] = []
     for sector, group in sector_df.groupby("_sector_key", sort=True):
-        aggregates.append(_aggregate(sector, group, bands=bands))
+        aggregates.append(_aggregate(str(sector), group, bands=bands))
     return aggregates
 
 
@@ -303,8 +303,8 @@ def _top_risks(df: pd.DataFrame, *, limit: int) -> list[HealthRisk]:
         return []
     sorted_df = valid.nsmallest(limit, "health_score")
     risks = []
-    for row in sorted_df.itertuples(index=False):
-        row_data = row._asdict()
+    for _, row in sorted_df.iterrows():
+        row_data = row.to_dict()
         band_value = row_data.get("health_band")
         risks.append(
             HealthRisk(

@@ -13,7 +13,7 @@ import time
 from collections.abc import Callable, Iterable, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, replace
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Protocol
@@ -38,7 +38,7 @@ from src.extensions.manager import ExtensionManager, get_extension_manager
 from src.infrastructure.observability import ObservabilityRegistry, bootstrap_observability
 
 
-class DataSource(str, Enum):
+class DataSource(StrEnum):
     """Supported data sources for Idiot Index evaluations."""
 
     SAMPLE = "sample"
@@ -405,23 +405,27 @@ def _build_leaderboard(df: pd.DataFrame, top_n: int) -> tuple[IndustryMetrics, .
     if df.empty:
         return tuple()
     ranked = df.sort_values("idiot_index", ascending=False).head(top_n)
+
+    def _optional_float(value: Any) -> float | None:
+        if pd.isna(value):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
     entries: list[IndustryMetrics] = []
-    for row in ranked.itertuples():
+    for _, row in ranked.iterrows():
+        row_data = row.to_dict()
         entries.append(
             IndustryMetrics(
-                industry_code=row.industry_code,
-                industry_name=row.industry_name,
-                idiot_index=float(row.idiot_index) if pd.notna(row.idiot_index) else None,
-                value_added_pct=(
-                    float(row.value_added_pct) if pd.notna(row.value_added_pct) else None
-                ),
-                materials_share_pct=(
-                    float(row.materials_share_pct)
-                    if hasattr(row, "materials_share_pct") and pd.notna(row.materials_share_pct)
-                    else None
-                ),
-                gross_output=float(row.gross_output) if pd.notna(row.gross_output) else None,
-                value_added=float(row.value_added) if pd.notna(row.value_added) else None,
+                industry_code=str(row_data.get("industry_code", "")),
+                industry_name=str(row_data.get("industry_name", "")),
+                idiot_index=_optional_float(row_data.get("idiot_index")),
+                value_added_pct=_optional_float(row_data.get("value_added_pct")),
+                materials_share_pct=_optional_float(row_data.get("materials_share_pct")),
+                gross_output=_optional_float(row_data.get("gross_output")),
+                value_added=_optional_float(row_data.get("value_added")),
             )
         )
     return tuple(entries)
