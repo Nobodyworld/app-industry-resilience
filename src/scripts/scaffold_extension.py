@@ -239,14 +239,12 @@ def main() -> int:
         force=args.force,
     )
 
-    message = textwrap.dedent(
-        f"""
+    message = textwrap.dedent(f"""
         [idiot-index] Extension scaffold created at {module_path}.
         Remember to implement SummaryExtension.contribute (and ScenarioExtension.contribute when requested).
         Instrumentation scaffolds emit basic counters and should be customised to capture domain events.
         The manifest at {MANIFEST_PATH} now includes the module so it loads automatically.
-        """
-    ).strip()
+        """).strip()
     print(message)
     return 0
 
