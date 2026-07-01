@@ -640,6 +640,8 @@ Cargo.lock
 *.tiff
 *.svg
 *.ico
+!assets/public-release/*.png
+!assets/public-release/*.svg
 
 # Videos
 *.mp4

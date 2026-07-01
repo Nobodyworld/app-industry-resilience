@@ -1,8 +1,12 @@
-# U.S. Industry Cost Structure Dashboard
+# U.S. Industry Cost Structure & Resilience Dashboard
 
-This project is a Streamlit and headless API application for exploring U.S. industry cost-structure ratios. It computes the informal "Idiot Index" ratio, supports scenario recalculation, and includes a public-data readiness foundation for reproducible no-auth source collection and rolling baseline checks.
+This repository demonstrates practical economic and financial analysis engineering using U.S. government industry datasets. It provides an interactive Streamlit dashboard and a headless API for reproducible metric calculation, scenario comparison, and release-grade validation.
 
-The application is analytical tooling, not an economic distress classifier. Composite score outputs are experimental heuristics derived from correlated cost-structure inputs.
+Problem addressed: compare industry input intensity and operating structure across sectors using transparent ratio-based metrics that can be recalculated under explicit scenario assumptions.
+
+What the metric does: computes an informal cost-structure ratio (`gross_output / materials_cost`, or `gross_output / intermediate_inputs` when materials are unavailable) and related heuristic diagnostics.
+
+What the metric does not mean: it is not a credit model, insolvency predictor, or causal macroeconomic forecast. Composite bands are heuristic summaries and must be interpreted with methodology limits.
 
 ## Demonstration
 
@@ -14,6 +18,17 @@ streamlit run app.py
 ```
 
 Open the local Streamlit URL and use the bundled sample dataset for an offline walkthrough. The same core service can be exercised through the API with `python src/scripts/run_api.py`.
+
+Offline sample walkthrough command set:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt -r requirements-dev.txt
+streamlit run app.py
+```
+
+Primary offline source for demos: `data/sample_industries.csv`.
 
 ## Quick Start
 
@@ -39,12 +54,42 @@ python src/scripts/public_data_readiness.py listen --dataset-id bls_ppi_monthly 
 python src/scripts/public_data_readiness.py backfill --dataset-id bls_ppi_monthly --start-year 2023 --end-year 2024 --storage-root build/public-smoke --dry-run --pretty
 ```
 
+## Data Sources
+
+Verified and implemented:
+
+- Census AIES annual archive (keyless public files).
+- BLS PPI monthly signal via public API series `PCU311111311111` (no key).
+- Bundled offline sample dataset for local demonstration.
+
+Optional environment-dependent integrations:
+
+- BEA adapter and Census ASM adapter paths require configured API keys.
+
+## Capability Status
+
+Verified features:
+
+- Streamlit dashboard for sample, official snapshot, and scenario exploration.
+- Headless API for evaluation, scenario analysis, health, and metrics endpoints.
+- Public-data readiness workflow (catalog, listener checks, backfill manifests, duplicate/revision guardrails).
+- Rolling release-aware baseline backtest service.
+- Structured export paths (CSV, JSON, XLSX).
+
+Experimental capabilities:
+
+- Composite health-style bands are heuristic and intended for comparative analysis only.
+
+Roadmap-oriented catalog entries:
+
+- Additional cataloged public sources may appear in the readiness catalog as planned entries without active ingestion implementations.
+
 ## Core Features
 
 - Streamlit dashboard for sample, BEA, Census ASM, uploaded CSV, and official snapshot workflows.
 - Headless API for evaluation, scenarios, analytics, metrics, and observability probes.
 - Normalization and metric computation for `industry_code`, `industry_name`, `year`, `gross_output`, `materials_cost`, `intermediate_inputs`, and `value_added`.
-- Scenario Lab recalculation for stated percentage shocks.
+- Scenario Lab recalculation for explicit percentage shocks.
 - Public-data readiness catalog, release manifests, duplicate/revision guardrails, AIES backfill, BLS PPI monthly signal backfill, listener checks, and a naive rolling previous-period baseline.
 
 ## Methodology Limitations
@@ -76,6 +121,22 @@ data/public/
   cleaned/<dataset_id>/<release_id>/
   manifests/<dataset_id>/<release_id>.json
 ```
+
+## Visual Evidence
+
+Release visuals are stored under `assets/public-release/`.
+
+Dashboard overview (sample-data capable interface):
+
+![Dashboard overview](assets/public-release/dashboard-overview.png)
+
+Scenario Lab comparison view:
+
+![Scenario Lab comparison](assets/public-release/scenario-lab.png)
+
+Architecture and data flow:
+
+![Architecture data flow](assets/public-release/architecture-data-flow.svg)
 
 ## Architecture Summary
 
@@ -109,6 +170,10 @@ git diff --check
 
 Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md) and should be run where `pip-audit`, `detect-secrets`, and `pytest-cov` are installed. Current branch validation should be checked in the pull request report, not inferred from this README.
 
+Most recent validated clean-clone totals are recorded in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md), including full test count and runtime coverage gate result.
+
+GitHub Actions status: repository Actions are currently disabled by owner policy, so local clean-clone validation is the authoritative release gate.
+
 ## Documentation
 
 - [Data dictionary](docs/DATA_DICTIONARY.md)
@@ -119,6 +184,15 @@ Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md
 - [Architecture overview](docs/ARCHITECTURE_OVERVIEW.md)
 - [Operations incident response](docs/OPERATIONS_INCIDENT_RESPONSE.md)
 - [Dependency register](docs/DEPENDENCIES.md)
+
+## Governance and Support
+
+- [License](LICENSE)
+- [Code of Conduct](docs/CODE_OF_CONDUCT.md)
+- [Contributing guide](docs/CONTRIBUTING.md)
+- [Security and incident response](docs/OPERATIONS_INCIDENT_RESPONSE.md)
+- [Data-source attribution and dependencies](docs/DEPENDENCIES.md)
+- [Industry shock case study](docs/INDUSTRY_SHOCK_CASE_STUDY.md)
 
 ## Docker
 

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">U.S. Industry Cost Structure and Resilience Dashboard Data Flow</title>
+  <desc id="desc">Data sources flow through ingestion and normalization into analytics, API, and Streamlit interfaces with export and validation outputs.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #1a1f36; }
+      .subtitle { font: 500 18px 'Segoe UI', Arial, sans-serif; fill: #374166; }
+      .box { fill: #ffffff; stroke: #2f4b8f; stroke-width: 2; rx: 14; }
+      .box-alt { fill: #eef3ff; stroke: #3559b7; stroke-width: 2; rx: 14; }
+      .label { font: 600 17px 'Segoe UI', Arial, sans-serif; fill: #16213e; }
+      .small { font: 500 14px 'Segoe UI', Arial, sans-serif; fill: #39456b; }
+      .arrow { stroke: #2c4a92; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2c4a92" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1200" height="680" />
+  <text class="title" x="44" y="60">U.S. Industry Cost Structure &amp; Resilience Dashboard</text>
+  <text class="subtitle" x="44" y="92">Public-data ingestion, metric computation, scenario simulation, and reproducible validation</text>
+
+  <rect class="box" x="44" y="150" width="290" height="140" />
+  <text class="label" x="64" y="188">Public and Optional Sources</text>
+  <text class="small" x="64" y="216">- Census AIES archive (keyless)</text>
+  <text class="small" x="64" y="238">- BLS PPI monthly signal (keyless)</text>
+  <text class="small" x="64" y="260">- Optional BEA/Census API keys</text>
+
+  <rect class="box-alt" x="430" y="130" width="340" height="180" />
+  <text class="label" x="450" y="168">Ingestion and Guardrails</text>
+  <text class="small" x="450" y="196">- Adapter collection and cleaning</text>
+  <text class="small" x="450" y="218">- Release manifest lineage</text>
+  <text class="small" x="450" y="240">- Duplicate/revision detection</text>
+  <text class="small" x="450" y="262">- Historical era splitting</text>
+
+  <rect class="box" x="870" y="150" width="286" height="140" />
+  <text class="label" x="890" y="188">Core Analytics Engine</text>
+  <text class="small" x="890" y="216">- Ratio and dependency metrics</text>
+  <text class="small" x="890" y="238">- Health-band heuristics</text>
+  <text class="small" x="890" y="260">- Rolling baseline backtests</text>
+
+  <rect class="box" x="110" y="410" width="300" height="170" />
+  <text class="label" x="130" y="450">Streamlit Dashboard</text>
+  <text class="small" x="130" y="478">- Interactive data source selection</text>
+  <text class="small" x="130" y="500">- Scenario Lab comparisons</text>
+  <text class="small" x="130" y="522">- Export (CSV/JSON/XLSX)</text>
+
+  <rect class="box" x="450" y="410" width="300" height="170" />
+  <text class="label" x="470" y="450">Headless API</text>
+  <text class="small" x="470" y="478">- Evaluate and scenario endpoints</text>
+  <text class="small" x="470" y="500">- Health and metrics probes</text>
+  <text class="small" x="470" y="522">- Automation-friendly responses</text>
+
+  <rect class="box" x="790" y="410" width="350" height="170" />
+  <text class="label" x="810" y="450">Validation and Evidence</text>
+  <text class="small" x="810" y="478">- Lint, type-check, test, coverage gate</text>
+  <text class="small" x="810" y="500">- Dependency and secret scanning</text>
+  <text class="small" x="810" y="522">- Clean-clone reproducibility report</text>
+
+  <path class="arrow" d="M334 220 L430 220" />
+  <path class="arrow" d="M770 220 L870 220" />
+  <path class="arrow" d="M1010 290 L1010 410" />
+  <path class="arrow" d="M600 310 L600 410" />
+  <path class="arrow" d="M550 310 L260 410" />
+</svg>
