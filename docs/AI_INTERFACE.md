@@ -5,12 +5,14 @@ The Idiot Index app ships with a lightweight agent toolkit under `src/agents/`. 
 ## Available Tools
 
 ### `compute_idiot_index_summary`
+
 - **Purpose:** Load Idiot Index data from the sample dataset, BEA, or Census ASM, then compute key metrics and a leaderboard.
 - **Module:** `src.agents.idiot_index`
 - **Request model:** `IdiotIndexRequest`
 - **Response model:** `IdiotIndexResponse`
 
 #### Request Fields
+
 | Field | Type | Description |
 | --- | --- | --- |
 | `year` | integer | Calendar year between 1997 and 2100. |
@@ -19,14 +21,15 @@ The Idiot Index app ships with a lightweight agent toolkit under `src/agents/`. 
 | `top_n` | integer | Number of industries to include in the leaderboard (1–25). |
 
 #### Response Fields
+
 | Field | Type | Description |
 | --- | --- | --- |
 | `rows_evaluated` | integer | Number of rows considered after filtering. |
 | `idiot_index_average` | number | Mean Idiot Index across the filtered dataset (if available). |
 | `top_industries` | array of objects | Each entry contains `code`, `name`, `idiot_index`, and optional `value_added_pct`. |
 | `notes` | array of strings | Metadata returned by upstream services (e.g., BEA notes). |
-| `health_score_average` | number | Composite health score (0–100) for the filtered dataset. |
-| `health_risk_band` | string | Risk band label (`excellent`, `healthy`, `watch`, or `critical`). |
+| `health_score_average` | number | Experimental composite score (0–100) for the filtered dataset. |
+| `health_risk_band` | string | Neutral review band label (`lower_input_intensity`, `moderate_input_intensity`, `higher_input_intensity`, or `review_required`). |
 
 The JSON schemas for the request and response models are accessible at runtime via `src.agents.get_tool("compute_idiot_index_summary").input_schema` and `.output_schema`.
 
@@ -72,6 +75,7 @@ PY
 ```
 
 ## Validation Behaviour
+
 - Invalid years or leaderboard sizes raise `ValueError` before any network calls occur.
 - Search strings are sanitised using `SecurityUtils.sanitize_string_input` to strip dangerous patterns.
 - When live data sources are requested without API keys, a `ValueError` is raised immediately.
@@ -85,6 +89,7 @@ PY
 Applications embedding the toolkit should catch `ValueError` for actionable user feedback and re-raise or log other exceptions.
 
 ## Extending the Toolkit
+
 1. Create a dataclass for the request and response payloads.
 2. Decorate the callable with `@tool(name="...", description="...")`.
 3. The decorator automatically registers the tool and captures JSON schemas for integration.

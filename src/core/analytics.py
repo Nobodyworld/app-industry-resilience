@@ -41,24 +41,24 @@ class HealthScoreConfig:
     bands: tuple[HealthBand, ...] = field(
         default_factory=lambda: (
             HealthBand(
-                name="excellent",
+                name="lower_input_intensity",
                 min_score=80.0,
-                description="Highly resilient and value-additive industries",
+                description="Lower input intensity under this experimental heuristic",
             ),
             HealthBand(
-                name="healthy",
+                name="moderate_input_intensity",
                 min_score=65.0,
-                description="Balanced performance with manageable risk",
+                description="Moderate input intensity under this experimental heuristic",
             ),
             HealthBand(
-                name="watch",
+                name="higher_input_intensity",
                 min_score=45.0,
-                description="Mixed signals that require monitoring",
+                description="Higher input intensity under this experimental heuristic",
             ),
             HealthBand(
-                name="critical",
+                name="review_required",
                 min_score=0.0,
-                description="Immediate intervention recommended",
+                description="Review required; not evidence of economic distress",
             ),
         )
     )

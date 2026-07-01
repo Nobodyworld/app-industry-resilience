@@ -44,4 +44,4 @@ This document records the vetted runtime and development dependencies for the Id
 - **Sample dataset** – derived from public BEA/ASM releases for offline demos; stored in `data/sample_industries.csv`.
 
 ---
-Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
+Licensed under the Apache License 2.0. See [LICENSE](../LICENSE).

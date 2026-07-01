@@ -21,7 +21,12 @@ def test_compute_idiot_index_summary_offline(source: DataSource) -> None:
     assert len(response.top_industries) <= 3
     assert all(item.idiot_index > 0 for item in response.top_industries)
     assert response.health_score_average is not None
-    assert response.health_risk_band in {"excellent", "healthy", "watch", "critical"}
+    assert response.health_risk_band in {
+        "lower_input_intensity",
+        "moderate_input_intensity",
+        "higher_input_intensity",
+        "review_required",
+    }
 
 
 def test_agent_tool_registry_contains_schema() -> None:

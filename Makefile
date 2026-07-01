@@ -175,7 +175,7 @@ observability:
 
 # agent-safe-task: persists observability snapshots to disk
 observability-snapshot:
-	${PYTHON} scripts/observability_snapshot.py --store --pretty ${ARGS}
+	${PYTHON} src/scripts/observability_snapshot.py --store --pretty ${ARGS}
 
 # agent-safe-task: streams observability events for incident response
 observability-tail:

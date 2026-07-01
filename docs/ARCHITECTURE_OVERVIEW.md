@@ -21,33 +21,40 @@ The Idiot Index application follows a layered Python architecture designed for t
 ## Layer responsibilities
 
 ### Adapters
+
 - **Location:** `src/adapters`
 - **Purpose:** Translate external data sources into normalized frames ready for the domain layer. The BEA adapter handles endpoint health checks, retries, caching, and NAICS enrichment.
 - **Key modules:** `bea.py`, `census.py`, `csv_loader.py`
 
 ### Core
+
 - **Location:** `src/core`
 - **Purpose:** Provide reusable primitives such as configuration (`config`), caching (`cache`), metrics (`metrics`), health analytics (`analytics`), normalisation (`normalize`), and security validation (`security`).
 - **Highlights:** Security utilities ensure API keys, uploads, and CSV content are validated before downstream processing. The analytics module computes composite health scores, risk bands, and cohort summaries that are reused by both UI components and the headless API.
 
 ### Application
+
 - **Location:** `src/application`
 - **Purpose:** Compose adapters and core services into workflows. `IdiotIndexService` coordinates dataset selection, normalisation, metrics, and leaderboard preparation. The thin wrapper `evaluate_idiot_index` powers both UI and headless automation entrypoints.
 
 ### Interfaces
+
 - **Location:** `src/interfaces`
 - **Purpose:** Present data via Streamlit (`interfaces/streamlit`), the headless API surface (`interfaces/api`) implemented with a FastAPI-compatible façade, or CLI/automation helpers. Streamlit components follow a modular pattern for reusability and test coverage, while the API reuses the same application services to support machine-to-machine access.
 
 ### Infrastructure
+
 - **Location:** `src/infrastructure`
 - **Purpose:** Cross-cutting concerns like logging, throttling (`api_limiter`), observability, and caching. These modules are shared across adapters and services to keep instrumentation consistent.
 - **Highlights:** `src/infrastructure/observability` now centralises metrics, tracing, and health integration through the `ObservabilityRegistry`. Application services wrap key operations with `registry.operation(...)` so spans, Prometheus counters, and health snapshots stay in sync, and emit post-run signals with `registry.record_event(...)` for lightweight dataset/scenario profiling. Logs automatically include the active `trace_id`, while `SnapshotStorage` (`src/infrastructure/observability/storage.py`) persists registry digests to `build/observability_snapshots` (configurable via `OBSERVABILITY_SNAPSHOT_DIR`) and, when enabled, streams them to object storage or plugin-defined backends via the refactored `replication.py` helpers. Replication events (`observability.snapshot.replication`) flow through the registry so instrumentation can expose counters, latency histograms, and health signals without touching core services.
 
 ### Agents
+
 - **Location:** `agents`
 - **Purpose:** Provide dataclass-driven schemas and functions so downstream automation or LLM agents can reuse the Idiot Index service without touching Streamlit internals.
 
 ### Extensions
+
 - **Location:** `src/extensions`
 - **Purpose:** Load modular analytics via `ExtensionManager`. Summary extensions enrich `IdiotIndexSummary` objects with additional notes or metadata, scenario extensions decorate `ScenarioResult` payloads, and instrumentation extensions register metrics/health hooks against the shared observability registry. Modules are discovered through `extensions/manifest.json` and the `IDIOT_INDEX_EXTENSIONS` environment variable.
 - **Highlights:** The built-in `manufacturing_cost_driver` extension demonstrates data enrichment, while `core_instrumentation` wires counters and health checks for pipeline execution. `snapshot_monitor` tracks persisted observability snapshots, publishing gauges for total count/age and a health component that warns when snapshots go stale. `snapshot_persistence` captures snapshots automatically on startup/shutdown and after `warn`/`error` events, pruning history according to retention settings, while the new `snapshot_replication` module registers S3/debug replication extensions and a metrics/health observer that reacts to `observability.snapshot.replication` events emitted during CLI or automated persistence.
@@ -80,16 +87,16 @@ The Idiot Index application follows a layered Python architecture designed for t
 - The `ObservabilityRegistry` (in `src/infrastructure/observability/instrumentation.py`) provides a single surface for Prometheus metrics, trace spans, health probe contributions, and recent event capture. Both `IdiotIndexService` and `ScenarioPlanner` wrap their core pipelines with registry operations so successes and failures emit structured telemetry, and then call `registry.record_event(...)` to publish derived dataset/scenario quality signals without opening empty context managers.
 - Instrumentation extensions (see `src/extensions/builtins/core_instrumentation.py`) subscribe to those events and expose counters (`idiot_index_pipeline_runs_total`) and latency histograms. The new `data_quality` extension listens for dataset/scenario profiling events, publishes gauges (`idiot_index_dataset_rows`, `idiot_index_dataset_missing_ratio`), and contributes a health check that warns on zero-row or high-missing-ratio outputs. Additional extensions can subscribe to custom event names without touching core services.
 - The built-in `rate_limiting` instrumentation extension wires rate-limit counters/histograms, adds a health check, and records HTTP retry events emitted by `src.core.utils.safe_get_json` so operators can spot flaky upstreams.
-- The headless API records request metrics via `src/interfaces/api/telemetry`, exposes Prometheus text at `/metrics`, publishes `/observability/status`, `/observability/digest`, the `observability.events` feed for filtered, reverse-chronological telemetry, and the persisted snapshot catalogue under `/observability/snapshots`. Offline operators can run `python scripts/observability_snapshot.py --store --list --compare`, stream new events with `python scripts/observability_tail.py --follow`, or collect a one-shot JSON bundle with `python scripts/diagnostics_bundle.py --pretty` for post-incident archives; setting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` to `s3` or `plugin:debug` triggers the new replication extensions so stored artefacts stream to remote buckets or curated debug directories automatically.
-- `src/infrastructure/observability/health.py` provides the reusable `HealthProbe`, powering both HTTP health endpoints and the `scripts/check_health.py` CLI. The registry binds into the probe so instrumentation extensions can ship bespoke health signals.
+- The headless API records request metrics via `src/interfaces/api/telemetry`, exposes Prometheus text at `/metrics`, publishes `/observability/status`, `/observability/digest`, the `observability.events` feed for filtered, reverse-chronological telemetry, and the persisted snapshot catalogue under `/observability/snapshots`. Offline operators can run `python src/scripts/observability_snapshot.py --store --list --compare`, stream new events with `python src/scripts/observability_tail.py --follow`, or collect a one-shot JSON bundle with `python src/scripts/diagnostics_bundle.py --pretty` for post-incident archives; setting `OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND` to `s3` or `plugin:debug` triggers the new replication extensions so stored artefacts stream to remote buckets or curated debug directories automatically.
+- `src/infrastructure/observability/health.py` provides the reusable `HealthProbe`, powering both HTTP health endpoints and the `src/scripts/check_health.py` CLI. The registry binds into the probe so instrumentation extensions can ship bespoke health signals.
 - Incident response procedures are documented in `docs/OPERATIONS_INCIDENT_RESPONSE.md`, now referencing the observability CLI for triage and recovery.
 
 ## Future-proofing & Migration Notes
 
-- **Plugin boundaries:** New automation, analytics, or monitoring capabilities should ship as extensions. Instrumentation plugins keep metrics decoupled from business logic, while summary/scenario plugins extend payloads. Use `python scripts/scaffold_extension.py --name <id> --instrumentation` to bootstrap both code and manifest entries. Inspect the active catalogue with `python scripts/extensions_catalog.py --json --pretty` to confirm registration and documentation coverage.
-- **Service scaffolds:** `python scripts/scaffold_service.py --name <service>` generates an observability-aware service shell under `src/application/services/` so future modules inherit tracing, metrics, and extension wiring.
+- **Plugin boundaries:** New automation, analytics, or monitoring capabilities should ship as extensions. Instrumentation plugins keep metrics decoupled from business logic, while summary/scenario plugins extend payloads. Use `python src/scripts/scaffold_extension.py --name <id> --instrumentation` to bootstrap both code and manifest entries. Inspect the active catalogue with `python src/scripts/extensions_catalog.py --json --pretty` to confirm registration and documentation coverage.
+- **Service scaffolds:** `python src/scripts/scaffold_service.py --name <service>` generates an observability-aware service shell under `src/application/services/` so future modules inherit tracing, metrics, and extension wiring.
 - **Scaling considerations:** The observability registry is intentionally lightweight; for distributed deployments swap the tracer implementation or plug an OTLP exporter behind the same interface. Health checks already expose registry counts, simplifying readiness probes behind load balancers.
 - **Next major upgrade path:** To support multi-tenant or async workloads, isolate data adapters behind explicit interfaces and let instrumentation extensions register tenant IDs as metric labels. The registry API is stable so callers can evolve without changing existing hooks.
 
 ---
-Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
+Licensed under the Apache License 2.0. See [LICENSE](../LICENSE).

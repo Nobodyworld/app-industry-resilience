@@ -1,24 +1,24 @@
-# Health Analytics Reference
+# Experimental Composite Analytics Reference
 
-This guide explains the composite health score introduced in Stage 1 along with its data sources and usage patterns.
+This guide explains the experimental composite score introduced in Stage 1 along with its data sources and usage patterns.
 
 ## Overview
 
-The health score combines four signals derived from Idiot Index metrics:
+The composite score combines four signals derived from the same source cost-structure inputs used by Idiot Index metrics:
 
-1. **Value-added percentage** – higher value-added implies healthier cost structures.
-2. **Resilience score** – computed as value added ÷ intermediate inputs; reflects ability to absorb shocks.
-3. **Materials dependency ratio** – lower ratios reduce exposure to supply shocks.
-4. **Shock sensitivity index** – lower values indicate better balance between value added and materials costs.
+1. **Value-added percentage** – derived from value added and gross output.
+2. **Resilience score** – computed as value added ÷ intermediate inputs.
+3. **Materials dependency ratio** – derived from material or intermediate-input intensity.
+4. **Shock sensitivity index** – another transformation of value added, output, and input intensity.
 
-Each component is normalised to a 0–1 range and weighted using `src/core/analytics.HealthScoreConfig` (35% value-added, 30% resilience, 20% materials dependency, 15% shock sensitivity). Scores are scaled to 0–100 and mapped into qualitative bands:
+These components are correlated and should not be read as independent evidence of industry health, resilience, or economic distress. Each component is normalised to a 0–1 range and weighted using `src/core/analytics.HealthScoreConfig` (35% value-added, 30% resilience, 20% materials dependency, 15% shock sensitivity). Scores are scaled to 0–100 and mapped into neutral review bands:
 
 | Band | Threshold | Description |
 | --- | --- | --- |
-| `excellent` | ≥ 80 | Highly resilient industries with balanced costs. |
-| `healthy` | ≥ 65 | Solid fundamentals with manageable risk. |
-| `watch` | ≥ 45 | Mixed signals that warrant monitoring. |
-| `critical` | < 45 | Vulnerable to materials or margin shocks. |
+| `lower_input_intensity` | ≥ 80 | Lower input intensity under this heuristic. |
+| `moderate_input_intensity` | ≥ 65 | Moderate input intensity under this heuristic. |
+| `higher_input_intensity` | ≥ 45 | Higher input intensity under this heuristic. |
+| `review_required` | < 45 | Review required; not evidence of economic distress. |
 
 The analytics module exposes two public functions:
 
@@ -27,9 +27,9 @@ The analytics module exposes two public functions:
 
 ## UI integration
 
-- **Signal bar** – shows the average health score and risk band for the current filter selection.
-- **Health tab** – surfaces cohort averages, band distribution, and top-risk industries in Streamlit.
-- **Scenario Lab** – displays health score deltas and risk band shifts when adjustments are applied.
+- **Signal bar** – shows the average experimental score and review band for the current filter selection.
+- **Health tab** – surfaces cohort averages, band distribution, and lowest-score industries in Streamlit.
+- **Scenario Lab** – displays score deltas and band shifts when adjustments are applied.
 
 ## API integration
 
@@ -57,10 +57,10 @@ Response excerpt:
     "filtered": {
       "overall": {
         "average_health_score": 68.4,
-        "risk_band": "healthy"
+        "risk_band": "moderate_input_intensity"
       },
       "top_risks": [
-        {"industry_code": "44-45", "health_score": 42.1, "band": "watch"}
+        {"industry_code": "44-45", "health_score": 42.1, "band": "review_required"}
       ]
     }
   }
@@ -69,13 +69,13 @@ Response excerpt:
 
 ## CLI workflow
 
-Use `make analytics` (or run `scripts/analytics_health.py`) to generate JSON summaries from CSV datasets:
+Use `make analytics` (or run `src/scripts/analytics_health.py`) to generate JSON summaries from CSV datasets:
 
 ```bash
 make analytics ARGS="--input data/sample_industries.csv --group-by sector --pretty"
 ```
 
-The script normalises columns, recomputes Idiot Index metrics, derives health scores, and prints cohort statistics for automation pipelines or scheduled reports.
+The script normalises columns, recomputes Idiot Index metrics, derives experimental composite scores, and prints cohort statistics for automation pipelines or scheduled reports.
 
 ## Extending the model
 

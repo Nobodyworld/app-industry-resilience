@@ -8,7 +8,7 @@ The headless Idiot Index API exposes the same computation pipeline that powers t
 make api ARGS="--host 0.0.0.0 --port 9000"
 ```
 
-This command executes `scripts/run_api.py`, which serves the bundled FastAPI-compatible application defined in `src/interfaces/api/app.py` using Python's built-in WSGI server. The CLI respects the following environment variables (all optional):
+This command executes `src/scripts/run_api.py`, which serves the bundled FastAPI-compatible application defined in `src/interfaces/api/app.py` using Python's built-in WSGI server. The CLI respects the following environment variables (all optional):
 
 - `API_HOST` / `API_PORT` – default network binding (`0.0.0.0:9000`).
 - `API_RELOAD` – accepted for compatibility but ignored (reload is not supported in the bundled server).
@@ -20,6 +20,7 @@ Inside Docker, set `APP_MODE=api` to boot the same service from the container en
 ## Endpoints
 
 ### `GET /health`
+
 Returns service metadata, component-level health status, and a trace identifier useful for correlating logs.
 
 ```json
@@ -52,13 +53,16 @@ Returns service metadata, component-level health status, and a trace identifier 
 ```
 
 ### `GET /healthz`
+
 Returns the same payload as `/health` and is intended for Kubernetes probes. Trace IDs rotate per request, while component
 status and metadata remain aligned.
 
 ### `GET /meta/sources`
+
 Lists supported data sources (`sample`, `bea`, `census`). Use this to drive UI dropdowns or validation in clients.
 
 ### `POST /evaluate`
+
 Compute Idiot Index metrics for a given year. Provide either a `source` (which will use configured API keys) or `records` containing inline data. Inline datasets must include at least `industry_code`, `industry_name`, `year`, and `gross_output` columns.
 
 ```bash
@@ -99,13 +103,13 @@ Successful responses include leaderboard entries, metadata, and the full/filtere
   },
   "health": {
     "filtered": {
-      "overall": {"average_health_score": 68.4, "risk_band": "healthy"},
+      "overall": {"average_health_score": 68.4, "risk_band": "moderate_input_intensity"},
       "band_breakdown": [
-        {"band": "healthy", "industries": 3, "percentage": 60.0},
-        {"band": "watch", "industries": 2, "percentage": 40.0}
+        {"band": "moderate_input_intensity", "industries": 3, "percentage": 60.0},
+        {"band": "higher_input_intensity", "industries": 2, "percentage": 40.0}
       ],
       "top_risks": [
-        {"industry_code": "44-45", "industry_name": "Retail", "health_score": 42.1, "band": "watch"}
+        {"industry_code": "44-45", "industry_name": "Retail", "health_score": 42.1, "band": "review_required"}
       ]
     }
   },
@@ -123,6 +127,7 @@ Successful responses include leaderboard entries, metadata, and the full/filtere
 ```
 
 ### `POST /scenario`
+
 Runs Scenario Lab adjustments on a supplied dataset. The baseline records should typically be taken from an `/evaluate` response.
 
 ```bash
@@ -140,6 +145,7 @@ curl -X POST http://localhost:9000/scenario \
 The response contains baseline/scenario summaries, per-industry deltas, and metadata copied from the dataset.
 
 ### `POST /analytics/health`
+
 Returns only the health analytics envelope for the supplied dataset. Accepts the same payload as `/evaluate` plus optional `group_by` (`overall`, `sector`, or `all`) and `top_risks` parameters.
 
 ```bash
@@ -156,6 +162,7 @@ curl -X POST http://localhost:9000/analytics/health \
 The response mirrors the `health` section embedded in `/evaluate` but omits leaderboard and dataset payloads, making it ideal for dashboards and scheduled reporting.
 
 ### `GET /metrics`
+
 Exposes Prometheus-formatted metrics covering request counts, latencies, and error totals. Scrape this endpoint from your monitoring system or curl it manually:
 
 ```bash
@@ -163,7 +170,8 @@ curl http://localhost:9000/metrics
 ```
 
 ### `GET /observability/status`
-Returns a JSON snapshot of the observability registry, including metric counts, exported span totals, registered health checks, and the most recent operations recorded by instrumentation extensions. The response mirrors `python scripts/observability_snapshot.py --pretty` for use in air-gapped environments.
+
+Returns a JSON snapshot of the observability registry, including metric counts, exported span totals, registered health checks, and the most recent operations recorded by instrumentation extensions. The response mirrors `python src/scripts/observability_snapshot.py --pretty` for use in air-gapped environments.
 
 ```json
 {
@@ -188,6 +196,7 @@ Returns a JSON snapshot of the observability registry, including metric counts, 
 ```
 
 ### `GET /observability/digest`
+
 Provides the same observability snapshot as `/observability/status` but enriches it with aggregate event counters, subscription counts, and the last error payload.
 
 ```json
@@ -211,6 +220,7 @@ Provides the same observability snapshot as `/observability/status` but enriches
 ```
 
 ### `GET /observability/events`
+
 Returns the most recent observation events emitted by the registry in reverse chronological order. Optional query parameters allow filtering by status (`success`, `error`, etc.) and limiting the number of events returned (default `25`, maximum `100`).
 
 ```json
@@ -232,6 +242,7 @@ Returns the most recent observation events emitted by the registry in reverse ch
 ```
 
 ### `GET /observability/snapshots`
+
 Returns metadata for every persisted snapshot in capture order (newest first). Use this catalogue to discover snapshot identifiers before fetching the full payload.
 
 ```json
@@ -250,7 +261,8 @@ Returns metadata for every persisted snapshot in capture order (newest first). U
 ```
 
 ### `GET /observability/snapshots/{snapshot_id}`
-Returns the full snapshot payload (matching the structure of `/observability/digest`) alongside metadata for the supplied identifier. Snapshots are stored on disk and can be captured via `make observability-snapshot` or `python scripts/observability_snapshot.py --store`.
+
+Returns the full snapshot payload (matching the structure of `/observability/digest`) alongside metadata for the supplied identifier. Snapshots are stored on disk and can be captured via `make observability-snapshot` or `python src/scripts/observability_snapshot.py --store`.
 
 ```json
 {

@@ -65,4 +65,4 @@ All P0 software-quality and release-gate checks in clean clone passed for commit
 
 ## Status
 
-READY FOR PUBLIC RELEASE (host Docker build not executed because Docker is unavailable on this validator machine)
+LOCAL VALIDATION PASSED FOR THE RECORDED CLEAN-CLONE RUN. Docker was not validated on that host, so this document is not a public-release approval by itself.

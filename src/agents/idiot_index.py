@@ -98,13 +98,11 @@ class IdiotIndexResponse:
     )
     health_score_average: float | None = field(
         default=None,
-        metadata={"description": "Composite health score (0-100) for the filtered dataset."},
+        metadata={"description": "Experimental composite score (0-100) for the filtered dataset."},
     )
     health_risk_band: str | None = field(
         default=None,
-        metadata={
-            "description": "Risk band label for the filtered dataset (excellent/healthy/watch/critical)."
-        },
+        metadata={"description": "Neutral review band label for the filtered dataset."},
     )
 
 
