@@ -67,6 +67,29 @@ Common delta fields:
 - `shock_sensitivity_index_delta`
 - `health_score_delta`
 
+## Public Signal Schema
+
+Public readiness sources that do not directly map to annual cost-structure inputs should be
+stored as leading signals instead of being forced into the core evaluation schema.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `observation_date` | string/date | Source observation period or release observation date. |
+| `frequency` | string | Daily, weekly, monthly, quarterly, annual, bi-annual, or multi-annual cadence. |
+| `series_id` | string | Upstream series, table, or file identifier. |
+| `industry_code` | string/null | NAICS or compatible industry code when available. |
+| `signal_name` | string | Human-readable signal label. |
+| `signal_value` | float/string | Source-native value after cleaning. |
+| `units` | string | Source-native units. |
+| `seasonal_adjustment` | string/null | Seasonal adjustment flag or description when published. |
+| `release_period` | string | Release batch key used by manifests and listener checks. |
+| `source` | string | Dataset family or upstream agency label. |
+
+Release manifests for public readiness data track `dataset_id`, `release_period`, `source_url`,
+`fetched_at`, `content_hash`, row count, columns, schema version, cleaning version, optional ETag,
+optional Last-Modified, observation range, and notes. These manifests are the duplicate-fetch
+guardrail for daily, weekly, monthly, quarterly, annual, bi-annual, and multi-annual refresh jobs.
+
 ## Interpretation Limitations
 
 - Metrics are heuristic diagnostics, not causal inference or forecasting guarantees.

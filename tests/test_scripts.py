@@ -12,6 +12,7 @@ from scripts import audit_metrics as audit_script
 from scripts import bump_version as bump_module
 from scripts import changelog_entry, connectors_catalog, diagnostics_bundle
 from scripts import observability_snapshot as observability_script
+from scripts import public_data_readiness as public_data_script
 from scripts import refresh_official_data as refresh_script
 from scripts import run_api as run_api_script
 from scripts import run_pytest_trace as pytest_trace_script
@@ -29,6 +30,7 @@ from scripts.run_scenario import (
     main as scenario_main,
 )
 from src.application import DataSource
+from src.core import ManifestStore, build_release_manifest, hash_payload
 
 
 def test_compute_module_complexity_counts_branches(monkeypatch, tmp_path) -> None:
@@ -574,6 +576,204 @@ def test_run_quality_checks_full_with_security(monkeypatch) -> None:
     assert any("codespell.py" in " ".join(cmd) for cmd in commands)
     assert any("pip_audit" in " ".join(cmd) for cmd in commands)
     assert any(cmd[0] == "detect-secrets-hook" for cmd in commands)
+
+
+def test_public_data_readiness_catalog_outputs_json(capsys) -> None:
+    exit_code = public_data_script.main(["catalog", "--pretty"])
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+
+    assert exit_code == 0
+    assert len(payload) >= 10
+    assert all(item["auth_requirement"] == "none" for item in payload)
+
+
+def test_public_data_readiness_check_release_skips_existing(tmp_path, capsys) -> None:
+    manifest = build_release_manifest(
+        dataset_id="census_aies_annual",
+        release_period="2023",
+        source_url="https://example.test/aies.zip",
+        content_hash=hash_payload(b"payload"),
+        row_count=87,
+        columns=["industry_code"],
+        fetched_at="2026-07-01T00:00:00Z",
+        etag="abc123",
+    )
+    ManifestStore(tmp_path).write(manifest)
+
+    exit_code = public_data_script.main(
+        [
+            "check-release",
+            "--manifest-dir",
+            str(tmp_path),
+            "--dataset-id",
+            "census_aies_annual",
+            "--release-period",
+            "2023",
+            "--source-url",
+            "https://example.test/aies.zip",
+            "--etag",
+            "abc123",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["should_fetch"] is False
+    assert payload["reason"] == "etag_match"
+
+
+def test_public_data_readiness_split_eras_outputs_windows(capsys) -> None:
+    exit_code = public_data_script.main(
+        [
+            "split-eras",
+            "--periods",
+            "2024-01",
+            "2024-02",
+            "2024-03",
+            "2024-04",
+            "2024-05",
+            "2024-06",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert [item["label"] for item in payload] == ["era_1", "era_2", "era_3"]
+    assert payload[0]["start_period"] == "2024-01"
+
+
+def test_public_data_readiness_listen_command(monkeypatch, tmp_path, capsys) -> None:
+    class StubResult:
+        def to_dict(self):
+            return {
+                "dataset_id": "bls_ppi_monthly",
+                "release_period": "2024-02",
+                "status": "new_release_available",
+            }
+
+    calls = []
+    monkeypatch.setattr(
+        public_data_script,
+        "listen_for_public_release",
+        lambda dataset_id, **kwargs: calls.append((dataset_id, kwargs)) or StubResult(),
+    )
+
+    exit_code = public_data_script.main(
+        [
+            "listen",
+            "--dataset-id",
+            "bls_ppi_monthly",
+            "--storage-root",
+            str(tmp_path),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["status"] == "new_release_available"
+    assert calls[0][0] == "bls_ppi_monthly"
+    assert calls[0][1]["storage_root"] == tmp_path
+
+
+def test_public_data_readiness_backfill_command(monkeypatch, tmp_path, capsys) -> None:
+    class StubResult:
+        def to_dict(self):
+            return {
+                "dataset_id": "census_aies_annual",
+                "release_period": "2023",
+                "status": "planned",
+                "dry_run": True,
+            }
+
+    calls = []
+    monkeypatch.setattr(
+        public_data_script,
+        "backfill_public_dataset",
+        lambda dataset_id, **kwargs: calls.append((dataset_id, kwargs)) or StubResult(),
+    )
+
+    exit_code = public_data_script.main(
+        [
+            "backfill",
+            "--dataset-id",
+            "census_aies_annual",
+            "--storage-root",
+            str(tmp_path),
+            "--start-year",
+            "2023",
+            "--end-year",
+            "2023",
+            "--dry-run",
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 0
+    assert payload["status"] == "planned"
+    assert calls[0][0] == "census_aies_annual"
+    assert calls[0][1]["dry_run"] is True
+
+
+def test_public_data_readiness_backtest_command(tmp_path, capsys) -> None:
+    cleaned = tmp_path / "cleaned.csv"
+    pd.DataFrame(
+        [
+            {
+                "observation_date": "2024-01-01",
+                "release_period": "2024-01",
+                "series_id": "A",
+                "signal_value": 1.0,
+            },
+            {
+                "observation_date": "2024-02-01",
+                "release_period": "2024-02",
+                "series_id": "A",
+                "signal_value": 2.0,
+            },
+            {
+                "observation_date": "2024-03-01",
+                "release_period": "2024-03",
+                "series_id": "A",
+                "signal_value": 3.0,
+            },
+            {
+                "observation_date": "2024-04-01",
+                "release_period": "2024-04",
+                "series_id": "A",
+                "signal_value": 4.0,
+            },
+            {
+                "observation_date": "2024-05-01",
+                "release_period": "2024-05",
+                "series_id": "A",
+                "signal_value": 5.0,
+            },
+            {
+                "observation_date": "2024-06-01",
+                "release_period": "2024-06",
+                "series_id": "A",
+                "signal_value": 6.0,
+            },
+        ]
+    ).to_csv(cleaned, index=False)
+    output = tmp_path / "backtest.json"
+
+    exit_code = public_data_script.main(
+        [
+            "backtest",
+            "--input",
+            str(cleaned),
+            "--output",
+            str(output),
+            "--pretty",
+        ]
+    )
+
+    assert exit_code == 0
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["baseline_config"]["method"] == "previous_period_observed_value"
+    assert payload["metrics"]["sample_count"] == 2
 
 
 def test_refresh_official_data_main_writes_csv(monkeypatch, tmp_path, capsys) -> None:

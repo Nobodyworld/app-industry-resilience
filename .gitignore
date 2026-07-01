@@ -114,6 +114,11 @@ dmypy.json
 .pytype/
 cython_debug/
 
+# Public data readiness outputs: keep large/live backfills out of git.
+data/public/raw/
+data/public/cleaned/
+data/public/manifests/
+
 # Rust
 target/
 **/*.rs.bk

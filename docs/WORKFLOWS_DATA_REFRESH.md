@@ -18,6 +18,55 @@ divided by intermediate-inputs measure.
 As of June 27, 2026, BEA's quarterly industry accounts are more current (2026 Q1, released June
 25, 2026), but API access requires a configured `BEA_API_KEY`.
 
+## Public data readiness guardrails
+
+The first public-data readiness layer is intentionally metadata-first. It defines a no-auth
+dataset catalog, writes release manifests, checks whether a release should be fetched again, and
+splits date-like observations into balanced eras for future rolling backtests.
+
+Inspect the validated phase-one catalog:
+
+```bash
+python src/scripts/public_data_readiness.py catalog --pretty
+```
+
+Record a release manifest after a fetch and clean step:
+
+```bash
+python src/scripts/public_data_readiness.py record-manifest \
+   --manifest-dir data/public_manifests \
+   --dataset-id census_aies_annual \
+   --release-period 2023 \
+   --source-url https://www2.census.gov/programs-surveys/aies/data/2023/AIES00BASIC.zip \
+   --payload-file data/official_industry_snapshot.csv \
+   --row-count 87 \
+   --columns industry_code industry_name year gross_output intermediate_inputs source
+```
+
+Check whether listener metadata indicates a release should be collected:
+
+```bash
+python src/scripts/public_data_readiness.py check-release \
+   --manifest-dir data/public_manifests \
+   --dataset-id census_aies_annual \
+   --release-period 2023 \
+   --source-url https://www2.census.gov/programs-surveys/aies/data/2023/AIES00BASIC.zip \
+   --etag "upstream-etag"
+```
+
+Split historical periods into at least three eras:
+
+```bash
+python src/scripts/public_data_readiness.py split-eras \
+   --periods 2021 2022 2023 2024 2025 2026 \
+   --sections 3 \
+   --pretty
+```
+
+Guardrail rule: scheduled jobs should prefer `check-release` using ETag, Last-Modified, source
+URL, or content hash metadata before downloading full payloads. Use `record-manifest` only after
+the raw or cleaned artifact has been created and its row count and columns are known.
+
 This guide explains how to refresh the Idiot Index datasets, rotate API keys, and validate the results before publishing updates.
 
 ## 1. Prepare credentials and configuration
@@ -35,10 +84,12 @@ This guide explains how to refresh the Idiot Index datasets, rotate API keys, an
 ## 3. Validate adapters
 
 1. Run targeted adapter tests:
+
    ```bash
    pytest tests/test_adapters_bea.py -k "not slow"
    pytest tests/test_adapters_census.py
    ```
+
 2. If new variables are required, update the adapter table definitions and extend coverage in the corresponding test modules.
 3. Confirm logs show healthy endpoint checks (`log_api_call`, `log_performance`). Investigate warnings about retries or degraded endpoints.
 
@@ -73,4 +124,4 @@ Address any linting, typing, or security findings before publishing. Review `bui
 - Monitor BEA/ASM dashboards for discrepancies immediately after deployment.
 
 ---
-Licensed under the repository's proprietary terms. See [LICENSE](../LICENSE).
+Licensed under the Apache License 2.0. See [LICENSE](../LICENSE).
