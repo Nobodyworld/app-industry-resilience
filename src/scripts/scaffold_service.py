@@ -39,7 +39,8 @@ def scaffold_service(name: str, *, force: bool) -> Path:
             f"Service module {module_path} already exists. Use --force to overwrite."
         )
 
-    template = textwrap.dedent(f"""
+    template = textwrap.dedent(
+        f"""
         '''Generated service scaffold.'''
 
         from __future__ import annotations
@@ -78,7 +79,8 @@ def scaffold_service(name: str, *, force: bool) -> Path:
                 with context:
                     # TODO-P2(3h): Implement the core service behaviour.
                     pass
-        """).strip()
+        """
+    ).strip()
 
     module_path.write_text(template + "\n", encoding="utf-8")
     return module_path
