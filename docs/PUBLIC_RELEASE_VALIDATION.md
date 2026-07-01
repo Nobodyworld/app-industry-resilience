@@ -34,8 +34,8 @@
 13. ./.venv/Scripts/pip-audit.exe -r requirements.txt -r requirements-dev.txt
 14. ./.venv/Scripts/detect-secrets-hook.exe --baseline config/.secrets.baseline
 15. ./.venv/Scripts/python.exe src/scripts/run_scenario.py --adjust "codes=311,gross=5,materials=-3" --top 5 --output build/reports/scenario_smoke.json
-16. ./.venv/Scripts/python.exe -m streamlit run app.py --server.headless true --server.port 8501 and HTTP probe of http://127.0.0.1:8501
-17. ./.venv/Scripts/python.exe src/scripts/run_api.py --host 127.0.0.1 --port 9011 and HTTP probes of http://127.0.0.1:9011/health and http://127.0.0.1:9011/metrics
+16. ./.venv/Scripts/python.exe -m streamlit run app.py --server.headless true --server.port 8501 and HTTP probe of <http://127.0.0.1:8501>
+17. ./.venv/Scripts/python.exe src/scripts/run_api.py --host 127.0.0.1 --port 9011 and HTTP probes of <http://127.0.0.1:9011/health> and <http://127.0.0.1:9011/metrics>
 18. Repository-only markdown link scan (excluding .venv): BROKEN_LINKS=0
 19. docker --version (container tool availability check)
 
