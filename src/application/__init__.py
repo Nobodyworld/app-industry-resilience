@@ -1,5 +1,6 @@
 """Application layer services that orchestrate Idiot Index use cases."""
 
+from .backtest_planner import BacktestMetricSummary, BacktestPlanner, BacktestResult, plan_backtest
 from .idiot_index_service import (
     DataSource,
     IdiotIndexService,
@@ -18,6 +19,9 @@ from .scenario_planner import (
 )
 
 __all__ = [
+    "BacktestMetricSummary",
+    "BacktestPlanner",
+    "BacktestResult",
     "DataSource",
     "IdiotIndexService",
     "IdiotIndexSummary",
@@ -29,5 +33,6 @@ __all__ = [
     "ScenarioPlanner",
     "ScenarioResult",
     "ScenarioSummary",
+    "plan_backtest",
     "plan_scenario",
 ]
