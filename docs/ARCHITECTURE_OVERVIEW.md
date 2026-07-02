@@ -1,6 +1,6 @@
 # Architecture Overview
 
-The Idiot Index application follows a layered Python architecture designed for testability and safe data handling. The layout keeps adapters, core logic, interfaces, and automation surfaces isolated so that each concern can evolve independently.
+The U.S. Industry Cost Structure & Resilience Dashboard follows a layered Python architecture designed for testability and safe data handling. The layout keeps adapters, core logic, interfaces, and automation surfaces isolated so that each concern can evolve independently.
 
 ```text
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -51,7 +51,7 @@ The Idiot Index application follows a layered Python architecture designed for t
 ### Agents
 
 - **Location:** `agents`
-- **Purpose:** Provide dataclass-driven schemas and functions so downstream automation or LLM agents can reuse the Idiot Index service without touching Streamlit internals.
+- **Purpose:** Provide dataclass-driven schemas and functions so downstream automation or LLM agents can reuse the core analysis service without touching Streamlit internals.
 
 ### Extensions
 

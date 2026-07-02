@@ -5,7 +5,7 @@ from __future__ import annotations
 from importlib import metadata
 
 try:
-    __version__ = metadata.version("idiot-index-app")
+    __version__ = metadata.version("industry-resilience-dashboard")
 except metadata.PackageNotFoundError:  # pragma: no cover - fallback during local execution
     __version__ = "0.1.0"
 

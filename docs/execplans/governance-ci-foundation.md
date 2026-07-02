@@ -66,7 +66,7 @@ Update README.md or CONTRIBUTING to reference new processes. Add docs/developmen
 
 ## Concrete Steps
 
-Work from repository root `/workspace/idiot-index-app`.
+Work from repository root `/workspace/app-industry-resilience`.
 
 1. Draft governance Markdown files and CODEOWNERS.
 2. Add .editorconfig with consistent styles.

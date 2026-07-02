@@ -1,4 +1,4 @@
-title = "idiot-index-app gitleaks policy"
+title = "industry-resilience-dashboard gitleaks policy"
 
 [allowlist]
   description = "Allow generated baselines and documentation references"

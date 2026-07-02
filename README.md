@@ -197,9 +197,9 @@ GitHub Actions status: repository Actions are currently disabled by owner policy
 ## Docker
 
 ```bash
-docker build -t idiot-index-app .
-docker run -p 8501:8501 idiot-index-app
-docker run -e APP_MODE=api -p 9000:9000 idiot-index-app
+docker build -t industry-resilience-dashboard .
+docker run -p 8501:8501 industry-resilience-dashboard
+docker run -e APP_MODE=api -p 9000:9000 industry-resilience-dashboard
 ```
 
 The image uses Python 3.13 and runtime dependencies only. Docker validation status belongs in the branch or release report because it depends on local Docker availability.

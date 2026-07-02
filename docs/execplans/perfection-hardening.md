@@ -74,7 +74,7 @@ Key modules involved in this sweep:
 
 - Edit `src/core/types.py`, `src/core/security.py`, `src/core/normalize.py`, `src/core/metrics.py`, `src/infrastructure/logging_config.py`, `src/core/utils.py`, and `src/interfaces/streamlit/helpers.py` following the plan above.
 - Update/add tests in `tests/test_security.py` and, if necessary, `tests/test_logging.py` to reflect tightened validations.
-- From `/workspace/idiot-index-app`, run:
+- From `/workspace/app-industry-resilience`, run:
     - `mypy src`
     - `pytest`
 

@@ -1,5 +1,5 @@
 [project]
-name = "idiot-index-app"
+name = "industry-resilience-dashboard"
 version = "0.1.0"
 description = "U.S. Industry Cost Structure and Resilience Dashboard"
 requires-python = ">=3.13"

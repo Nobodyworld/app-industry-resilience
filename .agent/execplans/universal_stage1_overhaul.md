@@ -54,7 +54,7 @@ Narrative roadmap for implementing Stage 1:
 
 ## Concrete Steps
 
-Detailed commands and checkpoints (repository root `/workspace/idiot-index-app`):
+Detailed commands and checkpoints (repository root `/workspace/app-industry-resilience`):
 
 1. Patch foundational bug and scaffolding:
        sed -n '1,120p' src/core/cache.py  # verify context

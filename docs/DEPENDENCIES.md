@@ -1,6 +1,6 @@
 # Dependency Register
 
-This document records the vetted runtime and development dependencies for the Idiot Index application. Use it during security reviews and upgrade planning.
+This document records the vetted runtime and development dependencies for the U.S. Industry Cost Structure & Resilience Dashboard. Use it during security reviews and upgrade planning.
 
 ## Runtime dependencies
 

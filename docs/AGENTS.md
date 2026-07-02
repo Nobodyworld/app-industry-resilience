@@ -1,4 +1,4 @@
-# Automation Guidance for Idiot Index
+# Automation Guidance for U.S. Industry Cost Structure & Resilience Dashboard
 
 This repository welcomes code-writing agents as long as they follow the guardrails below. Human contributors should also review these expectations when orchestrating automated workflows.
 
@@ -13,7 +13,7 @@ This repository welcomes code-writing agents as long as they follow the guardrai
 
 ## Safe Operating Checklist
 
-- Run all commands from the repository root (`/workspace/idiot-index-app`).
+- Run all commands from the repository root (`/workspace/app-industry-resilience`).
 - Prefer the provided Make targets for setup and validation (`make setup`, `make quality-gate`, `make api`).
 - Use `make observability-tail` and `make extensions-catalog` for read-only diagnostics instead of modifying core services when triaging instrumentation issues.
 - When creating new extensions or automation scripts, update `extensions/manifest.json` and the relevant docs (`EXTENSION_GUIDE.md`) so that humans can audit the change.
@@ -27,4 +27,4 @@ Agents must leave the working tree clean after execution:
 - All manifests (`extensions/manifest.json`, `pyproject.toml`, etc.) should be formatted and valid JSON/TOML.
 - The latest documentation must reflect the executed work, especially when extending the observability or plugin layers.
 
-By adhering to this guidance, automated and human contributors can collaborate without breaking the Idiot Index platform.
+By adhering to this guidance, automated and human contributors can collaborate without breaking the dashboard platform.

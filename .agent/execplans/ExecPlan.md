@@ -113,7 +113,7 @@ We must keep core free of infrastructure dependencies, so Redis wiring must be i
 
 ## Concrete Steps
 
-1. From `/workspace/idiot-index-app`, read and modify the Python modules listed above, following the sequence in the Plan of Work. Use incremental edits with focused commits.
+1. From `/workspace/app-industry-resilience`, read and modify the Python modules listed above, following the sequence in the Plan of Work. Use incremental edits with focused commits.
 2. Install any new dev dependencies locally if needed: `pip install fakeredis redis` (will also be handled by updated requirements).
 3. Execute unit tests focused on new functionality before the full gate, e.g., `pytest tests/test_rate_limiter.py tests/test_security.py` to iterate quickly.
 4. Once the implementation stabilises, run the full gate: `make quality-gate`.
