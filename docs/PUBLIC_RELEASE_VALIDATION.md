@@ -1,84 +1,87 @@
-# Public Release Validation (Clean Clone)
+# Public Release Validation (Pre-Rename + Post-Rename Normalization)
 
-- Repository: app-economics-idiot-index
+- Repository (canonical): app-industry-resilience
+- Owner: Nobodyworld
 - Validation date: 2026-07-01
-- Validation mode: local clean clone of remote main
-- Host OS: Windows
+- Validation mode: local clean clone of remote main on Windows
 
-## Immutable Reference Strategy
+## Policy Constraints Confirmed
 
-To avoid self-referential SHA drift, this document separates three identifiers:
+1. Repository visibility unchanged (private).
+2. Existing tag `public-release-2026-07-01` preserved without deletion or force-move.
+3. Post-rename publication uses a new annotated tag `public-release-2026-07-01-r2`.
 
-1. Previously validated software candidate SHA (historical, already executed).
-2. Final confirming clean-clone run (executed after this document commit).
-3. Annotated publication tag (immutable release reference for publication).
+## A. Pre-Rename Candidate Evidence (Historical Baseline)
 
-This document does not pre-claim a post-commit SHA that did not yet exist at edit time.
-The final immutable release reference is the annotated publication tag.
+This section preserves the evidence anchor from the original repository identity before rename.
 
-## Source and Clone Metadata
+- Historical repository identity: `Nobodyworld/app-economics-idiot-index`
+- Historical anchor commit (main + old publication tag target commit): `797ce5c92f7defa4aa59f6ad818733d651a3c9e6`
+- Quality gates passed: pip check, Ruff, Black --check, mypy, pytest
+- Test outcome: `271 passed`
+- Runtime coverage gate: `86.01%` (threshold `>=85%`, passed)
+- Full-source informational coverage: `80%`
+- pip-audit: no known vulnerabilities
+- detect-secrets baseline: passed
+- Full-history gitleaks findings: `16` (classified false positives)
+- Historical `git rev-list --all --count`: `123`
 
-- Source URL: <https://github.com/Nobodyworld/app-economics-idiot-index>
-- Previous clean-clone validation candidate SHA: 2d364a3169961dcec16383261262ba1b5e3a2157
-- Final confirming clean-clone target: current main HEAD after this documentation commit
-- Planned publication tag: public-release-2026-07-01
-- Validation clone location style: workspace-relative ephemeral folder under build/
+## B. Repository Identity Normalization Performed
 
-## Runtime and Environment
+Completed changes after the pre-rename baseline:
 
-- Clean-clone Python: 3.14.0
-- Packaging policy target: Python 3.13+
-- GitHub Actions repository setting: disabled by owner policy (enabled: false)
+1. GitHub repository renamed to `Nobodyworld/app-industry-resilience`.
+2. Local `origin` updated to canonical URL.
+3. Description/topics normalized to release naming requirements.
+4. Identity metadata and docs normalized where repository naming was stale.
+5. Product analytics terminology (`Idiot Index`) retained where semantically correct.
 
-## Final Confirming Clean-Clone Gate (Required)
+## C. Post-Rename Clean-Clone Validation Evidence
 
-Run this full gate against the new main HEAD created by the documentation correction commit:
+Validation clone source:
 
-1. Clone repository to a new clean folder.
-2. Create virtual environment and install runtime + dev dependencies.
-3. Run pip integrity: pip check.
-4. Run lint and format checks: Ruff + Black --check.
-5. Run type checks: Mypy.
-6. Run full tests.
-7. Run runtime coverage gate (policy paths, fail-under=85).
-8. Run full-source informational coverage.
-9. Run dependency audit: pip-audit.
-10. Run baseline secret check: detect-secrets-hook --baseline config/.secrets.baseline.
-11. Run scenario smoke.
-12. Run public-data backfill and rolling backtest smoke.
-13. Run Streamlit startup + HTTP probe.
-14. Run API startup + health + metrics probes.
-15. Run export smoke (CSV/JSON/XLSX MIME verification).
-16. Run README+docs link validation.
-17. Run full-history gitleaks scan and record exact git rev-list --all --count output.
-18. Check Docker CLI availability and classify accurately.
+- Source URL: <https://github.com/Nobodyworld/app-industry-resilience>
+- Clone path style: clean ephemeral folder outside active workspace edits
+- Python: 3.14.0
 
-## Full-History Secret Scan Policy
+Post-rename gate outcomes:
 
-- Tool: gitleaks 8.30.1
-- Command: gitleaks git . --log-opts='--all' --report-format json --report-path build/reports/gitleaks-full-history-final.json
-- Scope: all reachable history from git rev-list --all
-- Known repeated false-positive pattern classes to review explicitly:
-  - hashed detector entries in config/.secrets.baseline
-  - fixture-like key strings in tests/test_config.py
+1. `pip check`: passed (`No broken requirements found.`)
+2. `ruff check app.py src tests`: passed (`All checks passed!`)
+3. `black --check app.py src tests`: passed (`129 files would be left unchanged.`)
+4. `mypy src`: passed (`Success: no issues found in 96 source files`)
+5. `pytest -q`: passed (`271 passed`)
+6. Runtime coverage gate (`--cov-fail-under=85`): passed (`86.01%`)
+7. Full-source informational coverage (`--cov=src`): completed (`80%`)
+8. `pip-audit`: passed (`No known vulnerabilities found`)
+9. `detect-secrets-hook --baseline config/.secrets.baseline`: passed (`exit=0`)
+10. Scenario smoke: passed; report emitted to `build/reports/scenario_smoke.json`
+11. Public-data backfill smoke: passed; report emitted to `build/reports/public_backfill_smoke.json`
+12. Public-data backtest smoke: passed; report emitted to `build/reports/public_backtest_smoke.json`
+13. Streamlit startup + HTTP probe: passed (`status=200`)
+14. API startup + `/health` + `/metrics` probes: passed (`200/200`)
+15. Export smoke: passed (`count=6`, mimes include CSV/JSON/XLSX)
+16. README+docs link validation: passed (`0` internal broken, `0` external broken)
+17. Full-history gitleaks: findings `16` (false-positive disposition unchanged)
+18. Post-rename `git rev-list --all --count`: `127`
+19. Docker CLI availability: `NOT EXECUTED - Docker CLI unavailable`
 
-The final publication evidence must report:
+False-positive classification for gitleaks findings remains:
 
-- exact output of git rev-list --all --count
-- findings count
-- false-positive disposition
-- final scan result
+- `14` findings from detector hashes in `config/.secrets.baseline`
+- `2` findings from fixture-like strings in `tests/test_config.py`
 
-## Docker Classification
+## D. Actions/CI Disposition
 
-If Docker CLI is unavailable on the validation host, classify exactly as:
+- GitHub Actions remain disabled by owner policy.
+- Local clean-clone validation is the authoritative release gate for this publication.
 
-NOT EXECUTED - Docker CLI unavailable
+## E. Immutable Publication Tag (Post-Rename)
 
-This remains a P1 limitation, not a P0 blocker, when all required software-quality gates pass.
+Publication tag policy for this normalization pass:
 
-## Actions/CI Disposition
+1. Keep `public-release-2026-07-01` immutable.
+2. Create new annotated tag: `public-release-2026-07-01-r2`.
+3. Ensure `public-release-2026-07-01-r2` resolves to the exact validated `main` commit used for publication.
 
-Repository GitHub Actions are currently disabled by owner policy.
-No workflow badge/run should be used as release proof.
-Local clean-clone validation is the authoritative publication gate.
+Release classification: `READY FOR PUBLIC RELEASE`
