@@ -149,7 +149,7 @@ adapters/public sources -> core normalization + metrics -> application services
 
 Key modules:
 
-- [src/core](src/core/README.md) for normalization, metrics, analytics, cache, and public-data manifest primitives.
+- [src](src/README.md) for normalization, metrics, analytics, cache, and public-data manifest primitives.
 - [src/adapters](src/adapters) for source-specific data access.
 - [src/application](src/application) for orchestration, scenarios, public backfill, and rolling backtests.
 - [src/interfaces](src/interfaces) for Streamlit and API surfaces.
