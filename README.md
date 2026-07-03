@@ -19,6 +19,13 @@ streamlit run app.py
 
 Open the local Streamlit URL and use the bundled sample dataset for an offline walkthrough. The same core service can be exercised through the API with `python src/scripts/run_api.py`.
 
+Suggested walkthrough in the UI:
+
+1. Confirm source and reference year in the left Data Studio panel.
+2. Use the top tabs in order: Overview, Explore, Compare, then Scenario Lab.
+3. In Scenario Lab, set at least one non-zero adjustment, click Run scenario, then use Reset scenario to return to idle state.
+4. Use the export panel for all-rows vs current-view outputs in CSV, JSON, or XLSX.
+
 Offline sample walkthrough command set:
 
 ```bash

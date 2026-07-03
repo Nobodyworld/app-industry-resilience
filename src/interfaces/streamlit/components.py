@@ -44,6 +44,8 @@ class ScenarioControlState:
     materials_cost_delta_pct: float
     value_added_delta_pct: float
     intermediate_inputs_delta_pct: float
+    run_requested: bool
+    reset_requested: bool
 
 
 def load_custom_styles() -> None:
@@ -185,6 +187,8 @@ def render_page_header(
     subtitle: str,
     meta: dict[str, str],
     focus_mode: bool,
+    *,
+    show_focus_toggle: bool = True,
 ) -> bool:
     """Render the hero header and return the current focus mode toggle state."""
 
@@ -203,6 +207,9 @@ def render_page_header(
             """,
             unsafe_allow_html=True,
         )
+
+    if not show_focus_toggle:
+        return False
 
     control_col_left, control_col_right = st.columns([5, 1])
     with control_col_right:
@@ -224,7 +231,9 @@ def render_sidebar(
     """Render sidebar inputs and validations, returning state for the caller."""
 
     st.sidebar.header("Data Studio")
-    st.sidebar.write("Choose how the Idiot Index should listen to your data today.")
+    st.sidebar.write(
+        "Choose the active dataset and continue through explore, compare, and scenario steps."
+    )
 
     options = [
         "Official snapshot (AIES 2023)",
@@ -234,6 +243,15 @@ def render_sidebar(
         "BEA (Economy-wide)",
     ]
     data_mode = st.sidebar.selectbox("Source", options)
+
+    source_status = {
+        "Official snapshot (AIES 2023)": "Official benchmark",
+        "Sample (offline)": "Offline demonstration",
+        "Upload CSV": "User-provided data",
+        "Census ASM (legacy)": "Legacy adapter",
+        "BEA (Economy-wide)": "Experimental adapter",
+    }
+    st.sidebar.caption(f"Status: {source_status[data_mode]}")
 
     min_year, max_year = year_bounds
     reference_default = 2023 if data_mode == "Official snapshot (AIES 2023)" else default_year
@@ -257,8 +275,8 @@ def render_sidebar(
     else:
         year_clean = year_result.value
 
-    bea_val = st.sidebar.text_input("BEA API Key", value=bea_key, type="password")
-    census_val = st.sidebar.text_input("Census API Key", value=census_key, type="password")
+    bea_val = bea_key
+    census_val = census_key
 
     uploaded_file = None
     if data_mode == "Upload CSV":
@@ -266,11 +284,15 @@ def render_sidebar(
         if uploaded_file is None:
             st.sidebar.info("Drop a CSV to activate the canvas.")
     elif data_mode == "Census ASM (legacy)":
+        st.sidebar.caption("Advanced adapter: requires a Census API key.")
+        census_val = st.sidebar.text_input("Census API Key", value=census_key, type="password")
         key_result = security_utils.validate_api_key(census_val, "Census")
         if not key_result.ok:
             st.sidebar.error(key_result.message)
             errors.append(key_result.message)
     elif data_mode == "BEA (Economy-wide)":
+        st.sidebar.caption("Experimental adapter: requires a BEA API key.")
+        bea_val = st.sidebar.text_input("BEA API Key", value=bea_key, type="password")
         key_result = security_utils.validate_api_key(bea_val, "BEA")
         if not key_result.ok:
             st.sidebar.error(key_result.message)
@@ -281,12 +303,14 @@ def render_sidebar(
             "Latest keyless Census benchmark: survey year 2023, released February 26, 2026. "
             "Uses total operating expenses as the denominator."
         ),
-        "Sample (offline)": "Explore the experience instantly with curated demo data.",
+        "Sample (offline)": "Explore the dashboard instantly with bundled offline sample data.",
         "Upload CSV": "Bring your own dataset. Required columns: industry_code, industry_name, year.",
         "Census ASM (legacy)": (
-            "Legacy manufacturing series through 2021. Census replaced ASM with AIES."
+            "Legacy manufacturing series through 2021. Not equivalent to the official AIES benchmark path."
         ),
-        "BEA (Economy-wide)": "Access the Bureau of Economic Analysis industry accounts.",
+        "BEA (Economy-wide)": (
+            "Experimental adapter for BEA industry accounts. Not equivalent to the official AIES benchmark path."
+        ),
     }
     st.sidebar.markdown(
         f"<div class='sidebar-guidance'>{guidance[data_mode]}</div>",
@@ -338,7 +362,7 @@ def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None 
             "hint": "most common reporting year",
         },
         {
-            "label": "Mean Idiot Index",
+            "label": "Mean output-to-cost ratio",
             "value": f"{avg_idiot_index:.2f}" if avg_idiot_index is not None else "—",
             "hint": "gross output ÷ available cost input",
         },
@@ -348,9 +372,11 @@ def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None 
     if badge["score"] is not None:
         cards.append(
             {
-                "label": "Avg health score",
+                "label": "Avg composite indicator",
                 "value": str(badge["score"]),
-                "hint": f"risk band: {badge['band']}" if badge["band"] else "composite resilience",
+                "hint": (
+                    f"indicator band: {badge['band']}" if badge["band"] else "composite indicator"
+                ),
             }
         )
 
@@ -405,7 +431,7 @@ def render_deep_dive(
 
         metric_cols = container.columns(4 if not focus_mode else 2)
         key_metrics = [
-            ("Idiot Index", row.get("idiot_index")),
+            ("Output-to-cost ratio", row.get("idiot_index")),
             ("Value-Added %", row.get("value_added_pct")),
             ("Materials Share %", row.get("materials_share_pct")),
             ("Value Added", row.get("value_added")),
@@ -419,7 +445,7 @@ def render_deep_dive(
                     st.metric(label, "N/A")
                 elif "%" in label:
                     st.metric(label, f"{value:.1f}%")
-                elif label == "Idiot Index":
+                elif label == "Output-to-cost ratio":
                     st.metric(label, f"{value:.2f}")
                 else:
                     st.metric(label, f"{value:,.0f}")
@@ -461,7 +487,8 @@ def render_scenario_controls(
     """Render Scenario Lab controls and return selected deltas."""
 
     st.markdown(
-        "The Scenario Lab applies percentage shocks to industries so you can probe resilience and dependency instantly."
+        "Scenario output is arithmetic sensitivity analysis, not a forecast. "
+        "Run a scenario only after setting at least one non-zero adjustment."
     )
     selection = st.multiselect(
         "Target industries",
@@ -469,6 +496,7 @@ def render_scenario_controls(
         default=list(default_selection or []),
         format_func=code_formatter,
         help="Leave empty to stress test the entire dataset.",
+        key="scenario_target_codes",
     )
 
     with st.expander("Adjust cost structure", expanded=True):
@@ -478,6 +506,7 @@ def render_scenario_controls(
             max_value=50.0,
             value=default_gross_delta,
             step=1.0,
+            key="scenario_gross_delta",
         )
         materials_delta = st.slider(
             "Materials cost change (%)",
@@ -485,6 +514,7 @@ def render_scenario_controls(
             max_value=50.0,
             value=default_materials_delta,
             step=1.0,
+            key="scenario_materials_delta",
         )
         value_delta = st.slider(
             "Value added change (%)",
@@ -492,6 +522,7 @@ def render_scenario_controls(
             max_value=25.0,
             value=default_value_delta,
             step=1.0,
+            key="scenario_value_delta",
         )
         intermediate_delta = st.slider(
             "Intermediate inputs change (%)",
@@ -500,6 +531,15 @@ def render_scenario_controls(
             value=default_intermediate_delta,
             step=1.0,
             help="Applies when intermediate inputs are available separately from materials cost.",
+            key="scenario_intermediate_delta",
+        )
+
+    action_col, reset_col = st.columns(2)
+    with action_col:
+        run_requested = st.button("Run scenario", use_container_width=True, key="scenario_run")
+    with reset_col:
+        reset_requested = st.button(
+            "Reset scenario", use_container_width=True, key="scenario_reset"
         )
 
     return ScenarioControlState(
@@ -508,6 +548,8 @@ def render_scenario_controls(
         materials_cost_delta_pct=materials_delta,
         value_added_delta_pct=value_delta,
         intermediate_inputs_delta_pct=intermediate_delta,
+        run_requested=run_requested,
+        reset_requested=reset_requested,
     )
 
 
@@ -521,59 +563,82 @@ def render_scenario_results(
     """Display scenario summaries, tables, and optional chart."""
 
     baseline_summary = summary["baseline"]
+    scenario_summary = summary.get("scenario")
     delta_summary = cast(Mapping[str, float | None], summary["delta"])
+
+    st.caption(
+        "Baseline values are current-state estimates. Scenario values and deltas are arithmetic sensitivity outputs only."
+    )
 
     metric_cols_primary = st.columns(3)
 
     def _metric(
-        column, label: str, baseline_value: float | None, delta_value: float | None
+        column,
+        label: str,
+        baseline_value: float | None,
+        scenario_value: float | None,
+        delta_value: float | None,
     ) -> None:
-        baseline_display = f"{baseline_value:,.2f}" if baseline_value is not None else "—"
+        if baseline_value is None or scenario_value is None:
+            column.metric(label, "—", None)
+            return
+
         delta_display = f"{delta_value:+,.2f}" if delta_value is not None else None
-        column.metric(label, baseline_display, delta_display)
+        column.metric(
+            label,
+            f"Baseline {baseline_value:,.2f}",
+            f"Scenario {scenario_value:,.2f} ({delta_display})" if delta_display else None,
+        )
 
     _metric(
         metric_cols_primary[0],
         "Gross output total",
         getattr(baseline_summary, "gross_output_total", None),
+        getattr(scenario_summary, "gross_output_total", None),
         delta_summary.get("gross_output_total"),
     )
     _metric(
         metric_cols_primary[1],
         "Value added total",
         getattr(baseline_summary, "value_added_total", None),
+        getattr(scenario_summary, "value_added_total", None),
         delta_summary.get("value_added_total"),
     )
     _metric(
         metric_cols_primary[2],
-        "Average resilience score",
+        "Average comparative score",
         getattr(baseline_summary, "resilience_score_avg", None),
+        getattr(scenario_summary, "resilience_score_avg", None),
         delta_summary.get("resilience_score_avg"),
     )
 
     metric_cols_secondary = st.columns(4)
     _metric(
         metric_cols_secondary[0],
-        "Average Idiot Index",
+        "Average output-to-cost ratio",
         getattr(baseline_summary, "idiot_index_avg", None),
+        getattr(scenario_summary, "idiot_index_avg", None),
         delta_summary.get("idiot_index_avg"),
     )
     _metric(
         metric_cols_secondary[1],
         "Materials dependency ratio",
         getattr(baseline_summary, "materials_dependency_ratio_avg", None),
+        getattr(scenario_summary, "materials_dependency_ratio_avg", None),
         delta_summary.get("materials_dependency_ratio_avg"),
     )
     _metric(
         metric_cols_secondary[2],
-        "Shock sensitivity index",
+        "Input sensitivity index",
         getattr(baseline_summary, "shock_sensitivity_index_avg", None),
+        getattr(scenario_summary, "shock_sensitivity_index_avg", None),
         delta_summary.get("shock_sensitivity_index_avg"),
     )
     _metric(
         metric_cols_secondary[3],
-        "Average health score",
+        "Average composite indicator",
         getattr(baseline_summary, "health_score_avg", None),
+        getattr(scenario_summary, "health_score_avg", None),
         delta_summary.get("health_score_avg"),
     )
 
@@ -582,7 +647,7 @@ def render_scenario_results(
     scenario_health = health_meta.get("scenario")
     if baseline_health and scenario_health:
         st.caption(
-            "Risk band shift: "
+            "Indicator-band shift: "
             f"{baseline_health.overall.risk_band or '—'} → {scenario_health.overall.risk_band or '—'}"
         )
 
@@ -604,7 +669,7 @@ def render_download_panel(artifacts: Sequence[DownloadArtifact]) -> None:
 
     with st.container():
         st.markdown("<div class='download-panel'>", unsafe_allow_html=True)
-        st.write("Carry the Idiot Index narrative with you.")
+        st.write("Export the current analysis outputs.")
         for artifact in artifacts:
             st.download_button(
                 artifact.label,
@@ -714,11 +779,11 @@ def build_data_story(
 
     if pd.notna(index_val):
         story_parts.append(
-            f"**{name}** carries an Idiot Index of **{index_val:.2f}**, highlighting the balance between gross output and its available cost input."
+            f"**{name}** carries an output-to-cost ratio of **{index_val:.2f}**, highlighting the balance between gross output and its available cost input."
         )
     else:
         story_parts.append(
-            f"**{name}** lacks a recent Idiot Index reading, suggesting the source data may need review."
+            f"**{name}** lacks a recent output-to-cost ratio reading, suggesting the source data may need review."
         )
 
     if filter_query:
