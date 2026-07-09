@@ -860,7 +860,7 @@ with st.expander("Technical diagnostics", expanded=False):
 download_artifacts = prepare_download_artifacts(
     df_full=df_display,
     df_filtered=df_filtered,
-    base_name="idiot_index_results",
+    base_name="industry_cost_structure_results",
 )
 st.caption(
     "Export scope: 'All rows' exports the active dataset for the selected source; "

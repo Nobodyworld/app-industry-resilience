@@ -61,7 +61,7 @@ def prepare_download_artifacts(
             return None
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-            frame.to_excel(writer, index=False, sheet_name="Idiot Index")
+            frame.to_excel(writer, index=False, sheet_name="Cost Structure")
         return buffer.getvalue()
 
     options = {
