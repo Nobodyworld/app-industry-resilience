@@ -1,6 +1,6 @@
 # Contributing Guide
 
-Thanks for investing time in the Idiot Index project! This guide explains how to set up a development environment, propose changes, and meet the repository's quality standards.
+Thanks for investing time in the Industry Resilience project. This guide explains how to set up a development environment, propose changes, and meet the repository's quality standards.
 
 ## Core Expectations
 
@@ -15,9 +15,9 @@ Thanks for investing time in the Idiot Index project! This guide explains how to
 
 - `app.py` – Streamlit entrypoint that wires the UI to the application layer.
 - `src/` – Production code, including the agent toolkit under `src/agents`, application services, core logic, adapters, interfaces, and infrastructure packages.
-- `docs/` – Reference material and runbooks. Long-form governance and release docs now live under `docs/handbook/` to keep the repository root focused on metadata.
+- `docs/` – Reference material and runbooks. Long-form governance and release docs live under `docs/handbook/`.
 - `docs/execplans/` – Historical ExecPlans documenting major refactors and investigations.
-- `extensions/`, `scripts/`, `tests/`, `assets/`, `data/` – Extension modules, automation helpers, test suites, static assets, and sample datasets respectively.
+- `extensions/`, `scripts/`, `tests/`, `assets/`, `data/` – Extension modules, automation helpers, test suites, static assets, and sample datasets.
 
 ## Prerequisites
 
@@ -32,9 +32,9 @@ From the repository root:
 make setup
 ```
 
-`make setup` upgrades `pip`, installs runtime + development dependencies, and registers the `pre-commit` hooks (including the `commit-msg` hook that enforces Conventional Commits).
+`make setup` upgrades `pip`, installs runtime and development dependencies, and registers the `pre-commit` hooks, including the `commit-msg` hook that enforces Conventional Commits.
 
-If you prefer to perform the steps manually:
+For manual setup:
 
 ```bash
 python -m pip install --upgrade pip
@@ -43,19 +43,19 @@ pre-commit install
 pre-commit install --hook-type commit-msg
 ```
 
-> **Offline note:** When external package indexes are inaccessible, run `SKIP_PIP=1 make setup`. The quality targets automatically fall back to the Python scripts in `scripts/` when the `pre-commit` binary is unavailable.
+> **Offline note:** When external package indexes are inaccessible, run `SKIP_PIP=1 make setup`. Quality targets fall back to repository scripts when the `pre-commit` binary is unavailable.
 
 ## Development Workflow
 
-1. Create a feature branch (`git checkout -b feat/add-cool-thing`).
-2. Make your changes.
+1. Create a focused feature branch, such as `git checkout -b feat/add-capability`.
+2. Make the change and add or update tests.
 3. Run the local quality gate:
 
    ```bash
    make quality-gate
    ```
 
-   `make quality-gate` runs Black (check mode), Ruff, mypy, runtime-scoped pytest coverage enforcement (`make coverage-runtime`, default fail-under 85), an informational full `src` coverage report, and the security gate (`pip-audit` + `detect-secrets`). This mirrors the CI workflow so failures are caught locally.
+   `make quality-gate` runs Black in check mode, Ruff, mypy, runtime-scoped pytest coverage enforcement (`make coverage-runtime`, default fail-under 85), an informational full-`src` coverage report, and the security gate (`pip-audit` plus `detect-secrets`). While repository Actions are disabled, this local gate is the authoritative validation path. When Actions are enabled, the hosted workflow should invoke the same target.
 
 4. Run additional focused commands as needed:
 
@@ -66,48 +66,46 @@ pre-commit install --hook-type commit-msg
    make test          # Run pytest without coverage
    make security      # Run pip-audit and detect-secrets checks
    make sbom          # Build a CycloneDX SBOM for dependencies
-   make audit         # Generate stewardship metrics (coverage, complexity, dependency graph)
-   make docs          # List key documentation links in the terminal
+   make audit         # Generate stewardship metrics
+   make docs          # List key documentation links
    ```
 
-The helper scripts invoked by these targets now auto-bootstrap the repository root onto `PYTHONPATH`, so you can run
-`python scripts/<name>.py` directly without installing the project as a package.
-
-1. Commit using Conventional Commits. The `commit-msg` hook will reject messages that do not comply.
-2. Push and open a pull request using the provided template.
+5. Commit using Conventional Commits. The `commit-msg` hook rejects non-compliant messages.
+6. Push the branch and open a pull request using the provided template.
 
 ## Pull Request Checklist
 
-Before requesting a review, verify that:
+Before requesting review, verify that:
 
 - `make quality-gate` passes locally.
 - Documentation is updated when behavior changes or new workflows are introduced.
-- New or changed configuration is explained in PR notes (feature flags, environment variables, migrations).
-- Screenshots are attached for UI changes.
+- New or changed configuration is explained in PR notes.
+- Screenshots are attached for user-interface changes.
+- No secrets, generated build output, or large local datasets are included.
 
-### Extensions, Services & Telemetry
+### Extensions, Services, and Telemetry
 
 - Use the scaffolds to keep new modules consistent:
-  - `python scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary/scenario/instrumentation hooks and updates `extensions/manifest.json`.
+  - `python scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary, scenario, and instrumentation hooks and updates `extensions/manifest.json`.
   - `python scripts/scaffold_service.py --name <service>` creates an observability-aware service skeleton under `src/application/services/`.
-- Instrumentation extensions should subscribe to events on the shared `ObservabilityRegistry` instead of mutating core services. The reference implementation lives in `src/extensions/builtins/core_instrumentation.py`.
-- Use `src/extensions/builtins/data_quality.py` as a second example of instrumentation that listens for dataset/scenario profile events, emits gauges, and registers health checks. Run `make extensions-catalog` to confirm your module appears with the expected metadata before publishing.
-- When shipping connectors, implement `ConnectorExtension.register` (see `src/extensions/builtins/connector_catalog.py`) and verify catalog output with `make connectors-catalog` so `/meta/connectors` and observability digests stay accurate.
-- When adding analytics, prefer creating a module under `src/extensions` using the scaffold above. Add tests mirroring `tests/test_extensions.py`.
-- Do not remove or bypass telemetry hooks. If a change impacts `/metrics`, `/observability/status`, `/health`, or trace logging, update `docs/OPERATIONS_INCIDENT_RESPONSE.md` and mention the change in the release notes.
+- Instrumentation extensions should subscribe to events on the shared `ObservabilityRegistry` instead of mutating core services.
+- Use `src/extensions/builtins/data_quality.py` as an instrumentation example and run `make extensions-catalog` before publishing extension changes.
+- When shipping connectors, implement `ConnectorExtension.register` and run `make connectors-catalog` so `/meta/connectors` and observability digests remain accurate.
+- When adding analytics, prefer a module under `src/extensions` and add tests mirroring `tests/test_extensions.py`.
+- Do not remove or bypass telemetry hooks. Changes affecting `/metrics`, `/observability/status`, `/health`, or trace logging must update `docs/OPERATIONS_INCIDENT_RESPONSE.md` and the release notes.
 
 ## Code Review
 
-Reviews focus on correctness, clarity, test coverage, performance, and security. Be ready to explain trade-offs and link to design context (e.g., entries in `docs/execplans`). Address feedback promptly and document meaningful decisions in the relevant ExecPlan.
+Reviews focus on correctness, clarity, test coverage, performance, security, and scope control. Explain meaningful trade-offs and link to relevant ExecPlans where appropriate.
 
 ## Releases
 
-Release automation is planned but not yet wired to production deployment. For now, coordinate with maintainers for release tagging. Keep `CHANGELOG.md` up to date by summarizing notable changes per release.
+Release automation is not yet wired to production deployment. Coordinate release tagging with the repository owner, keep existing tags immutable, and update `CHANGELOG.md` for notable changes.
 
 ## Getting Help
 
-- Open a GitHub Discussion or issue using the provided templates.
-- Tag `@idiot-index/maintainers` in pull requests for review.
-- For security-sensitive disclosures, follow the instructions in `docs/handbook/SECURITY.md` instead of filing a public issue.
+- Open an issue using the provided templates; use GitHub Discussions when enabled.
+- Request review from `@Nobodyworld`.
+- For security-sensitive disclosures, follow [docs/handbook/SECURITY.md](handbook/SECURITY.md) and do not file a public issue.
 
-We appreciate every contribution that makes the Idiot Index easier to run, safer to operate, and more insightful for end users!
+Thank you for helping make the Industry Resilience dashboard easier to run, safer to operate, and more useful to analysts.
