@@ -2,30 +2,30 @@
 
 ## Supported Versions
 
-The Idiot Index application is developed and released from the `main` branch. Security updates are applied to the most recent release and the current `main` branch only. Older tags are not maintained.
+The U.S. Industry Cost Structure & Resilience Dashboard is developed and released from the `main` branch. Security updates are applied to the current `main` branch and the most recent release only. Older tags are not maintained.
 
 ## Reporting a Vulnerability
 
-Please report suspected security vulnerabilities privately so we can triage and respond without exposing users to unnecessary risk.
+Please report suspected security vulnerabilities privately so they can be investigated without exposing users or maintainers to unnecessary risk.
 
-- Email: [security@idiot-index.app](mailto:security@idiot-index.app)
-- Subject: `SECURITY: <short summary>`
-- Include: affected versions (if known), reproduction steps, impact assessment, and any suggested mitigations.
+1. Open the repository **Security** tab and use **Report a vulnerability** when private vulnerability reporting is available.
+2. If that option is unavailable, contact the repository owner through a private contact method published on the [Nobodyworld GitHub profile](https://github.com/Nobodyworld).
+3. Include affected versions or commit SHAs, reproduction steps, impact, relevant logs, and any suggested mitigation.
 
-We acknowledge reports within **2 business days** and aim to provide an initial assessment or mitigation plan within **7 business days**. If you do not receive a timely response, please follow up using the same email thread.
+Do not open a public issue, discussion, or pull request containing vulnerability details.
+
+Reports are handled on a best-effort basis. The maintainer aims to acknowledge a complete report within five business days, but this open-source project does not provide a response-time SLA.
 
 ## Coordinated Disclosure
 
-We prefer coordinated disclosure. After a fix is available, we will:
+Please allow a reasonable remediation period before publishing vulnerability details. After a fix is available, the project may:
 
-1. Communicate remediation steps directly with the reporter.
-2. Publish an advisory (GitHub Security Advisory or CHANGELOG entry) summarizing the impact and resolution.
-3. Credit the reporter if they wish to be acknowledged.
+1. Communicate remediation steps directly to the reporter.
+2. Publish a GitHub Security Advisory or changelog entry describing the impact and resolution.
+3. Credit the reporter when requested.
 
-Please do not create public GitHub issues for vulnerabilities. For questions about this policy, contact the maintainers via [maintainers@idiot-index.app](mailto:maintainers@idiot-index.app).
+## Dependency Monitoring
 
-## Dependency monitoring
-
-- Run `make security` (pip-audit + detect-secrets) monthly or when upgrading dependencies.
-- Track runtime and development dependencies in [DEPENDENCIES.md](../DEPENDENCIES.md). The register records license information, review cadence, and data-source obligations.
-- Document mitigations and remediation timelines for any high or critical CVEs in `docs/exec/` and reference them in `CHANGELOG.md` once resolved.
+- Run `make security` (`pip-audit` plus `detect-secrets`) when dependencies change and during release validation.
+- Track runtime and development dependencies in [DEPENDENCIES.md](../DEPENDENCIES.md).
+- Document mitigations and remediation timelines for high or critical vulnerabilities in `docs/execplans/` and reference completed remediation in `CHANGELOG.md`.
