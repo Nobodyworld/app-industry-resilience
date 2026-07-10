@@ -1,7 +1,8 @@
 # Code owners for automatic review assignment
-*       @idiot-index/maintainers
+*                          @Nobodyworld
 
 # Critical domains
-src/security.py   @idiot-index/maintainers
-src/infra/**      @idiot-index/maintainers
-.github/**        @idiot-index/maintainers
+src/core/security.py       @Nobodyworld
+src/infrastructure/**      @Nobodyworld
+.github/**                 @Nobodyworld
+docs/handbook/SECURITY.md @Nobodyworld
