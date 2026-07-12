@@ -96,7 +96,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     module_path = scaffold_service(args.name, force=args.force)
-    print(f"[idiot-index] Service scaffold created at {module_path}.")
+    print(f"[industry-resilience] Service scaffold created at {module_path}.")
     return 0
 
 

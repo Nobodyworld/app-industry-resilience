@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate a scaffold for a new Idiot Index extension module."""
+"""Generate a scaffold for a new Industry Resilience extension module."""
 
 from __future__ import annotations
 
@@ -240,7 +240,7 @@ def main() -> int:
     )
 
     message = textwrap.dedent(f"""
-        [idiot-index] Extension scaffold created at {module_path}.
+        [industry-resilience] Extension scaffold created at {module_path}.
         Remember to implement SummaryExtension.contribute (and ScenarioExtension.contribute when requested).
         Instrumentation scaffolds emit basic counters and should be customised to capture domain events.
         The manifest at {MANIFEST_PATH} now includes the module so it loads automatically.

@@ -73,7 +73,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     entry = _format_entry(args.date, args.title, args.lines, args.metadata)
     append_entry(Path(args.file), entry)
-    print(f"[idiot-index] Changelog updated with '{args.title}'.")
+    print(f"[industry-resilience] Changelog updated with '{args.title}'.")
     return 0
 
 
