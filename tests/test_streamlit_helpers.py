@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
+import zipfile
 from datetime import UTC, datetime
+from io import BytesIO
 
 import pandas as pd
+import pytest
 
 from src.core.metrics import MetricConfig, compute_metrics
 from src.infrastructure.observability.storage import ObservabilitySnapshot
@@ -48,14 +52,60 @@ def _sample_df():
 
 
 def test_prepare_download_artifacts_csv_json() -> None:
+    pytest.importorskip("xlsxwriter")
     df = _sample_df()
-    artifacts = prepare_download_artifacts(df, df, base_name="report.csv")
-    assert any(a.mime == "text/csv" for a in artifacts)
-    assert any(a.mime == "application/json" for a in artifacts)
-    assert any(
-        a.mime == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        for a in artifacts
+    artifacts = prepare_download_artifacts(df, df, base_name="industry_cost_structure_results")
+
+    labels = {artifact.label for artifact in artifacts}
+    file_names = {artifact.file_name for artifact in artifacts}
+
+    assert len(artifacts) == 6
+    assert labels == {
+        "All rows – CSV",
+        "All rows – JSON",
+        "All rows – Excel",
+        "Current view – CSV",
+        "Current view – JSON",
+        "Current view – Excel",
+    }
+    assert file_names == {
+        "industry_cost_structure_results_full.csv",
+        "industry_cost_structure_results_full.json",
+        "industry_cost_structure_results_full.xlsx",
+        "industry_cost_structure_results_filtered.csv",
+        "industry_cost_structure_results_filtered.json",
+        "industry_cost_structure_results_filtered.xlsx",
+    }
+    legacy_stem = "idiot" + "_index_results"
+    assert all(legacy_stem not in artifact.file_name for artifact in artifacts)
+
+    csv_artifact = next(
+        artifact
+        for artifact in artifacts
+        if artifact.file_name == "industry_cost_structure_results_full.csv"
     )
+    csv_rows = pd.read_csv(BytesIO(csv_artifact.data))
+    assert csv_rows.loc[0, "industry_code"] == 311
+    assert csv_rows.loc[0, "industry_name"] == "Food"
+
+    json_artifact = next(
+        artifact
+        for artifact in artifacts
+        if artifact.file_name == "industry_cost_structure_results_full.json"
+    )
+    json_rows = json.loads(json_artifact.data.decode())
+    assert json_rows[0]["industry_code"] == "311"
+    assert json_rows[0]["industry_name"] == "Food"
+
+    xlsx_artifact = next(
+        artifact
+        for artifact in artifacts
+        if artifact.file_name == "industry_cost_structure_results_full.xlsx"
+    )
+    assert xlsx_artifact.data
+    with zipfile.ZipFile(BytesIO(xlsx_artifact.data)) as workbook:
+        workbook_xml = workbook.read("xl/workbook.xml").decode()
+    assert 'name="Cost Structure"' in workbook_xml
 
 
 def test_build_comparison_table_empty_and_with_codes() -> None:

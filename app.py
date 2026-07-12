@@ -47,8 +47,6 @@ from src.interfaces.streamlit.components import (
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
     build_health_band_distribution,
-    build_health_risk_table,
-    build_health_sector_table,
     build_scenario_comparison_table,
     calculate_benchmark,
     decode_query_params,
@@ -58,6 +56,52 @@ from src.interfaces.streamlit.helpers import (
     prepare_trend_data,
     summarise_scenario_deltas,
 )
+
+
+def _get_query_params() -> dict[str, list[str]]:
+    """Return query params as a mutable mapping of key to list of values."""
+
+    if hasattr(st, "experimental_get_query_params"):
+        return dict(decode_query_params(st.experimental_get_query_params()))
+
+    params = st.query_params
+    query_params: dict[str, list[str]] = {}
+    for key in list(params.keys()):
+        values: list[str] = []
+        get_all = getattr(params, "get_all", None)
+        if callable(get_all):
+            raw_values = get_all(key)
+            if raw_values:
+                values = [str(value) for value in raw_values]
+        if not values:
+            raw_value = params.get(key)
+            if raw_value is None:
+                continue
+            if isinstance(raw_value, list):
+                values = [str(value) for value in raw_value]
+            else:
+                values = [str(raw_value)]
+        if values:
+            query_params[key] = values
+    return query_params
+
+
+def _set_query_params(params: Mapping[str, list[str]]) -> None:
+    """Set query params using modern Streamlit API with legacy fallback."""
+
+    if hasattr(st, "experimental_set_query_params"):
+        st.experimental_set_query_params(**params)
+        return
+
+    query_params = st.query_params
+    query_params.clear()
+    for key, values in params.items():
+        if not values:
+            continue
+        if len(values) == 1:
+            query_params[key] = values[0]
+        else:
+            query_params[key] = values
 
 
 @st.cache_data(show_spinner=False)
@@ -149,28 +193,12 @@ APP_NORMALIZATION = NormalizationOptions(
 )
 
 OBSERVABILITY_HISTORY = load_snapshot_history(APP_CONFIG.observability_snapshot_dir, limit=12)
+bootstrap_warnings = list(bootstrap_state.warnings)
+config_summary = cast(dict[str, Any], get_config_summary(APP_CONFIG))
+handler_summary = SecurityUtils.rate_limit_handler_summary()
+config_summary.setdefault("rate_limit_backend", {})["handler"] = handler_summary
 
-for warning in bootstrap_state.warnings:
-    st.sidebar.warning(warning)
-
-with st.sidebar.expander("Configuration summary", expanded=False):
-    config_summary = cast(dict[str, Any], get_config_summary(APP_CONFIG))
-    handler_summary = SecurityUtils.rate_limit_handler_summary()
-    config_summary.setdefault("rate_limit_backend", {})["handler"] = handler_summary
-    st.json(config_summary)
-
-rate_backend = handler_summary.get("backend", "memory")
-if rate_backend == "redis":
-    if handler_summary.get("last_error"):
-        st.sidebar.warning(
-            "Redis rate limiter is active but reported recent errors; falling back to in-memory tokens."
-        )
-    else:
-        st.sidebar.success("Redis-backed rate limiting active across instances.")
-else:
-    st.sidebar.info("Rate limiting is running in in-process memory mode.")
-
-query_params_initial = decode_query_params(st.experimental_get_query_params())
+query_params_initial = _get_query_params()
 
 
 def _last_value(key: str, default: str | None = None) -> str | None:
@@ -228,10 +256,29 @@ sidebar_state = render_sidebar(
     security_utils=SecurityUtils,
 )
 
+data_mode = sidebar_state.data_mode
+
+with st.sidebar.expander("Technical diagnostics", expanded=False):
+    if bootstrap_warnings and data_mode in {"Census ASM (legacy)", "BEA (Economy-wide)"}:
+        for warning in bootstrap_warnings:
+            st.warning(warning)
+
+    rate_backend = handler_summary.get("backend", "memory")
+    if rate_backend == "redis":
+        if handler_summary.get("last_error"):
+            st.warning(
+                "Redis rate limiter is active but reported recent errors; falling back to in-memory tokens."
+            )
+        else:
+            st.success("Redis-backed rate limiting active across instances.")
+    else:
+        st.info("Rate limiting is running in in-process memory mode.")
+
+    st.json(config_summary)
+
 if sidebar_state.halt or sidebar_state.year_clean is None:
     st.stop()
 
-data_mode = sidebar_state.data_mode
 data_mode_slug = data_mode.lower().replace(" ", "-")
 year_clean = sidebar_state.year_clean
 if data_mode == "Official snapshot (AIES 2023)":
@@ -335,116 +382,136 @@ if current_query:
         | df_filtered["industry_code"].str.lower().str.contains(query_lower)
     ]
 
-focus_mode = render_page_header(
+render_page_header(
     title="U.S. Industry Cost Structure and Resilience Dashboard",
-    subtitle="Sense, compare, and narrate the balance between gross output and cost inputs.",
+    subtitle="Explore industry cost structures using transparent ratio calculations and scenario sensitivity checks.",
     meta={
         "Source": data_mode,
         "Year": str(year_clean),
         "Visible": f"{len(df_filtered):,} / {len(df_display):,}",
     },
-    focus_mode=st.session_state["focus_mode"],
+    focus_mode=False,
+    show_focus_toggle=False,
 )
 
-st.session_state["focus_mode"] = focus_mode
+render_state_banner(
+    "Start with source and vintage, then explore an industry, compare peers, and run a scenario before exporting outputs."
+)
 
-if focus_mode:
-    render_state_banner(
-        "Focus mode is active. Peripheral panels stay within reach, but the deep dive takes center stage."
-    )
-else:
-    if data_mode == "Upload CSV":
-        render_state_banner(
-            "Working from your uploaded dataset. Everything stays local to this session."
-        )
-    elif error:
-        render_state_banner(
-            "We hit a retrieval snag earlier. Showing the most recent successful data in the meantime."
-        )
-    else:
-        render_state_banner(
-            f"{len(df_filtered):,} industries tuned · adjust the filters to tighten the narrative."
-        )
+st.markdown("### Start here")
+st.markdown(
+    "1. Confirm source and vintage.\n"
+    "2. Use the **Output-to-cost ratio** (gross output divided by materials cost or intermediate inputs).\n"
+    "3. Explore one industry, compare peers, then run a scenario.\n"
+    "4. Export full or filtered results from the export panel."
+)
+st.caption(
+    "This ratio is not a credit model or causal forecast. Census AIES uses a revenue-to-operating-expense proxy. "
+    "Composite indicators are experimental and algebraically related, so they do not independently prove industry health or distress."
+)
+st.caption('Historically described as the informal "Idiot Index" in legacy materials.')
 
 if data_mode == "Official snapshot (AIES 2023)":
     st.info(
-        "**Data vintage:** 2023 Annual Integrated Economic Survey, released February 26, "
-        "2026. Revenue ÷ total operating expenses is shown as a cost-efficiency proxy; "
-        "it is not the strict BEA gross-output ÷ intermediate-inputs measure. BEA's latest "
-        "industry release covers 2026 Q1 and requires an API key."
+        "**Data vintage:** 2023 Annual Integrated Economic Survey, released February 26, 2026. "
+        "This dashboard shows a revenue-to-operating-expense proxy for cost structure analysis."
     )
-    st.markdown("**Official-data availability timeline (as of June 27, 2026)**")
-    st.dataframe(
-        pd.DataFrame(
-            [
-                {
-                    "Source": "Census ASM",
-                    "Observation period": "2021",
-                    "Published": "May 31, 2023",
-                    "Status / next milestone": "Discontinued; replaced by AIES",
-                },
-                {
-                    "Source": "Census Economic Census",
-                    "Observation period": "2022",
-                    "Published": "April 10, 2025",
-                    "Status / next milestone": "Five-year manufacturing benchmark",
-                },
-                {
-                    "Source": "Census AIES",
-                    "Observation period": "2023",
-                    "Published": "February 26, 2026",
-                    "Status / next milestone": "Current annual comprehensive benchmark",
-                },
-                {
-                    "Source": "BEA GDP by Industry",
-                    "Observation period": "2026 Q1",
-                    "Published": "June 25, 2026",
-                    "Status / next milestone": "Next industry release: September 30, 2026",
-                },
-            ]
-        ),
-        use_container_width=True,
-        hide_index=True,
-    )
-
-if not focus_mode:
-    render_signal_bar(df_filtered, health_summary=summary.health_summary_filtered)
-
-tabs = ["Pulse", "Industries", "Top Signals", "Health", "Observability"]
-(
-    pulse_tab,
-    industries_tab,
-    signals_tab,
-    health_tab,
-    observability_tab,
-) = render_insight_tabs(tabs)
-
-with pulse_tab:
-    st.subheader("Pulse overview")
-    cols = st.columns(3)
-    with cols[0]:
-        st.metric("Rows", len(df_filtered))
-    with cols[1]:
-        st.metric("Distinct industries", df_filtered["industry_code"].nunique())
-    with cols[2]:
-        dominant_year = (
-            int(df_filtered["year"].mode().iloc[0])
-            if not df_filtered["year"].isna().all()
-            else "N/A"
+    with st.expander("About this dataset", expanded=False):
+        st.markdown("**Official-data availability timeline (as of June 27, 2026)**")
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Source": "Census ASM",
+                        "Observation period": "2021",
+                        "Published": "May 31, 2023",
+                        "Status / next milestone": "Discontinued; replaced by AIES",
+                    },
+                    {
+                        "Source": "Census Economic Census",
+                        "Observation period": "2022",
+                        "Published": "April 10, 2025",
+                        "Status / next milestone": "Five-year manufacturing benchmark",
+                    },
+                    {
+                        "Source": "Census AIES",
+                        "Observation period": "2023",
+                        "Published": "February 26, 2026",
+                        "Status / next milestone": "Current annual comprehensive benchmark",
+                    },
+                    {
+                        "Source": "BEA GDP by Industry",
+                        "Observation period": "2026 Q1",
+                        "Published": "June 25, 2026",
+                        "Status / next milestone": "Next industry release: September 30, 2026",
+                    },
+                ]
+            ),
+            use_container_width=True,
+            hide_index=True,
         )
-        st.metric("Modal year", dominant_year)
 
-    st.markdown("---")
-    st.write("Top by Idiot Index")
-    top5 = (
-        df_filtered.sort_values("idiot_index", ascending=False)
-        .head(5)
-        .loc[:, ["industry_name", "idiot_index", "value_added_pct"]]
+render_signal_bar(df_filtered, health_summary=summary.health_summary_filtered)
+
+
+def _format_overview_table(frame: pd.DataFrame) -> pd.DataFrame:
+    table = frame.loc[
+        :,
+        [
+            "industry_code",
+            "industry_name",
+            "year",
+            "idiot_index",
+            "value_added_pct",
+            "materials_share_pct",
+            "source",
+        ],
+    ].copy()
+    table = table.rename(
+        columns={
+            "industry_code": "Industry code",
+            "industry_name": "Industry",
+            "year": "Year",
+            "idiot_index": "Output-to-cost ratio",
+            "value_added_pct": "Value-added (%)",
+            "materials_share_pct": "Cost share (%)",
+            "source": "Source",
+        }
     )
-    st.dataframe(top5, use_container_width=True)
+    for col in ["Output-to-cost ratio", "Value-added (%)", "Cost share (%)"]:
+        table[col] = pd.to_numeric(table[col], errors="coerce").round(2)
+    return table
 
-with industries_tab:
-    st.subheader("Industry explorer")
+
+tabs = ["Overview", "Explore", "Compare", "Scenario Lab"]
+overview_tab, explore_tab, compare_tab, scenario_tab = render_insight_tabs(tabs)
+
+code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"], strict=False))
+choices: Sequence[str] = list(dict.fromkeys(df_filtered["industry_code"]))
+selected_code: str | None = None
+if choices:
+    default_code = st.session_state.get("industry_selection_code")
+    if default_code not in choices:
+        default_code = choices[0]
+    selected_code = default_code
+    st.session_state["industry_selection_code"] = selected_code
+
+with overview_tab:
+    st.subheader("Overview")
+    st.markdown("**Top industries by output-to-cost ratio**")
+    overview_table = _format_overview_table(
+        df_filtered.sort_values("idiot_index", ascending=False).head(10)
+    )
+    st.dataframe(overview_table, use_container_width=True, hide_index=True)
+
+    health_filtered = summary.health_summary_filtered
+    distribution_table = build_health_band_distribution(health_filtered)
+    if not distribution_table.empty:
+        st.markdown("**Indicator-band distribution**")
+        st.dataframe(distribution_table, use_container_width=True, hide_index=True)
+
+with explore_tab:
+    st.subheader("Explore")
     search_value = st.text_input(
         "Search by name or code",
         value=current_query_raw,
@@ -459,216 +526,146 @@ with industries_tab:
             df_view["industry_name"].str.lower().str.contains(query_lower)
             | df_view["industry_code"].str.lower().str.contains(query_lower)
         ]
+
     st.dataframe(
-        df_view.sort_values(["year", "idiot_index"], ascending=[False, False]),
-        use_container_width=True,
-    )
-
-with signals_tab:
-    st.subheader("Momentum signals")
-    topn = st.slider(
-        "How many industries should headline the chart?",
-        min_value=5,
-        max_value=50,
-        value=15,
-        step=5,
-    )
-    chart_df = df_view.sort_values("idiot_index", ascending=False).head(topn)
-    fig = px.bar(
-        chart_df,
-        x="idiot_index",
-        y="industry_name",
-        orientation="h",
-        title=f"Top {topn} Industries by Idiot Index",
-        labels={"idiot_index": "Idiot Index", "industry_name": "Industry"},
-        color="idiot_index",
-        color_continuous_scale="RdYlGn_r",
-    )
-    fig.update_layout(
-        xaxis_title="Idiot Index (Gross Output ÷ Materials Cost)",
-        yaxis_title="Industry",
-        height=max(400, len(chart_df) * 25),
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-with health_tab:
-    st.subheader("Health insights")
-    health_filtered = summary.health_summary_filtered
-    sectors_table = build_health_sector_table(health_filtered)
-    distribution_table = build_health_band_distribution(health_filtered)
-    risk_table = build_health_risk_table(health_filtered)
-
-    if sectors_table.empty:
-        st.info("Health analytics will appear once the dataset includes resilience metrics.")
-    else:
-        cols = st.columns(2)
-        with cols[0]:
-            st.markdown("**Cohort health scoreboard**")
-            st.dataframe(sectors_table, use_container_width=True)
-        with cols[1]:
-            st.markdown("**Risk band distribution**")
-            st.dataframe(distribution_table, use_container_width=True)
-
-        st.markdown("---")
-        st.markdown("**Highest risk industries**")
-        st.dataframe(risk_table, use_container_width=True)
-
-with observability_tab:
-    render_observability_snapshots(
-        OBSERVABILITY_HISTORY,
-        empty_message=(
-            "Snapshots are persisted under "
-            f"`{APP_CONFIG.observability_snapshot_dir}`. Run `make observability-snapshot` to capture one."
+        _format_overview_table(
+            df_view.sort_values(["year", "idiot_index"], ascending=[False, False])
         ),
+        use_container_width=True,
+        hide_index=True,
     )
 
-st.subheader("Deep dive")
-code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"], strict=False))
-choices: Sequence[str] = list(dict.fromkeys(df_filtered["industry_code"]))
-selected_code: str | None = None
-if not choices:
-    st.warning("No industries match the current filters.")
-else:
-    default_code = st.session_state.get("industry_selection_code")
-    if default_code not in choices:
-        default_code = choices[0]
-        st.session_state["industry_selection_code"] = default_code
-    selected_code = st.selectbox(
-        "Select an industry",
-        choices,
-        index=choices.index(default_code) if default_code in choices else 0,
+    if not choices:
+        st.warning("No industries match the current filters.")
+    else:
+        selected_code = st.selectbox(
+            "Select an industry",
+            choices,
+            index=choices.index(selected_code) if selected_code in choices else 0,
+            format_func=lambda code: f"{code_lookup.get(code, code)} ({code})",
+        )
+        st.session_state["industry_selection_code"] = selected_code
+        row = df_filtered[df_filtered["industry_code"] == selected_code].head(1)
+        if row.empty:
+            st.error("No data available for the selected industry.")
+        else:
+            current_row = row.iloc[0]
+            story = build_data_story(
+                row=current_row,
+                filtered_size=len(df_filtered),
+                total_size=len(df_display),
+                filter_query=SecurityUtils.sanitize_string_input(
+                    st.session_state.get("search_query", "").strip()
+                ),
+                data_mode=data_mode,
+            )
+            render_deep_dive(row=current_row, story=story, focus_mode=False)
+
+    with st.expander("Advanced data view", expanded=False):
+        st.dataframe(df_view, use_container_width=True)
+
+comparison_selection: list[str] = []
+with compare_tab:
+    st.subheader("Compare")
+    comparison_options = sorted(code_lookup.keys())
+    valid_existing = [
+        code for code in st.session_state.get("comparison_codes", []) if code in comparison_options
+    ]
+    comparison_selection = st.multiselect(
+        "Compare industries",
+        options=comparison_options,
+        default=valid_existing,
         format_func=lambda code: f"{code_lookup.get(code, code)} ({code})",
     )
-    st.session_state["industry_selection_code"] = selected_code
-    row = df_filtered[df_filtered["industry_code"] == selected_code].head(1)
-    if row.empty:
-        st.error("No data available for the selected industry.")
-    else:
-        current_row = row.iloc[0]
-        story = build_data_story(
-            row=current_row,
-            filtered_size=len(df_filtered),
-            total_size=len(df_display),
-            filter_query=SecurityUtils.sanitize_string_input(
-                st.session_state.get("search_query", "").strip()
-            ),
-            data_mode=data_mode,
+    st.session_state["comparison_codes"] = comparison_selection
+
+    comparison_table = build_comparison_table(df_display, comparison_selection)
+    if comparison_table.empty:
+        st.info(
+            "Select one or more industries to compare output-to-cost ratio and composition signals."
         )
-        render_deep_dive(row=current_row, story=story, focus_mode=focus_mode)
+    else:
+        comparison_display = comparison_table.rename(
+            columns={
+                "industry_code": "Industry code",
+                "industry_name": "Industry",
+                "idiot_index": "Output-to-cost ratio",
+                "value_added_pct": "Value-added (%)",
+                "materials_share_pct": "Cost share (%)",
+                "gross_output": "Gross output",
+                "value_added": "Value added",
+                "resilience_score": "Comparative score",
+                "materials_dependency_ratio": "Materials dependency ratio",
+                "shock_sensitivity_index": "Input sensitivity index",
+            }
+        )
+        st.dataframe(comparison_display.round(3), use_container_width=True, hide_index=True)
 
-st.markdown("---")
-st.subheader("Comparisons & benchmarking")
+    trend_selection = comparison_selection or ([selected_code] if selected_code else [])
+    trend_data = prepare_trend_data(df_display, trend_selection)
+    if trend_data.empty or trend_data["year"].nunique() <= 1:
+        st.caption("Add additional years to see historical trendlines for selected industries.")
+    else:
+        trend_fig = px.line(
+            trend_data,
+            x="year",
+            y="idiot_index",
+            color="industry_name",
+            title="Historical output-to-cost ratio trend",
+        )
+        trend_fig.update_layout(xaxis_title="Year", yaxis_title="Output-to-cost ratio")
+        st.plotly_chart(trend_fig, use_container_width=True)
 
-comparison_options = sorted(code_lookup.keys())
-valid_existing = [
-    code for code in st.session_state.get("comparison_codes", []) if code in comparison_options
-]
-comparison_selection = st.multiselect(
-    "Compare industries",
-    options=comparison_options,
-    default=valid_existing,
-    format_func=lambda code: f"{code_lookup.get(code, code)} ({code})",
-)
-st.session_state["comparison_codes"] = comparison_selection
-
-comparison_table = build_comparison_table(df_display, comparison_selection)
-if comparison_table.empty:
-    st.info("Select one or more industries to compare their Idiot Index and value-added mix.")
-else:
-    st.dataframe(comparison_table, use_container_width=True)
-
-trend_selection = comparison_selection or ([selected_code] if selected_code else [])
-trend_data = prepare_trend_data(df_display, trend_selection)
-if trend_data.empty or trend_data["year"].nunique() <= 1:
-    st.caption("Add additional years to see historical trendlines for the selected industries.")
-else:
-    trend_fig = px.line(
-        trend_data,
-        x="year",
-        y="idiot_index",
-        color="industry_name",
-        title="Historical Idiot Index trend",
-    )
-    trend_fig.update_layout(xaxis_title="Year", yaxis_title="Idiot Index")
-    st.plotly_chart(trend_fig, use_container_width=True)
-
-benchmark_stats = calculate_benchmark(df_display, selected_code)
-metric_cols = st.columns(3)
-
-idiot_avg = benchmark_stats.get("idiot_index_avg")
-idiot_delta = benchmark_stats.get("idiot_index_delta")
-with metric_cols[0]:
-    st.metric(
-        "Dataset average Idiot Index",
-        f"{idiot_avg:.2f}" if idiot_avg is not None and pd.notna(idiot_avg) else "—",
-        delta=(
-            f"{idiot_delta:+.2f}" if idiot_delta is not None and pd.notna(idiot_delta) else None
-        ),
-    )
-
-value_avg = benchmark_stats.get("value_added_pct_avg")
-value_delta = benchmark_stats.get("value_added_pct_delta")
-with metric_cols[1]:
-    st.metric(
-        "Dataset average Value-Added %",
-        f"{value_avg:.1f}%" if value_avg is not None and pd.notna(value_avg) else "—",
-        delta=(
-            f"{value_delta:+.1f}%" if value_delta is not None and pd.notna(value_delta) else None
-        ),
-    )
-
-materials_avg = benchmark_stats.get("materials_share_pct_avg")
-materials_delta = benchmark_stats.get("materials_share_pct_delta")
-with metric_cols[2]:
-    st.metric(
-        "Dataset average Materials Share %",
-        f"{materials_avg:.1f}%" if materials_avg is not None and pd.notna(materials_avg) else "—",
-        delta=(
-            f"{materials_delta:+.1f}%"
-            if materials_delta is not None and pd.notna(materials_delta)
-            else None
-        ),
-    )
-
-resilience_avg = benchmark_stats.get("resilience_score_avg")
-resilience_delta = benchmark_stats.get("resilience_score_delta")
-dependency_avg = benchmark_stats.get("materials_dependency_ratio_avg")
-dependency_delta = benchmark_stats.get("materials_dependency_ratio_delta")
-shock_avg = benchmark_stats.get("shock_sensitivity_index_avg")
-shock_delta = benchmark_stats.get("shock_sensitivity_index_delta")
-
-res_cols = st.columns(3)
-with res_cols[0]:
-    st.metric(
-        "Dataset average Resilience score",
-        f"{resilience_avg:.2f}" if resilience_avg is not None and pd.notna(resilience_avg) else "—",
-        delta=(
-            f"{resilience_delta:+.2f}"
-            if resilience_delta is not None and pd.notna(resilience_delta)
-            else None
-        ),
-    )
-with res_cols[1]:
-    st.metric(
-        "Materials dependency ratio",
-        f"{dependency_avg:.2f}" if dependency_avg is not None and pd.notna(dependency_avg) else "—",
-        delta=(
-            f"{dependency_delta:+.2f}"
-            if dependency_delta is not None and pd.notna(dependency_delta)
-            else None
-        ),
-    )
-with res_cols[2]:
-    st.metric(
-        "Shock sensitivity index",
-        f"{shock_avg:.2f}" if shock_avg is not None and pd.notna(shock_avg) else "—",
-        delta=(
-            f"{shock_delta:+.2f}" if shock_delta is not None and pd.notna(shock_delta) else None
-        ),
-    )
-
-st.markdown("---")
-st.subheader("Scenario Lab")
+    benchmark_stats = calculate_benchmark(df_display, selected_code)
+    metric_cols = st.columns(3)
+    with metric_cols[0]:
+        st.metric(
+            "Dataset average output-to-cost ratio",
+            (
+                f"{benchmark_stats.get('idiot_index_avg'):.2f}"
+                if benchmark_stats.get("idiot_index_avg") is not None
+                and pd.notna(benchmark_stats.get("idiot_index_avg"))
+                else "—"
+            ),
+            delta=(
+                f"{benchmark_stats.get('idiot_index_delta'):+.2f}"
+                if benchmark_stats.get("idiot_index_delta") is not None
+                and pd.notna(benchmark_stats.get("idiot_index_delta"))
+                else None
+            ),
+        )
+    with metric_cols[1]:
+        st.metric(
+            "Dataset average value-added (%)",
+            (
+                f"{benchmark_stats.get('value_added_pct_avg'):.1f}%"
+                if benchmark_stats.get("value_added_pct_avg") is not None
+                and pd.notna(benchmark_stats.get("value_added_pct_avg"))
+                else "—"
+            ),
+            delta=(
+                f"{benchmark_stats.get('value_added_pct_delta'):+.1f}%"
+                if benchmark_stats.get("value_added_pct_delta") is not None
+                and pd.notna(benchmark_stats.get("value_added_pct_delta"))
+                else None
+            ),
+        )
+    with metric_cols[2]:
+        st.metric(
+            "Dataset average cost share (%)",
+            (
+                f"{benchmark_stats.get('materials_share_pct_avg'):.1f}%"
+                if benchmark_stats.get("materials_share_pct_avg") is not None
+                and pd.notna(benchmark_stats.get("materials_share_pct_avg"))
+                else "—"
+            ),
+            delta=(
+                f"{benchmark_stats.get('materials_share_pct_delta'):+.1f}%"
+                if benchmark_stats.get("materials_share_pct_delta") is not None
+                and pd.notna(benchmark_stats.get("materials_share_pct_delta"))
+                else None
+            ),
+        )
 
 
 def _last_float_query(key: str, default: float = 0.0) -> float:
@@ -689,86 +686,192 @@ scenario_default_materials = _last_float_query("scenario_materials")
 scenario_default_value = _last_float_query("scenario_value")
 scenario_default_intermediate = _last_float_query("scenario_intermediate")
 
-scenario_controls = render_scenario_controls(
-    available_codes=comparison_options,
-    code_formatter=lambda code: f"{code_lookup.get(code, code)} ({code})",
-    default_selection=(
+if st.session_state.pop("scenario_reset_pending", False):
+    for key in [
+        "scenario_target_codes",
+        "scenario_gross_delta",
+        "scenario_materials_delta",
+        "scenario_value_delta",
+        "scenario_intermediate_delta",
+    ]:
+        st.session_state.pop(key, None)
+
+if "scenario_target_codes" not in st.session_state:
+    st.session_state["scenario_target_codes"] = (
         scenario_defaults_selection
         or comparison_selection
         or ([selected_code] if selected_code else [])
-    ),
-    default_gross_delta=scenario_default_gross,
-    default_materials_delta=scenario_default_materials,
-    default_value_delta=scenario_default_value,
-    default_intermediate_delta=scenario_default_intermediate,
-)
+    )
+if "scenario_gross_delta" not in st.session_state:
+    st.session_state["scenario_gross_delta"] = scenario_default_gross
+if "scenario_materials_delta" not in st.session_state:
+    st.session_state["scenario_materials_delta"] = scenario_default_materials
+if "scenario_value_delta" not in st.session_state:
+    st.session_state["scenario_value_delta"] = scenario_default_value
+if "scenario_intermediate_delta" not in st.session_state:
+    st.session_state["scenario_intermediate_delta"] = scenario_default_intermediate
 
-adjustment_active = bool(scenario_controls.target_codes) or any(
-    abs(value) > 0.001
-    for value in [
-        scenario_controls.gross_output_delta_pct,
-        scenario_controls.materials_cost_delta_pct,
-        scenario_controls.value_added_delta_pct,
-        scenario_controls.intermediate_inputs_delta_pct,
+with scenario_tab:
+    st.subheader("Scenario Lab")
+
+    available_scenario_codes = sorted(code_lookup.keys())
+    valid_scenario_targets = [
+        code
+        for code in cast(list[str], st.session_state.get("scenario_target_codes", []))
+        if code in available_scenario_codes
     ]
-)
+    st.session_state["scenario_target_codes"] = valid_scenario_targets
 
-if adjustment_active:
-    scenario_adjustment = ScenarioAdjustment(
-        industry_codes=scenario_controls.target_codes or None,
-        gross_output_delta_pct=scenario_controls.gross_output_delta_pct,
-        materials_cost_delta_pct=scenario_controls.materials_cost_delta_pct,
-        value_added_delta_pct=scenario_controls.value_added_delta_pct,
-        intermediate_inputs_delta_pct=scenario_controls.intermediate_inputs_delta_pct,
+    scenario_controls = render_scenario_controls(
+        available_codes=available_scenario_codes,
+        code_formatter=lambda code: f"{code_lookup.get(code, code)} ({code})",
+        default_selection=valid_scenario_targets,
+        default_gross_delta=float(st.session_state.get("scenario_gross_delta", 0.0)),
+        default_materials_delta=float(st.session_state.get("scenario_materials_delta", 0.0)),
+        default_value_delta=float(st.session_state.get("scenario_value_delta", 0.0)),
+        default_intermediate_delta=float(st.session_state.get("scenario_intermediate_delta", 0.0)),
     )
 
-    scenario_result = SCENARIO_PLANNER.plan(df_display, [scenario_adjustment])
-    scenario_summary = summarise_scenario_deltas(scenario_result, top_n=10)
-
-    focus_codes: Sequence[str] = scenario_controls.target_codes or comparison_selection
-    if not focus_codes and selected_code:
-        focus_codes = [selected_code]
-
-    scenario_table = build_scenario_comparison_table(
-        scenario_result, focus_codes=focus_codes or None
+    has_non_zero_adjustment = any(
+        abs(value) > 0.001
+        for value in [
+            scenario_controls.gross_output_delta_pct,
+            scenario_controls.materials_cost_delta_pct,
+            scenario_controls.value_added_delta_pct,
+            scenario_controls.intermediate_inputs_delta_pct,
+        ]
     )
-    top_deltas = cast(pd.DataFrame, scenario_summary["top"]).copy()
-    chart_source = scenario_result.deltas
-    if focus_codes:
-        chart_source = chart_source[chart_source["industry_code"].isin(focus_codes)]
-    chart_slice = chart_source.sort_values("idiot_index", ascending=False).head(10)
-    scenario_fig = px.bar(
-        chart_slice,
-        x="idiot_index",
-        y="industry_name",
-        orientation="h",
-        title="Idiot Index delta (scenario vs baseline)",
-        labels={"idiot_index": "Δ Idiot Index", "industry_name": "Industry"},
-        color="idiot_index",
-        color_continuous_scale="RdYlGn",
-    )
-    scenario_fig.update_layout(xaxis_title="Δ Idiot Index", yaxis_title="Industry")
 
-    render_scenario_results(
-        summary=scenario_summary,
-        comparison_table=scenario_table,
-        top_deltas=top_deltas,
-        figure=scenario_fig,
+    scenario_payload = {
+        "target_codes": list(scenario_controls.target_codes),
+        "gross": float(scenario_controls.gross_output_delta_pct),
+        "materials": float(scenario_controls.materials_cost_delta_pct),
+        "value": float(scenario_controls.value_added_delta_pct),
+        "intermediate": float(scenario_controls.intermediate_inputs_delta_pct),
+    }
+
+    if scenario_controls.reset_requested:
+        st.session_state["scenario_committed"] = None
+        st.session_state["scenario_reset_pending"] = True
+        st.rerun()
+
+    if scenario_controls.run_requested:
+        if not has_non_zero_adjustment:
+            st.warning("Set at least one non-zero adjustment before running a scenario.")
+            st.session_state["scenario_committed"] = None
+        else:
+            st.session_state["scenario_committed"] = scenario_payload
+
+    committed_scenario = st.session_state.get("scenario_committed")
+    adjustment_active = committed_scenario is not None
+
+    if adjustment_active and committed_scenario != scenario_payload:
+        st.info("Adjustments changed. Click Run scenario to refresh results.")
+
+    if adjustment_active:
+        scenario_adjustment = ScenarioAdjustment(
+            industry_codes=committed_scenario["target_codes"] or None,
+            gross_output_delta_pct=committed_scenario["gross"],
+            materials_cost_delta_pct=committed_scenario["materials"],
+            value_added_delta_pct=committed_scenario["value"],
+            intermediate_inputs_delta_pct=committed_scenario["intermediate"],
+        )
+
+        scenario_result = SCENARIO_PLANNER.plan(df_display, [scenario_adjustment])
+        scenario_summary = summarise_scenario_deltas(scenario_result, top_n=10)
+
+        focus_codes: Sequence[str] = committed_scenario["target_codes"] or comparison_selection
+        if not focus_codes and selected_code:
+            focus_codes = [selected_code]
+
+        scenario_table = build_scenario_comparison_table(
+            scenario_result, focus_codes=focus_codes or None
+        )
+        scenario_table_display = scenario_table.rename(
+            columns={
+                "industry_code": "Industry code",
+                "industry_name": "Industry",
+                "gross_output_baseline": "Gross output (baseline)",
+                "gross_output_scenario": "Gross output (scenario)",
+                "gross_output_delta": "Gross output (delta)",
+                "materials_cost_baseline": "Materials cost (baseline)",
+                "materials_cost_scenario": "Materials cost (scenario)",
+                "materials_cost_delta": "Materials cost (delta)",
+                "value_added_baseline": "Value added (baseline)",
+                "value_added_scenario": "Value added (scenario)",
+                "value_added_delta": "Value added (delta)",
+                "idiot_index_baseline": "Output-to-cost ratio (baseline)",
+                "idiot_index_scenario": "Output-to-cost ratio (scenario)",
+                "idiot_index_delta": "Output-to-cost ratio (delta)",
+                "resilience_score_baseline": "Comparative score (baseline)",
+                "resilience_score_scenario": "Comparative score (scenario)",
+                "resilience_score_delta": "Comparative score (delta)",
+            }
+        ).round(3)
+
+        top_deltas = cast(pd.DataFrame, scenario_summary["top"]).copy()
+        top_deltas = top_deltas.rename(
+            columns={
+                "industry_code": "Industry code",
+                "industry_name": "Industry",
+                "idiot_index": "Output-to-cost ratio (delta)",
+            }
+        )
+
+        chart_source = scenario_result.deltas
+        if focus_codes:
+            chart_source = chart_source[chart_source["industry_code"].isin(focus_codes)]
+        chart_slice = chart_source.sort_values("idiot_index", ascending=False).head(10)
+        scenario_fig = px.bar(
+            chart_slice,
+            x="idiot_index",
+            y="industry_name",
+            orientation="h",
+            title="Output-to-cost ratio delta (scenario vs baseline)",
+            labels={"idiot_index": "Δ Output-to-cost ratio", "industry_name": "Industry"},
+            color="idiot_index",
+            color_continuous_scale="Tealrose",
+        )
+        scenario_fig.update_layout(
+            xaxis_title="Δ Output-to-cost ratio",
+            yaxis_title="Industry",
+        )
+
+        render_scenario_results(
+            summary=scenario_summary,
+            comparison_table=scenario_table_display,
+            top_deltas=top_deltas,
+            figure=scenario_fig,
+        )
+    else:
+        st.info(
+            "Idle scenario state. Select an industry target if useful, set at least one non-zero adjustment, and click Run scenario."
+        )
+
+with st.expander("Technical diagnostics", expanded=False):
+    render_observability_snapshots(
+        OBSERVABILITY_HISTORY,
+        empty_message=(
+            "Snapshots are persisted under "
+            f"`{APP_CONFIG.observability_snapshot_dir}`. Run `make observability-snapshot` to capture one."
+        ),
     )
-else:
-    st.info("Select industries or adjust the sliders to model a scenario.")
 
 download_artifacts = prepare_download_artifacts(
     df_full=df_display,
     df_filtered=df_filtered,
-    base_name="idiot_index_results",
+    base_name="industry_cost_structure_results",
+)
+st.caption(
+    "Export scope: 'All rows' exports the active dataset for the selected source; "
+    "'Current view' exports the currently filtered table state."
 )
 render_download_panel(download_artifacts)
 
 share_mapping: dict[str, list[str]] = dict(
     encode_query_params(
-        focus="true" if focus_mode else "false",
-        search=current_query_raw or None,
+        focus="false",
+        search=st.session_state.get("search_query", "") or None,
         industry=selected_code if selected_code else None,
         compare=comparison_selection if comparison_selection else None,
         year=str(year_clean) if year_clean is not None else None,
@@ -784,15 +887,15 @@ def _store_scenario_param(key: str, value: float) -> None:
         share_mapping.pop(key, None)
 
 
-if adjustment_active:
-    if scenario_controls.target_codes:
-        share_mapping["scenario_codes"] = list(scenario_controls.target_codes)
+if adjustment_active and committed_scenario:
+    if committed_scenario["target_codes"]:
+        share_mapping["scenario_codes"] = list(committed_scenario["target_codes"])
     else:
         share_mapping.pop("scenario_codes", None)
-    _store_scenario_param("scenario_gross", scenario_controls.gross_output_delta_pct)
-    _store_scenario_param("scenario_materials", scenario_controls.materials_cost_delta_pct)
-    _store_scenario_param("scenario_value", scenario_controls.value_added_delta_pct)
-    _store_scenario_param("scenario_intermediate", scenario_controls.intermediate_inputs_delta_pct)
+    _store_scenario_param("scenario_gross", committed_scenario["gross"])
+    _store_scenario_param("scenario_materials", committed_scenario["materials"])
+    _store_scenario_param("scenario_value", committed_scenario["value"])
+    _store_scenario_param("scenario_intermediate", committed_scenario["intermediate"])
 else:
     for key in [
         "scenario_codes",
@@ -811,7 +914,7 @@ def _normalise(mapping: Mapping[str, list[str]]) -> tuple[tuple[str, tuple[str, 
 
 
 if _normalise(share_mapping) != _normalise(query_params_initial):
-    st.experimental_set_query_params(**share_mapping)
+    _set_query_params(share_mapping)
 
 share_url = "?" + urlencode(
     [(key, value) for key, values in share_mapping.items() for value in values]

@@ -53,7 +53,7 @@ def test_build_data_story_with_no_materials_share() -> None:
         filter_query="search",
         data_mode="Upload CSV",
     )
-    assert "lacks a recent Idiot Index" in story
+    assert "lacks a recent output-to-cost ratio" in story
     assert "narrowed the field" in story
     assert "`search`" in story
 
@@ -121,6 +121,9 @@ def test_render_sidebar_upload_requires_file(monkeypatch) -> None:
         def markdown(self, _text: str, unsafe_allow_html: bool = False) -> None:
             return None
 
+        def caption(self, _text: str) -> None:
+            return None
+
     sidebar = SidebarStub()
     monkeypatch.setattr(st, "sidebar", sidebar)
 
@@ -174,6 +177,9 @@ def test_render_sidebar_bea_invalid_key(monkeypatch) -> None:
             return None
 
         def markdown(self, _text: str, unsafe_allow_html: bool = False) -> None:
+            return None
+
+        def caption(self, _text: str) -> None:
             return None
 
     monkeypatch.setattr(st, "sidebar", SidebarStub())
@@ -243,12 +249,26 @@ def test_render_scenario_controls_and_results(monkeypatch) -> None:
         ) -> None:
             self.metrics.append((label, baseline_display, delta_display))
 
+    class ButtonCol:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
     monkeypatch.setattr(st, "markdown", lambda *args, **kwargs: None)
     monkeypatch.setattr(st, "multiselect", lambda *args, **kwargs: ["311"])
     monkeypatch.setattr(st, "expander", lambda *args, **kwargs: ExpanderCtx())
     slider_values = iter([5.0, -2.0, 1.0, 3.0])
     monkeypatch.setattr(st, "slider", lambda *args, **kwargs: next(slider_values))
-    monkeypatch.setattr(st, "columns", lambda count: [MetricCol() for _ in range(count)])
+
+    def _columns(count: int):
+        if count == 2:
+            return [ButtonCol(), ButtonCol()]
+        return [MetricCol() for _ in range(count)]
+
+    monkeypatch.setattr(st, "columns", _columns)
+    monkeypatch.setattr(st, "button", lambda *args, **kwargs: False)
     monkeypatch.setattr(st, "caption", lambda *args, **kwargs: None)
     monkeypatch.setattr(st, "dataframe", lambda *args, **kwargs: None)
     monkeypatch.setattr(st, "plotly_chart", lambda *args, **kwargs: None)

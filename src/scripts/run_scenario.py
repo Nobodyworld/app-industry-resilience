@@ -106,7 +106,7 @@ def format_metric(label: str, baseline: float | None, scenario: float | None) ->
     if baseline is None or scenario is None:
         return f"{label}: n/a"
     delta = scenario - baseline
-    return f"{label}: {baseline:,.2f} -> {scenario:,.2f} (Δ {delta:+,.2f})"
+    return f"{label}: {baseline:,.2f} -> {scenario:,.2f} (change {delta:+,.2f})"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -162,8 +162,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("\nTop idiotic index deltas")
         for row in top.itertuples():
             print(
-                f"  {row.industry_code} – {row.industry_name}: Δ Idiot Index {row.idiot_index:+.2f}, "
-                f"Δ Resilience {row.resilience_score:+.2f}"
+                f"  {row.industry_code} - {row.industry_name}: Idiot Index change {row.idiot_index:+.2f}, "
+                f"Resilience change {row.resilience_score:+.2f}"
             )
 
     if args.output:
