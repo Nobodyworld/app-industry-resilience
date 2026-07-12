@@ -55,7 +55,7 @@ pre-commit install --hook-type commit-msg
    make quality-gate
    ```
 
-   `make quality-gate` runs Black in check mode, Ruff, mypy, runtime-scoped pytest coverage enforcement (`make coverage-runtime`, default fail-under 85), an informational full-`src` coverage report, and the security gate (`pip-audit` plus `detect-secrets`). While repository Actions are disabled, this local gate is the authoritative validation path. When Actions are enabled, the hosted workflow should invoke the same target.
+   `make quality-gate` runs Black in check mode, Ruff, mypy, runtime-scoped pytest coverage enforcement (`make coverage-runtime`, default fail-under 85), an informational full-`src` coverage report, and the security gate (`pip-audit` plus `detect-secrets`). Run it locally before push. GitHub Actions invokes the same target for pull requests and updates to `main`; both local and hosted results should be reported when available.
 
 4. Run additional focused commands as needed:
 
@@ -78,6 +78,7 @@ pre-commit install --hook-type commit-msg
 Before requesting review, verify that:
 
 - `make quality-gate` passes locally.
+- The hosted `CI / Quality Gate` check completes successfully.
 - Documentation is updated when behavior changes or new workflows are introduced.
 - New or changed configuration is explained in PR notes.
 - Screenshots are attached for user-interface changes.
