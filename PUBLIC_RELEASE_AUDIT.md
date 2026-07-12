@@ -1,6 +1,8 @@
 # Public Release Audit
 
 > Historical/superseded record: this Phase 1 audit reflects repository state as of 2026-06-22 only. For current validation status, final SHA, and release decision, see `docs/PUBLIC_RELEASE_VALIDATION.md`.
+>
+> Current CI policy update (2026-07-11): the owner requires GitHub Actions to be enabled for this repository. Issue [#54](https://github.com/Nobodyworld/app-industry-resilience/issues/54) tracks repository settings and the required successful hosted quality-gate run. Statements below about intentionally disabled Actions describe the historical audit period only.
 
 - Repository: `app-industry-resilience`
 - Audit date: `2026-06-22`
@@ -163,10 +165,11 @@ P2 concerns:
 - `ci: repair security gate shell flow`
 - `refactor: replace local FastAPI and Pydantic shims`
 
-### Validation governance mode
+### Validation governance mode during this historical pass
 
-- Owner policy: GitHub Actions is intentionally disabled for most repositories.
-- This repository is therefore being validated using local and clean-clone execution as the authoritative gate for this pass.
+- At the time of this audit, the owner policy intentionally disabled GitHub Actions for most repositories.
+- Local and clean-clone execution were therefore used as the authoritative gate for that historical pass.
+- The current repository policy supersedes this approach and requires hosted Actions; see issue #54.
 
 ### Current blocker re-evaluation
 
