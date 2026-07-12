@@ -1,0 +1,19 @@
+name: Actions Smoke
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Runner Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm runner execution
+        run: |
+          echo "GitHub Actions runner started successfully."
+          uname -a
