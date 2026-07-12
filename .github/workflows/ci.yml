@@ -1,5 +1,6 @@
 name: CI
 
+# Repository Actions policy must allow GitHub-owned actions used by quality-gate.yml.
 on:
   push:
     branches: ["main"]
