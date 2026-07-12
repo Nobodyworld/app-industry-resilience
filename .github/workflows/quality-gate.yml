@@ -8,24 +8,18 @@ on:
         required: false
         type: string
         default: "3.13"
-    secrets:
-      token:
-        description: Optional token override for checkout/artefact upload.
-        required: false
+
+permissions:
+  contents: read
 
 jobs:
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write
-      checks: write
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.token || github.token }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
