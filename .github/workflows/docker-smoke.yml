@@ -116,6 +116,33 @@ jobs:
             sleep 2
           done
 
+      - name: Record Docker validation evidence
+        run: |
+          docker_client_version="$(docker version --format '{{.Client.Version}}')"
+          docker_server_version="$(docker version --format '{{.Server.Version}}')"
+          image_id="$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')"
+          runtime_user="$(docker image inspect "$IMAGE_NAME" --format '{{.Config.User}}')"
+          {
+            echo "runner_image=ubuntu-latest"
+            echo "docker_client_version=$docker_client_version"
+            echo "docker_server_version=$docker_server_version"
+            echo "image_name=$IMAGE_NAME"
+            echo "image_id=$image_id"
+            echo "configured_runtime_user=$runtime_user"
+            echo "build_command=docker build --pull --tag $IMAGE_NAME ."
+            echo "streamlit_command=docker run --detach --name industry-resilience-streamlit --publish 8501:8501 $IMAGE_NAME"
+            echo "streamlit_health_url=http://127.0.0.1:8501/_stcore/health"
+            echo "api_command=docker run --detach --name industry-resilience-api --env APP_MODE=api --publish 9000:9000 $IMAGE_NAME"
+            echo "api_health_url=http://127.0.0.1:9000/health"
+            echo "api_metrics_url=http://127.0.0.1:9000/metrics"
+          } | tee docker-validation.txt
+
+      - name: Upload Docker validation evidence
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: docker-validation-evidence
+          path: docker-validation.txt
+
       - name: Show container logs on failure
         if: ${{ failure() }}
         run: |
