@@ -1,0 +1,19 @@
+name: Probe Upload Artifact
+
+on:
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "artifact probe" > artifact.txt
+      - uses: actions/upload-artifact@v5
+        with:
+          name: allowlist-probe
+          path: artifact.txt
