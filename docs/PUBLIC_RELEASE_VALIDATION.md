@@ -1,5 +1,7 @@
 # Public Release Validation (Pre-Rename + Post-Rename Normalization)
 
+> Historical validation record dated 2026-07-01. The Actions disposition in section D describes the policy at that time and is not the current merge policy. The owner now requires GitHub Actions for this repository; issue [#54](https://github.com/Nobodyworld/app-industry-resilience/issues/54) tracks enablement and the first successful hosted quality-gate run. Current release-candidate evidence is recorded in issue #55 and the active pull requests.
+
 - Repository (canonical): app-industry-resilience
 - Owner: Nobodyworld
 - Validation date: 2026-07-01
@@ -71,10 +73,11 @@ False-positive classification for gitleaks findings remains:
 - `14` findings from detector hashes in `config/.secrets.baseline`
 - `2` findings from fixture-like strings in `tests/test_config.py`
 
-## D. Actions/CI Disposition
+## D. Historical Actions/CI Disposition (2026-07-01)
 
-- GitHub Actions remain disabled by owner policy.
-- Local clean-clone validation is the authoritative release gate for this publication.
+- GitHub Actions were disabled by owner policy during this validation pass.
+- Local clean-clone validation was treated as the authoritative release gate for that historical publication record.
+- This disposition has been superseded: current pull requests and release candidates require a successful hosted Actions quality gate. See issue #54.
 
 ## E. Immutable Publication Tag (Post-Rename)
 
@@ -84,4 +87,6 @@ Publication tag policy for this normalization pass:
 2. Create new annotated tag: `public-release-2026-07-01-r2`.
 3. Ensure `public-release-2026-07-01-r2` resolves to the exact validated `main` commit used for publication.
 
-Release classification: `READY FOR PUBLIC RELEASE`
+Historical release classification: `READY FOR PUBLIC RELEASE`
+
+Current publication status must be determined from the active release issues and pull requests rather than this historical record.
