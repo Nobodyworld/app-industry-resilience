@@ -1,4 +1,4 @@
-"""Launch the Idiot Index API service using the bundled lightweight server."""
+"""Launch the Industry Resilience API service using the bundled lightweight server."""
 
 from __future__ import annotations
 
@@ -42,10 +42,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
 
     if args.reload:
-        print("[idiot-index] Hot reload is not supported; ignoring --reload flag.")
+        print("[industry-resilience] Hot reload is not supported; ignoring --reload flag.")
     if args.workers != 1:
-        print("[idiot-index] Multi-worker mode is not supported; forcing workers=1.")
-    print(f"[idiot-index] Log level set to {args.log_level}")
+        print("[industry-resilience] Multi-worker mode is not supported; forcing workers=1.")
+    print(f"[industry-resilience] Log level set to {args.log_level}")
 
     class _ThreadingWSGIServer(ThreadingMixIn, WSGIServer):  # pragma: no cover - exercised via CLI
         daemon_threads = True
@@ -64,12 +64,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 host = socket.gethostbyname(socket.gethostname())
             except OSError:
                 host = "localhost"
-        print(f"[idiot-index] Serving API on http://{host}:{port}")
-        print(f"[idiot-index] Metrics available at http://{host}:{port}/metrics")
+        print(f"[industry-resilience] Serving API on http://{host}:{port}")
+        print(f"[industry-resilience] Metrics available at http://{host}:{port}/metrics")
         try:
             server.serve_forever()
         except KeyboardInterrupt:  # pragma: no cover - CLI convenience
-            print("[idiot-index] Shutting down")
+            print("[industry-resilience] Shutting down")
     return 0
 
 
