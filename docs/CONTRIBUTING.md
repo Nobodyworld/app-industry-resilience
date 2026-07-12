@@ -9,6 +9,7 @@ Thanks for investing time in the Industry Resilience project. This guide explain
 - **Keep pull requests focused.** Ship reviewable slices; avoid unrelated refactors.
 - **Adopt Conventional Commits.** Every commit message must follow the `<type>(optional scope): <subject>` format using the types enforced by `scripts/commitlint.py`.
 - **Run the full quality suite** (`make quality-gate`) before opening a pull request.
+- **Pin GitHub Actions immutably.** Every external `uses:` reference must point to an approved repository and a full-length commit SHA; moving tags such as `@v5` are not permitted.
 - **Document significant work with an ExecPlan.** Place plans under `.agent/execplans/` so reviewers can trace decisions.
 
 ## Repository Layout
@@ -79,6 +80,7 @@ Before requesting review, verify that:
 
 - `make quality-gate` passes locally.
 - The hosted `CI / Quality Gate` check completes successfully.
+- Every external action in changed workflows is pinned to a full-length commit SHA.
 - Documentation is updated when behavior changes or new workflows are introduced.
 - New or changed configuration is explained in PR notes.
 - Screenshots are attached for user-interface changes.
