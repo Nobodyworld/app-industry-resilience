@@ -1,34 +1,37 @@
 # Support Policy
 
-We aim to keep the Idiot Index app usable for practitioners who want quick insights into industry efficiency. Support is provided on a best-effort basis by project maintainers and community contributors.
+The Industry Resilience dashboard is maintained as an open-source analytical showcase. Support is provided on a best-effort basis by the repository owner and community contributors.
 
 ## Where to Get Help
 
-- **Questions / How-to**: Open a GitHub Discussion (preferred) or use the `feature-request` issue template for roadmap ideas.
-- **Bug Reports**: Use the `bug-report` issue template with steps to reproduce, expected vs. actual behavior, and environment details.
-- **Security Reports**: Follow the private disclosure process in [SECURITY.md](SECURITY.md). Do **not** open a public issue for security concerns.
+- **Questions and how-to requests**: Open a GitHub Discussion when Discussions are enabled. Otherwise, use the most relevant issue template.
+- **Bug reports**: Use the bug-report template and include reproduction steps, expected and actual behavior, and environment details.
+- **Feature requests**: Use the feature-request template with a clear problem statement and acceptance criteria.
+- **Security reports**: Follow the private disclosure process in [SECURITY.md](SECURITY.md). Do not open a public issue for security concerns.
 
 ## Response Targets
 
+These targets are goals rather than service-level commitments.
+
 | Priority | Examples | Target Response |
 |----------|----------|-----------------|
-| P0       | Production outage, security vulnerability, data corruption | 1 business day acknowledgement |
-| P1       | Broken main branch build, regression in supported workflows | 2 business days |
-| P2       | General bug reports, documentation issues | 5 business days |
-| P3       | Feature requests, questions, refactoring suggestions | Community best-effort |
+| P0 | Security vulnerability, data corruption | 5 business days acknowledgement |
+| P1 | Broken `main` branch or supported-workflow regression | 5 business days |
+| P2 | General bug reports and documentation issues | Best effort |
+| P3 | Feature requests, questions, and refactoring suggestions | Community best effort |
 
 ## What We Need From You
 
-To help us help you:
-
-- Reproduce the issue on the latest `main` branch.
-- Include logs (`logs/` directory or Streamlit console), configuration (`.env` values minus secrets), and sample data when possible.
-- Describe attempted mitigations.
+- Reproduce the issue on the latest `main` branch when possible.
+- Include logs, sanitized configuration, and a minimal sample dataset when relevant.
+- Remove API keys, credentials, personal data, and other secrets before posting.
+- Describe attempted mitigations and whether the issue also occurs with the bundled sample dataset.
 
 ## Out of Scope
 
-- Custom ETL or dashboard work beyond the Idiot Index use case.
-- Proprietary dataset integration (we can advise on architecture but cannot own custom connectors).
-- Long-term SLA commitments without a commercial agreement.
+- Custom ETL, reporting, or dashboard work for proprietary datasets.
+- Maintaining third-party integrations that require credentials or commercial access.
+- Long-term availability, response-time, or support commitments without a separate agreement.
+- Treating experimental composite indicators as financial, credit, or investment advice.
 
-Thanks for using and contributing to the Idiot Index!
+Thank you for helping improve the Industry Resilience dashboard.

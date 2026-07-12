@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem with the Idiot Index application or tooling.
+about: Report a problem with the Industry Resilience dashboard or tooling.
 title: "bug: "
 labels: ["bug", "needs-triage"]
 assignees: []
@@ -14,7 +14,7 @@ assignees: []
 
 1. <!-- Step one -->
 2. <!-- Step two -->
-3. <!-- ... -->
+3. <!-- Additional steps -->
 
 ## Expected Behavior
 
@@ -22,18 +22,19 @@ assignees: []
 
 ## Actual Behavior
 
-<!-- Tell us what actually happened. Include full error messages. -->
+<!-- Tell us what happened. Include complete error messages when safe. -->
 
 ## Environment
 
-- OS: <!-- e.g., Ubuntu 22.04 -->
-- Python: <!-- e.g., 3.10.14 -->
-- Idiot Index version / commit: <!-- e.g., v0.1.0 or SHA -->
+- OS: <!-- e.g., Windows 11 or Ubuntu 24.04 -->
+- Python: <!-- e.g., 3.13.7 -->
+- Application version or commit: <!-- e.g., v0.1.0 or commit SHA -->
+- Data source or mode: <!-- bundled sample, AIES snapshot, BEA, Census ASM, uploaded CSV -->
 
-## Logs & Diagnostics
+## Logs and Diagnostics
 
-<!-- Paste relevant log excerpts, stack traces, or screenshots. -->
+<!-- Paste relevant sanitized logs, stack traces, or screenshots. Remove secrets and personal data. -->
 
 ## Additional Context
 
-<!-- Anything else we should know? Feature flags, configuration, data sources, etc. -->
+<!-- Include feature flags, configuration details, or sample-data notes that may help reproduce the issue. -->
