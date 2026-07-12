@@ -1,0 +1,129 @@
+name: Docker Smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "requirements.txt"
+      - "app.py"
+      - "src/**"
+      - ".github/workflows/docker-smoke.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "requirements.txt"
+      - "app.py"
+      - "src/**"
+      - ".github/workflows/docker-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-smoke:
+    name: Docker Deployment Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE_NAME: industry-resilience:${{ github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Show Docker environment
+        run: docker version
+
+      - name: Build runtime image
+        run: docker build --pull --tag "$IMAGE_NAME" .
+
+      - name: Verify non-root runtime user
+        run: |
+          runtime_user="$(docker image inspect "$IMAGE_NAME" --format '{{.Config.User}}')"
+          echo "Configured runtime user: $runtime_user"
+          test "$runtime_user" = "app"
+
+      - name: Start Streamlit mode
+        run: docker run --detach --name industry-resilience-streamlit --publish 8501:8501 "$IMAGE_NAME"
+
+      - name: Verify Streamlit endpoint and container health
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8501/_stcore/health > /tmp/streamlit-health.txt; then
+              cat /tmp/streamlit-health.txt
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-streamlit
+              exit 1
+            fi
+            sleep 2
+          done
+
+          for attempt in {1..60}; do
+            status="$(docker inspect industry-resilience-streamlit --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}')"
+            echo "Streamlit health status: $status"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            if [ "$status" = "unhealthy" ] || [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-streamlit
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Stop Streamlit mode
+        run: docker rm --force industry-resilience-streamlit
+
+      - name: Start API mode
+        run: docker run --detach --name industry-resilience-api --env APP_MODE=api --publish 9000:9000 "$IMAGE_NAME"
+
+      - name: Verify API endpoints and container health
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:9000/health > /tmp/api-health.json && \
+               curl --fail --silent --show-error http://127.0.0.1:9000/metrics > /tmp/api-metrics.txt; then
+              cat /tmp/api-health.json
+              head -n 20 /tmp/api-metrics.txt
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-api
+              exit 1
+            fi
+            sleep 2
+          done
+
+          for attempt in {1..60}; do
+            status="$(docker inspect industry-resilience-api --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}')"
+            echo "API health status: $status"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            if [ "$status" = "unhealthy" ] || [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-api
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Show container logs on failure
+        if: ${{ failure() }}
+        run: |
+          docker logs industry-resilience-streamlit 2>/dev/null || true
+          docker logs industry-resilience-api 2>/dev/null || true
+
+      - name: Remove smoke-test containers
+        if: ${{ always() }}
+        run: |
+          docker rm --force industry-resilience-streamlit 2>/dev/null || true
+          docker rm --force industry-resilience-api 2>/dev/null || true
