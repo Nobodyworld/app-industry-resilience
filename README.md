@@ -179,7 +179,7 @@ Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md
 
 Most recent validated clean-clone totals are recorded in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md), including full test count and runtime coverage gate result.
 
-GitHub Actions status: repository Actions are currently disabled by owner policy, so local clean-clone validation is the authoritative release gate.
+GitHub Actions policy: hosted CI is required for current pull requests and release candidates. Local clean-clone validation remains supporting evidence, but it does not replace a successful Actions run. See [issue #54](https://github.com/Nobodyworld/app-industry-resilience/issues/54) for the enablement record.
 
 ## Documentation
 
@@ -197,7 +197,8 @@ GitHub Actions status: repository Actions are currently disabled by owner policy
 - [License](LICENSE)
 - [Code of Conduct](docs/CODE_OF_CONDUCT.md)
 - [Contributing guide](docs/CONTRIBUTING.md)
-- [Security and incident response](docs/OPERATIONS_INCIDENT_RESPONSE.md)
+- [Security policy](docs/handbook/SECURITY.md)
+- [Operations incident response](docs/OPERATIONS_INCIDENT_RESPONSE.md)
 - [Data-source attribution and dependencies](docs/DEPENDENCIES.md)
 - [Industry shock case study](docs/INDUSTRY_SHOCK_CASE_STUDY.md)
 
