@@ -46,7 +46,10 @@ def _bea_payload(*rows: object) -> dict[str, object]:
         (_bea_payload(), "contains no rows"),
     ],
 )
-def test_bea_rejects_malformed_envelopes(payload: object, expected: str) -> None:
+def test_bea_rejects_malformed_envelopes(
+    payload: object,
+    expected: str,
+) -> None:
     with pytest.raises(BEAClientError, match=expected):
         _parse_bea_response(payload)
 
@@ -62,7 +65,10 @@ def test_bea_rejects_malformed_envelopes(payload: object, expected: str) -> None
         (_bea_row(DataValue="NaN"), "must be finite"),
     ],
 )
-def test_bea_rejects_malformed_rows(row: object, expected: str) -> None:
+def test_bea_rejects_malformed_rows(
+    row: object,
+    expected: str,
+) -> None:
     with pytest.raises(BEAClientError, match=expected):
         _parse_bea_response(_bea_payload(row))
 
@@ -135,8 +141,20 @@ def test_bea_naics_enrichment_maps_ranges_and_preserves_unknown_labels() -> None
 @patch("src.adapters.bea.safe_get_json")
 def test_bea_fetch_records_unmapped_metadata(mock_get_json, _cache) -> None:
     health = {"BEAAPI": {"Results": {"Data": []}}}
-    go = _bea_payload(_bea_row(Industry="999", IndustrYDescription="Novel", DataValue="100"))
-    inputs = _bea_payload(_bea_row(Industry="999", IndustrYDescription="Novel", DataValue="60"))
+    go = _bea_payload(
+        _bea_row(
+            Industry="999",
+            IndustrYDescription="Novel",
+            DataValue="100",
+        )
+    )
+    inputs = _bea_payload(
+        _bea_row(
+            Industry="999",
+            IndustrYDescription="Novel",
+            DataValue="60",
+        )
+    )
     mock_get_json.side_effect = [health, go, inputs]
 
     frame = fetch_go_ii_by_industry("valid_api_key_12345", 2021)
@@ -166,12 +184,26 @@ def _census_payload(*rows: object) -> list[object]:
             "missing required columns",
         ),
         (_census_payload(["311", "Food", "100"]), "header has 5 columns"),
-        (_census_payload(["", "Food", "100", "60", "40"]), "must not be empty"),
-        (_census_payload(["311", "", "100", "60", "40"]), "must not be empty"),
-        (_census_payload(["311", "Food", "not-numeric", "60", "40"]), "must be numeric"),
+        (
+            _census_payload(["", "Food", "100", "60", "40"]),
+            "must not be empty",
+        ),
+        (
+            _census_payload(["311", "", "100", "60", "40"]),
+            "must not be empty",
+        ),
+        (
+            _census_payload(
+                ["311", "Food", "not-numeric", "60", "40"]
+            ),
+            "must be numeric",
+        ),
     ],
 )
-def test_census_rejects_malformed_contracts(payload: object, expected: str) -> None:
+def test_census_rejects_malformed_contracts(
+    payload: object,
+    expected: str,
+) -> None:
     with pytest.raises(CensusASMClientError, match=expected):
         _validate_census_payload(payload, year=2021)
 
@@ -188,7 +220,10 @@ def test_census_valid_fixture_normalizes_without_behavior_change() -> None:
         patch("src.adapters.census_asm.load_config", return_value=config),
         patch("src.adapters.census_asm.get_api_cache", return_value=None),
         patch("src.adapters.census_asm.api_limiter.wait_for_api"),
-        patch("src.adapters.census_asm.safe_get_json", return_value=payload),
+        patch(
+            "src.adapters.census_asm.safe_get_json",
+            return_value=payload,
+        ),
     ):
         frame = fetch_asm_manufacturing("valid_api_key_12345", 2021)
 
