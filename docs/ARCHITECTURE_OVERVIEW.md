@@ -50,7 +50,7 @@ The U.S. Industry Cost Structure & Resilience Dashboard follows a layered Python
 
 ### Agents
 
-- **Location:** `agents`
+- **Location:** `src/agents`
 - **Purpose:** Provide dataclass-driven schemas and functions so downstream automation or LLM agents can reuse the core analysis service without touching Streamlit internals.
 
 ### Extensions
@@ -63,10 +63,10 @@ The U.S. Industry Cost Structure & Resilience Dashboard follows a layered Python
 ## Data flow summary
 
 1. **Configuration bootstrap** – `app.py` loads configuration via `src.core.config.load_config()`, validating environment variables, API keys, and file policies.
-2. **Data acquisition** – `src.application.service.IdiotIndexService` requests data from adapters based on user selection (sample CSV, BEA, or Census ASM). Adapters rely on shared retry/caching utilities.
+2. **Data acquisition** – `src.application.idiot_index_service.IdiotIndexService` requests data from adapters based on user selection (sample CSV, BEA, or Census ASM). Adapters rely on shared retry/caching utilities.
 3. **Normalisation** – `src.core.normalize` ensures consistent column naming; `src.core.metrics.compute_metrics` calculates Idiot Index, value-added %, and material share metrics. `src.core.analytics.compute_health_scores` then derives composite health scores and risk bands that flow into service responses.
 4. **Narrative rendering** – Streamlit components under `src.interfaces.streamlit` render hero metrics, health insights, tables, and charts while maintaining accessible structure for tests.
-5. **Automation reuse** – The `agents` package exports typed request/response contracts mirroring the application service so CLI or AI clients can trigger evaluations safely.
+5. **Automation reuse** – The `src.agents` package exports typed request/response contracts mirroring the application service so CLI or AI clients can trigger evaluations safely.
 
 ## Caching & performance
 

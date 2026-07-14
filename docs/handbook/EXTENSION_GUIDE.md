@@ -1,6 +1,6 @@
-# Idiot Index Extension Guide
+# Industry Resilience Extension Guide
 
-The Idiot Index platform exposes a formal extension layer so new analytics, connectors, and scenario enrichments can evolve independently of the core application. This guide explains how to build, register, and validate extensions.
+The Industry Resilience platform exposes a formal extension layer so new analytics, connectors, and scenario enrichments can evolve independently of the core application. This guide explains how to build, register, and validate extensions.
 
 ## Concepts
 
@@ -15,7 +15,7 @@ The Idiot Index platform exposes a formal extension layer so new analytics, conn
 
 1. **Generate a scaffold** using the helper script:
    ```bash
-   python scripts/scaffold_extension.py --name supply_chain_risk --with-scenario --instrumentation
+   python src/scripts/scaffold_extension.py --name supply_chain_risk --with-scenario --instrumentation
    ```
    This creates `src/extensions/community/supply_chain_risk.py`, ensures the `community` package exists, and appends the module path to `extensions/manifest.json`.
 
@@ -49,8 +49,8 @@ The Idiot Index platform exposes a formal extension layer so new analytics, conn
   ```
 - Notes appear in the response body (for APIs) or Streamlit UI as additional bullet points.
 - Prometheus metrics expose overall request counts, allowing operators to correlate extension issues with `idiot_index_api_errors_total` labels. Instrumentation extensions can subscribe to the same registry and publish dedicated metrics (see `src/extensions/builtins/core_instrumentation.py`, `src/extensions/builtins/data_quality.py`, `src/extensions/builtins/snapshot_monitor.py`, `src/extensions/builtins/snapshot_persistence.py`, and `src/extensions/builtins/snapshot_replication.py` for reference implementations). The data-quality plugin listens for dataset/scenario profile events and emits gauges (`idiot_index_dataset_rows`, `idiot_index_dataset_missing_ratio`) together with a health check that warns about empty or sparse datasets. `snapshot_monitor` listens for the `observability.snapshot.persisted` event to expose snapshot counts/age and a health check that warns about stale archives, while `snapshot_persistence` captures snapshots on lifecycle events and error telemetry so operators always have fresh history to inspect. The `snapshot_replication` instrumentation extension subscribes to `observability.snapshot.replication` events to expose replication counters, latency histograms, and a health component reporting the latest remote outcome. Extensions can also call `registry.record_event(...)` to publish derived signals of their own.
-- When `snapshot_persistence` is active, it now also streams each persisted archive to the remote replicator returned by `build_snapshot_replicator(...)`. Built-in replication extensions support S3 (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=s3`), Google Cloud Storage (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=gcs`), Azure Blob Storage (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=azure-blob`), and a debug-friendly filesystem mirror (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` with `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` describing the target directory). Additional connectors can register custom implementations by implementing `ReplicationExtension` and adding the module to the manifest.
-- Run `python scripts/extensions_catalog.py --json --pretty` (or `make extensions-catalog`) to confirm registration details, descriptions, and hook types before shipping a new module. Use `python scripts/connectors_catalog.py --json --pretty` (or `make connectors-catalog`) to validate connector entries, health checks, and metadata.
+- When `snapshot_persistence` is active, it also streams each persisted archive to the remote replicator returned by `build_snapshot_replicator(...)`. Built-in replication extensions support S3 (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=s3`), Google Cloud Storage (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=gcs`), Azure Blob Storage (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=azure-blob`), and a debug-friendly filesystem mirror (`OBSERVABILITY_SNAPSHOT_REMOTE_BACKEND=plugin:debug` with `OBSERVABILITY_SNAPSHOT_REMOTE_OPTIONS` describing the target directory). Additional connectors can register custom implementations by implementing `ReplicationExtension` and adding the module to the manifest.
+- Run `python src/scripts/extensions_catalog.py --json --pretty` (or `make extensions-catalog`) to confirm registration details, descriptions, and hook types before shipping a new module. Use `python src/scripts/connectors_catalog.py --json --pretty` (or `make connectors-catalog`) to validate connector entries, health checks, and metadata.
 
 ## Safe Deployment Checklist
 

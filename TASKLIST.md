@@ -1,21 +1,21 @@
 # TASKLIST: Task Compilation
 
--*NEVER REMOVE SPEC.md, STYLE-GUIDE.md, or TASKLIST.md FROM THE ROOT*
+> Required root governance files: `README.md`, `SPEC.md`, `STYLE-GUIDE.md`, and `TASKLIST.md`. Do not remove them; keep the canonical links in the root entry-point files current.
 
-Use this file to compile and track all tasks that need to be completed for this repository. Check off items as they are finished. Keep each task on a single line. Check off already completed tasks and keep things in chronological order when updating and adding to the file. Follow Template Entry below.
+Use this file to compile and track all repository tasks. Check off items as they are finished, keep each task on a single line, and preserve chronological order. Follow the template below.
 
-Keep entries one-line, oldest-first. When completing a task, check it off and append a one-line completion note indented underneath (date + PR/link + 1â€“2 sentence summary).
+Keep entries one-line and oldest-first. When completing a task, check it off and append a one-line completion note indented underneath (date + PR/link + 1–2 sentence summary).
 
 ## Template (single-line + optional completion note)
 
 ```text
-- [ ] Short task description â€” TK-YYYYMMDD-###
+- [ ] Short task description — TK-YYYYMMDD-###
 ```
 
 Completion note (indented, one line):
 
 ```text
-  - Completed: YYYY-MM-DD â€” PR: <url> â€” short summary
+  - Completed: YYYY-MM-DD — PR: <url> — short summary
 ```
 
 ---
@@ -31,7 +31,6 @@ Completion note (indented, one line):
 - [x] Fix Census ASM type error in line 92 | owner: dev | priority: high | added: 2025-11-14 | closed: 2025-11-14 – Guarded `year_result.value` via `year_value: int` and used `getattr(config, 'census_asm_endpoint_template', None)` to avoid AttributeError.
 - [ ] Implement API response caching strategy | owner: dev | priority: medium | added: 2025-11-14 – Add TTL-based caching for BEA/Census responses to reduce API calls and improve performance.
 - [ ] Add rate limiting metrics and monitoring | owner: ops | priority: medium | added: 2025-11-14 – Expose rate limit hit counters and remaining token gauges in Prometheus metrics; instrument Redis health status as a gauge.
-- [ ] Add rate limiting metrics and monitoring | owner: ops | priority: medium | added: 2025-11-14 – Expose rate limit hit counters and remaining token gauges in Prometheus metrics; instrument Redis health status as gauge.
 - [x] Create Streamlit component smoke tests | owner: dev | priority: medium | added: 2025-11-14 | closed: 2025-11-14 – Added a minimal smoke test suite in `tests/test_streamlit_components.py` and stubbed Streamlit primitives for deterministic checks.
 - [ ] Document error recovery procedures | owner: docs | priority: medium | added: 2025-11-14 – Expand `OPERATIONS_INCIDENT_RESPONSE.md` with runbooks for common API failures and data quality issues.
 - [ ] Add data validation layer for API responses | owner: dev | priority: medium | added: 2025-11-14 – Validate BEA/Census response schemas before normalization to catch API breaking changes early.
@@ -52,5 +51,5 @@ Completion note (indented, one line):
 - [ ] Add a logger metric/count to track how often helpers trigger auto-compute (useful telemetry).
 - [ ] Add a small benchmark test for compute_metrics to quantify runtime on representative sample sizes.
 - [ ] Add a pre-commit config or GitHub Action job to run ruff/black/mypy to avoid style drift.
-- [ ] Add telemetry when _ensure_metrics runs (counter metric)
-- [ ] Add docs mentioning auto-compute behavior and recommended usage patterns
+- [ ] Add telemetry when _ensure_metrics runs (counter metric).
+- [ ] Add docs mentioning auto-compute behavior and recommended usage patterns.

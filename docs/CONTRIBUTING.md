@@ -7,7 +7,7 @@ Thanks for investing time in the Industry Resilience project. This guide explain
 - **Preserve behavior** unless you have evidence it is broken. Document any intentional change.
 - **Write tests** for every bug fix or feature. Maintain the existing coverage goals.
 - **Keep pull requests focused.** Ship reviewable slices; avoid unrelated refactors.
-- **Adopt Conventional Commits.** Every commit message must follow the `<type>(optional scope): <subject>` format using the types enforced by `scripts/commitlint.py`.
+- **Adopt Conventional Commits.** Every commit message must follow the `<type>(optional scope): <subject>` format using the types enforced by `src/scripts/commitlint.py`.
 - **Run the full quality suite** (`make quality-gate`) before opening a pull request.
 - **Pin GitHub Actions immutably.** Every external `uses:` reference must point to an approved repository and a full-length commit SHA; moving tags such as `@v5` are not permitted.
 - **Document significant work with an ExecPlan.** Place plans under `.agent/execplans/` so reviewers can trace decisions.
@@ -16,9 +16,10 @@ Thanks for investing time in the Industry Resilience project. This guide explain
 
 - `app.py` – Streamlit entrypoint that wires the UI to the application layer.
 - `src/` – Production code, including the agent toolkit under `src/agents`, application services, core logic, adapters, interfaces, and infrastructure packages.
+- `src/scripts/` – Developer automation and operational command-line helpers.
 - `docs/` – Reference material and runbooks. Long-form governance and release docs live under `docs/handbook/`.
 - `docs/execplans/` – Historical ExecPlans documenting major refactors and investigations.
-- `extensions/`, `scripts/`, `tests/`, `assets/`, `data/` – Extension modules, automation helpers, test suites, static assets, and sample datasets.
+- `extensions/`, `tests/`, `assets/`, `data/` – Extension manifests, test suites, static assets, and sample datasets.
 
 ## Prerequisites
 
@@ -89,8 +90,8 @@ Before requesting review, verify that:
 ### Extensions, Services, and Telemetry
 
 - Use the scaffolds to keep new modules consistent:
-  - `python scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary, scenario, and instrumentation hooks and updates `extensions/manifest.json`.
-  - `python scripts/scaffold_service.py --name <service>` creates an observability-aware service skeleton under `src/application/services/`.
+  - `python src/scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary, scenario, and instrumentation hooks and updates `extensions/manifest.json`.
+  - `python src/scripts/scaffold_service.py --name <service>` creates an observability-aware service skeleton under `src/application/services/`.
 - Instrumentation extensions should subscribe to events on the shared `ObservabilityRegistry` instead of mutating core services.
 - Use `src/extensions/builtins/data_quality.py` as an instrumentation example and run `make extensions-catalog` before publishing extension changes.
 - When shipping connectors, implement `ConnectorExtension.register` and run `make connectors-catalog` so `/meta/connectors` and observability digests remain accurate.

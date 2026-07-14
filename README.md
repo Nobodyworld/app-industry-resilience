@@ -177,11 +177,11 @@ python src/scripts/run_quality_checks.py --fast
 git diff --check
 ```
 
-Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md) and should be run where `pip-audit`, `detect-secrets`, and `pytest-cov` are installed. Current branch validation should be checked in the pull request report, not inferred from this README.
+Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md) and should be run where `pip-audit`, `detect-secrets`, and `pytest-cov` are installed. Current pull requests must pass the hosted `CI / Quality Gate`; the completed public-beta publication evidence is recorded in [issue #72](https://github.com/Nobodyworld/app-industry-resilience/issues/72).
 
-Most recent validated clean-clone totals are recorded in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md), including full test count and runtime coverage gate result.
+Most recent clean-clone totals are recorded in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md). Current hosted evidence should be taken from the relevant pull request or Actions run rather than inferred from historical totals.
 
-GitHub Actions policy: hosted CI is required for current pull requests and release candidates. Local clean-clone validation remains supporting evidence, but it does not replace a successful Actions run. All external action references must use approved repositories and be pinned to full-length commit SHAs. See [issue #54](https://github.com/Nobodyworld/app-industry-resilience/issues/54) for the policy and enablement record.
+GitHub Actions policy: hosted CI is required for current pull requests and release candidates. Local clean-clone validation remains supporting evidence, but it does not replace a successful Actions run. All external action references must use approved repositories and be pinned to full-length commit SHAs. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for contributor requirements and [issue #72](https://github.com/Nobodyworld/app-industry-resilience/issues/72) for the completed public-beta validation record.
 
 ## Documentation
 
@@ -212,7 +212,7 @@ docker run -p 8501:8501 industry-resilience-dashboard
 docker run -e APP_MODE=api -p 9000:9000 industry-resilience-dashboard
 ```
 
-The image uses Python 3.13 and runtime dependencies only. Docker validation status belongs in the branch or release report because it depends on local Docker availability.
+The image uses Python 3.13 and runtime dependencies only. The pinned, least-privilege [Docker Smoke workflow](.github/workflows/docker-smoke.yml) validates the production image, non-root runtime user, Streamlit health, API `/health`, and API `/metrics` on deployment-relevant changes. Completed public-beta Docker evidence is recorded in [issue #72](https://github.com/Nobodyworld/app-industry-resilience/issues/72).
 
 ## License
 
