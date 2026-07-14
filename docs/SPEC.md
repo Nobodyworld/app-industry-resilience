@@ -39,7 +39,7 @@ Use `make format`, `make lint`, `make typecheck`, or `make test` for targeted de
 
 ## 4. Configuration
 
-- Configuration values are centralised in `src/config.py` with environment variable overrides. Key settings include API credentials, rate limiter backend, observability replication targets, and dtype overrides.
+- Configuration values are centralised in `src/core/config.py` with environment variable overrides. Key settings include API credentials, rate limiter backend, observability replication targets, and dtype overrides.
 - `.env` files are not committed; developers should export variables locally when required.
 - JSON/TOML configuration files:
   - `extensions/manifest.json` – declares available extensions.
@@ -47,7 +47,11 @@ Use `make format`, `make lint`, `make typecheck`, or `make test` for targeted de
   - `pyproject.toml` – Python packaging metadata.
   - `codex_chain.json` – automation hints for Codex agents.
 
-Validate changes to these files by loading them in tests or via `python -m json.tool <file>` / `python -m tomllib <file>`.
+Validate JSON with `python -m json.tool <file>`. Validate TOML with a short `tomllib` load, for example:
+
+```bash
+python -c "import pathlib, tomllib; tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8'))"
+```
 
 ## 5. Repository Layout
 
