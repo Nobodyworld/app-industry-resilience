@@ -92,13 +92,20 @@ def test_fetch_bea_multi_year_caches(mock_get_json, tmp_path) -> None:
             }
         }
 
-    mock_get_json.side_effect = [
-        health_response,
-        build_response(2021, "100"),
-        build_response(2021, "60"),
-        build_response(2020, "90"),
-        build_response(2020, "55"),
-    ]
+    values = {
+        2021: {"1": "100", "2": "60"},
+        2020: {"1": "90", "2": "55"},
+    }
+
+    def response_for_request(_url, *, params=None, **_kwargs):
+        if params and params.get("method") == "GetParameterValues":
+            return health_response
+        assert params is not None
+        request_year = int(params["Year"])
+        table_id = params["TableID"]
+        return build_response(request_year, values[request_year][table_id])
+
+    mock_get_json.side_effect = response_for_request
 
     with patch("src.adapters.bea.get_api_cache", side_effect=fake_cache):
         frame = fetch_go_ii_by_industry("valid_api_key_12345", [2021, 2020])
