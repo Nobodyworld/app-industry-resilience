@@ -36,9 +36,35 @@ python src/scripts/scaffold_extension.py --name supply_chain --with-connector
 
 Each health check reports credential status and supported year ranges. Missing or invalid credentials yield `warn` status so responders can differentiate misconfiguration from upstream outages.
 
+## Provider Contract Validation
+
+BEA and Census ASM responses are validated at the adapter boundary before normalization or metric calculation.
+
+### BEA
+
+A valid table response must contain the `BEAAPI.Results.Data` envelope and at least one row. Every row must contain a non-empty `Industry` code, `IndustrYDescription` provider label, positive integral `Year`, and finite numeric `DataValue`. Malformed envelopes, missing fields, mismatched years, duplicate rows, empty tables, and invalid numeric values raise `BEAClientError` with provider and row context but without credentials or full payload contents.
+
+BEA provider labels are preserved. The adapter adds:
+
+- `naics_sector_name` – the matching sector label, or `Unmapped NAICS <code>`;
+- `bea_group` – the mapped group, or `UNMAPPED`;
+- `naics_mapping_status` – `mapped` or `unmapped`.
+
+Two-digit and two-digit-range entries such as `31-33` are applied to more detailed codes such as `311`. Codes that still have no mapping remain in the dataset, retain their provider label, and are listed in `dataframe.attrs["bea_metadata"]["unmapped_naics_codes"]`. A bounded warning is emitted without logging API credentials or complete upstream rows.
+
+### Census ASM
+
+A valid Census ASM response must be a list containing a header and at least one row. The header must include `NAICS2017`, `NAICS2017_LABEL`, `RCPTOT`, `CSTMTOT`, and `VALADD`. Each row must match the header width, include non-empty code and label values, and provide finite numeric shipment, material-cost, and value-added values. Violations raise `CensusASMClientError` before normalization.
+
+Validated Census frames include `dataframe.attrs["census_asm_metadata"]` with the provider year, row count, required fields, and `contract_validated: true`. Cached responses preserve the same metadata.
+
+These checks detect provider schema drift early. They do not change analytical formulas, heuristic bands, or the project’s public-beta limitations.
+
 ## Best Practices
 
 - Keep identifiers stable; treat them as API contracts.
 - Prefer reusable helper functions for shared health logic (e.g., credential checks).
+- Validate external envelopes and rows before normalization; do not rely on coercion to hide malformed provider values.
+- Preserve provider codes and labels when enrichment metadata is unavailable.
 - Document connector-specific environment variables in `README.md` or dedicated runbooks.
 - Consider emitting connector-specific metrics via instrumentation extensions when runtime performance or error rates are critical.
