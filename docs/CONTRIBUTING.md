@@ -89,8 +89,8 @@ Before requesting review, verify that:
 ### Extensions, Services, and Telemetry
 
 - Use the scaffolds to keep new modules consistent:
-  - `python scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary, scenario, and instrumentation hooks and updates `extensions/manifest.json`.
-  - `python scripts/scaffold_service.py --name <service>` creates an observability-aware service skeleton under `src/application/services/`.
+  - `python src/scripts/scaffold_extension.py --name <name> --with-scenario --instrumentation` seeds summary, scenario, and instrumentation hooks and updates `extensions/manifest.json`.
+  - `python src/scripts/scaffold_service.py --name <service>` creates an observability-aware service skeleton under `src/application/services/`.
 - Instrumentation extensions should subscribe to events on the shared `ObservabilityRegistry` instead of mutating core services.
 - Use `src/extensions/builtins/data_quality.py` as an instrumentation example and run `make extensions-catalog` before publishing extension changes.
 - When shipping connectors, implement `ConnectorExtension.register` and run `make connectors-catalog` so `/meta/connectors` and observability digests remain accurate.
