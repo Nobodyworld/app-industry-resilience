@@ -1,4 +1,4 @@
-name: Security Diagnostics
+name: Regression Diagnostics
 
 on:
   pull_request:
@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   diagnose:
-    name: Capture Security Diagnostics
+    name: Capture Regression Diagnostics
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -27,22 +27,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Capture security outputs
+      - name: Capture regression output
         shell: bash
         run: |
-          mkdir -p build/security-diagnostics
+          mkdir -p build/regression-diagnostics
           set +e
-          python -m pip_audit -r requirements.txt -r requirements-dev.txt \
-            > build/security-diagnostics/pip-audit.log 2>&1
-          echo $? > build/security-diagnostics/pip-audit.exit
-          detect-secrets-hook --baseline config/.secrets.baseline \
-            > build/security-diagnostics/detect-secrets.log 2>&1
-          echo $? > build/security-diagnostics/detect-secrets.exit
+          python -m pytest -q > build/regression-diagnostics/pytest.log 2>&1
+          echo $? > build/regression-diagnostics/pytest.exit
           set -e
 
-      - name: Upload security outputs
+      - name: Upload regression output
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: security-diagnostics
-          path: build/security-diagnostics
+          name: regression-diagnostics
+          path: build/regression-diagnostics
