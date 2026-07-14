@@ -1,6 +1,6 @@
 # Extensions Catalog
 
-Extensions expand the Idiot Index platform without modifying core services. The `manifest.json` file declares built-in modules so automation can discover available connectors, instrumentation hooks, and scenario planners.
+Extensions expand the Industry Resilience platform without modifying core services. The `manifest.json` file declares built-in modules so automation can discover available connectors, instrumentation hooks, and scenario planners.
 
 To add a new extension:
 
