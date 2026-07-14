@@ -26,7 +26,9 @@ def require_mapping(value: object, *, context: str) -> Mapping[str, Any]:
 def require_sequence(value: object, *, context: str) -> Sequence[Any]:
     """Return ``value`` as a non-string sequence or raise a contract error."""
 
-    if isinstance(value, str | bytes | bytearray) or not isinstance(value, Sequence):
+    if isinstance(value, str | bytes | bytearray) or not isinstance(
+        value, Sequence
+    ):
         raise ContractValidationError(f"{context} must be an array.")
     return value
 
@@ -35,10 +37,14 @@ def require_nonempty_text(value: object, *, field: str, context: str) -> str:
     """Validate and return a required textual field."""
 
     if value is None:
-        raise ContractValidationError(f"{context} is missing required field '{field}'.")
+        raise ContractValidationError(
+            f"{context} is missing required field '{field}'."
+        )
     text = str(value).strip()
     if not text:
-        raise ContractValidationError(f"{context} field '{field}' must not be empty.")
+        raise ContractValidationError(
+            f"{context} field '{field}' must not be empty."
+        )
     return text
 
 
@@ -50,27 +56,42 @@ def require_positive_year(value: object, *, field: str, context: str) -> int:
         numeric = Decimal(text)
     except InvalidOperation as exc:
         raise ContractValidationError(
-            f"{context} field '{field}' must be an integer year; received {text!r}."
+            f"{context} field '{field}' must be an integer year; "
+            f"received {text!r}."
         ) from exc
-    if not numeric.is_finite() or numeric != numeric.to_integral_value() or numeric <= 0:
+    if (
+        not numeric.is_finite()
+        or numeric != numeric.to_integral_value()
+        or numeric <= 0
+    ):
         raise ContractValidationError(
-            f"{context} field '{field}' must be a positive integer year; received {text!r}."
+            f"{context} field '{field}' must be a positive integer year; "
+            f"received {text!r}."
         )
     return int(numeric)
 
 
-def require_finite_number(value: object, *, field: str, context: str) -> float:
-    """Validate a finite numeric field while accepting common thousands separators."""
+def require_finite_number(
+    value: object,
+    *,
+    field: str,
+    context: str,
+) -> float:
+    """Validate a finite numeric field with common thousands separators."""
 
     if value is None or isinstance(value, bool):
-        raise ContractValidationError(f"{context} field '{field}' must be numeric.")
+        raise ContractValidationError(
+            f"{context} field '{field}' must be numeric."
+        )
 
     if isinstance(value, int | float):
         numeric = float(value)
     else:
         text = str(value).strip()
         if not text:
-            raise ContractValidationError(f"{context} field '{field}' must be numeric.")
+            raise ContractValidationError(
+                f"{context} field '{field}' must be numeric."
+            )
         cleaned = _NUMERIC_CLEANER.sub("", text.replace("−", "-"))
         try:
             numeric = float(Decimal(cleaned))
