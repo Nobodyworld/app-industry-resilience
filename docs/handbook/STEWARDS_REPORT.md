@@ -1,4 +1,6 @@
-# Steward Report – Idiot Index Platform
+# Historical Steward Report – 2025-11 Snapshot
+
+> **Historical evidence only.** The measurements, command paths, recommendations, and source references below reflect a 2025 repository snapshot and are not current release evidence. Use the latest GitHub Actions runs and [issue #72](https://github.com/Nobodyworld/app-industry-resilience/issues/72) for the validated PUBLIC BETA state.
 
 ## System Metrics
 | Metric | Value | Source |
