@@ -193,9 +193,7 @@ def _census_payload(*rows: object) -> list[object]:
             "must not be empty",
         ),
         (
-            _census_payload(
-                ["311", "Food", "not-numeric", "60", "40"]
-            ),
+            _census_payload(["311", "Food", "not-numeric", "60", "40"]),
             "must be numeric",
         ),
     ],
