@@ -1,14 +1,14 @@
-# Idiot Index Specification
+# Industry Resilience Specification
 
-_Last updated: 2025-10-31_
+_Last updated: 2026-07-14_
 
-The Idiot Index project delivers a Streamlit dashboard and headless API for analysing industry cost efficiency. This specification captures the canonical requirements for maintaining and extending the repository after the restructuring.
+The Industry Resilience project delivers a Streamlit dashboard and headless API for analysing industry cost structure and comparative resilience signals. This specification captures the canonical requirements for maintaining and extending the repository.
 
 ## 1. Architecture Overview
 
 - **Presentation**: `app.py` (Streamlit UI) and the FastAPI-compatible service under `src/interfaces/api`.
 - **Domain Services**: `src/application/idiot_index_service.py` orchestrates data retrieval, normalisation, analytics, and leaderboard generation.
-- **Data Access**: Adapters in `src/adapters/` provide BEA, Census ASM, and sample dataset connectors with caching via `src/cache.py`.
+- **Data Access**: Adapters in `src/adapters/` provide BEA, Census ASM, and sample dataset connectors with caching via `src/core/cache.py`.
 - **Analytics**: `src/core/analytics` offers composite health scoring, resilience metrics, and cohort aggregations consumed by both UI and API layers.
 - **Observability**: Extensions under `src/extensions/` plus infrastructure modules handle metrics, tracing, and snapshot replication.
 - **Agent Surface**: `src/agents/` exposes curated tooling for automation clients, delegating to the application layer while enforcing schema metadata.
@@ -20,9 +20,9 @@ Refer to [`ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md) for diagrams and
 | Workflow | Entry Point | Notes |
 | --- | --- | --- |
 | Streamlit dashboard | `streamlit run app.py` | Uses cached sample data by default; BEA and ASM integrations activate when API keys are supplied. |
-| Headless API | `make api` or `python scripts/run_api.py` | Serves a minimal FastAPI-compatible app on port 9000 with health and observability endpoints. |
-| Scenario planning CLI | `python scripts/run_scenario.py` | Applies shocks to current datasets and emits summary tables. |
-| Observability snapshotting | `python scripts/observability_snapshot.py` | Persists local and remote snapshots with optional replication extensions. |
+| Headless API | `make api` or `python src/scripts/run_api.py` | Serves a minimal FastAPI-compatible app on port 9000 with health and observability endpoints. |
+| Scenario planning CLI | `python src/scripts/run_scenario.py` | Applies shocks to current datasets and emits summary tables. |
+| Observability snapshotting | `python src/scripts/observability_snapshot.py` | Persists local and remote snapshots with optional replication extensions. |
 | Agent integrations | `src/agents/` | Provides dataclass schemas and tool metadata for conversational agents. |
 
 ## 3. Quality Gates
@@ -55,7 +55,7 @@ Each major directory now contains a `README.md` describing its scope:
 
 - [`src/`](../src/README.md) – source code, organised by layer.
 - [`tests/`](../tests/README.md) – pytest suites.
-- [`scripts/`](../src/scripts/README.md) – automation helpers.
+- [`src/scripts/`](../src/scripts/README.md) – automation helpers.
 - [`docs/`](README.md) – documentation hub.
 - [`extensions/`](../extensions/README.md) – manifest-driven plugins.
 - [`data/`](../data/README.md) – sample datasets for offline usage.
@@ -81,7 +81,7 @@ Keep these documents up to date whenever workflows or architecture change.
 ## 8. Extension Ecosystem
 
 - New connectors, instrumentation modules, or replication backends must be registered in `extensions/manifest.json` and implement the appropriate contract under `src/extensions/`.
-- Use `python scripts/scaffold_extension.py --name <snake_case_name>` to bootstrap new modules.
+- Use `python src/scripts/scaffold_extension.py --name <snake_case_name>` to bootstrap new modules.
 - Verify catalog output with `make extensions-catalog` and `make connectors-catalog`.
 
 ## 9. Release & Reporting Requirements
