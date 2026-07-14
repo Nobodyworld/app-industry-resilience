@@ -1,0 +1,50 @@
+name: CI Diagnostics
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Capture Quality Diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Capture diagnostic outputs
+        shell: bash
+        run: |
+          mkdir -p build/ci-diagnostics
+          set +e
+          python -m black --check app.py src tests > build/ci-diagnostics/black.log 2>&1
+          echo $? > build/ci-diagnostics/black.exit
+          python -m ruff check app.py src tests > build/ci-diagnostics/ruff.log 2>&1
+          echo $? > build/ci-diagnostics/ruff.exit
+          python -m mypy src > build/ci-diagnostics/mypy.log 2>&1
+          echo $? > build/ci-diagnostics/mypy.exit
+          python -m pytest -q tests/test_adapter_contract_validation.py > build/ci-diagnostics/pytest.log 2>&1
+          echo $? > build/ci-diagnostics/pytest.exit
+          set -e
+
+      - name: Upload diagnostic outputs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ci-diagnostics
+          path: build/ci-diagnostics
