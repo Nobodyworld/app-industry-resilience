@@ -43,7 +43,7 @@ def require_nonempty_text(value: object, *, field: str, context: str) -> str:
 
 
 def require_positive_year(value: object, *, field: str, context: str) -> int:
-    """Validate a positive integral year value."""
+    """Validate a finite positive integral year value."""
 
     text = require_nonempty_text(value, field=field, context=context)
     try:
@@ -52,7 +52,7 @@ def require_positive_year(value: object, *, field: str, context: str) -> int:
         raise ContractValidationError(
             f"{context} field '{field}' must be an integer year; received {text!r}."
         ) from exc
-    if numeric != numeric.to_integral_value() or numeric <= 0:
+    if not numeric.is_finite() or numeric != numeric.to_integral_value() or numeric <= 0:
         raise ContractValidationError(
             f"{context} field '{field}' must be a positive integer year; received {text!r}."
         )
