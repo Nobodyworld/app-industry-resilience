@@ -1,5 +1,7 @@
 # U.S. Industry Cost Structure & Resilience Dashboard
 
+> **Status: PUBLIC BETA** — Functional and actively developed. The analytical metrics are experimental and should not be treated as financial, investment, credit, or policy advice.
+
 This repository demonstrates practical economic and financial analysis engineering using U.S. government industry datasets. It provides an interactive Streamlit dashboard and a headless API for reproducible metric calculation, scenario comparison, and release-grade validation.
 
 Problem addressed: compare industry input intensity and operating structure across sectors using transparent ratio-based metrics that can be recalculated under explicit scenario assumptions.
