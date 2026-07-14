@@ -41,11 +41,12 @@ Use `make format`, `make lint`, `make typecheck`, or `make test` for targeted de
 
 - Configuration values are centralised in `src/core/config.py` with environment variable overrides. Key settings include API credentials, rate limiter backend, observability replication targets, and dtype overrides.
 - `.env` files are not committed; developers should export variables locally when required.
-- JSON/TOML configuration files:
+- Maintained repository configuration files include:
   - `extensions/manifest.json` – declares available extensions.
-  - `MASTER-VERSIONS.json` – records dependency alignment snapshots.
-  - `pyproject.toml` – Python packaging metadata.
-  - `codex_chain.json` – automation hints for Codex agents.
+  - `pyproject.toml` – Python packaging, formatter, linter, type-checker, pytest, coverage, and Commitizen metadata.
+  - `config/.pre-commit-config.yaml` – local hook definitions.
+  - `config/.secrets.baseline` – the reviewed `detect-secrets` baseline.
+  - `.github/dependabot.yml` – bounded dependency-update policy.
 
 Validate JSON with `python -m json.tool <file>`. Validate TOML with a short `tomllib` load, for example:
 
@@ -55,7 +56,7 @@ python -c "import pathlib, tomllib; tomllib.loads(pathlib.Path('pyproject.toml')
 
 ## 5. Repository Layout
 
-Each major directory now contains a `README.md` describing its scope:
+Each major directory contains a `README.md` or maintained guide describing its scope:
 
 - [`src/`](../src/README.md) – source code, organised by layer.
 - [`tests/`](../tests/README.md) – pytest suites.
@@ -69,6 +70,7 @@ Each major directory now contains a `README.md` describing its scope:
 ## 6. Documentation
 
 - The root [`README.md`](../README.md) provides onboarding, command references, and environment configuration tips.
+- Root [`SPEC.md`](../SPEC.md) is the concise authoritative repository specification; this document supplies the detailed architecture and maintenance reference.
 - [`handbook/`](handbook/README.md) hosts canonical guides for architecture, automation, releases, and security.
 - [`execplans/`](execplans/README.md) archives historical execution plans, including the repository cleanup and validation pass described in the latest entry of [`CHANGELOG.md`](CHANGELOG.md).
 - [`exec/`](exec/README.md) captures stakeholder-facing summaries and status reports.
@@ -93,6 +95,6 @@ Keep these documents up to date whenever workflows or architecture change.
 - Update [`CHANGELOG.md`](CHANGELOG.md) for every meaningful change.
 - Track task completion in [`TASKLIST.md`](../TASKLIST.md) using the provided format.
 - Provide execution context in [`execplans/`](execplans/README.md) when undertaking significant refactors.
-- Adhere to coding conventions in [`STYLE-GUIDE.md`](STYLE-GUIDE.md) and document any deviations in an ADR or the changelog.
+- Adhere to coding conventions in root [`STYLE-GUIDE.md`](../STYLE-GUIDE.md), detailed [`STYLE-GUIDE.md`](STYLE-GUIDE.md), and [`CONTRIBUTING.md`](CONTRIBUTING.md); document justified deviations in an ADR or the changelog.
 
-This specification should be treated as the authoritative reference for repository expectations. Revisit and update it as architecture or processes evolve.
+This specification should be treated as the detailed reference supporting the authoritative root `SPEC.md`. Revisit both documents as architecture or processes evolve.
