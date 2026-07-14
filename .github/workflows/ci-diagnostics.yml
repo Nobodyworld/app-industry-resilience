@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   diagnose:
-    name: Capture Quality Diagnostics
+    name: Capture Formatted Files
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -27,24 +27,33 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Capture diagnostic outputs
+      - name: Generate exact formatted files
         shell: bash
         run: |
-          mkdir -p build/ci-diagnostics
-          set +e
-          python -m black --check app.py src tests > build/ci-diagnostics/black.log 2>&1
-          echo $? > build/ci-diagnostics/black.exit
-          python -m ruff check app.py src tests > build/ci-diagnostics/ruff.log 2>&1
-          echo $? > build/ci-diagnostics/ruff.exit
-          python -m mypy src > build/ci-diagnostics/mypy.log 2>&1
-          echo $? > build/ci-diagnostics/mypy.exit
-          python -m pytest -q tests/test_adapter_contract_validation.py > build/ci-diagnostics/pytest.log 2>&1
-          echo $? > build/ci-diagnostics/pytest.exit
-          set -e
+          mkdir -p build/black-formatted/src/adapters build/black-formatted/tests
+          cp src/adapters/_contracts.py build/black-formatted/src/adapters/_contracts.py
+          cp src/adapters/bea.py build/black-formatted/src/adapters/bea.py
+          cp src/adapters/census_asm.py build/black-formatted/src/adapters/census_asm.py
+          cp tests/test_adapter_contract_validation.py build/black-formatted/tests/test_adapter_contract_validation.py
+          python - <<'PY'
+          from pathlib import Path
 
-      - name: Upload diagnostic outputs
-        if: ${{ always() }}
+          path = Path("build/black-formatted/src/adapters/bea.py")
+          content = path.read_text(encoding="utf-8")
+          old = "    if isinstance(year, int):\n        years = (year,)\n"
+          new = "    years: tuple[int, ...]\n    if isinstance(year, int):\n        years = (year,)\n"
+          if old not in content:
+              raise SystemExit("Unable to locate _ensure_years assignment")
+          path.write_text(content.replace(old, new, 1), encoding="utf-8")
+          PY
+          python -m black build/black-formatted/src/adapters/_contracts.py \
+            build/black-formatted/src/adapters/bea.py \
+            build/black-formatted/src/adapters/census_asm.py \
+            build/black-formatted/tests/test_adapter_contract_validation.py
+          python -m black --check build/black-formatted
+
+      - name: Upload formatted files
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ci-diagnostics
-          path: build/ci-diagnostics
+          name: black-formatted
+          path: build/black-formatted
