@@ -76,7 +76,8 @@ def fetch_asm_manufacturing(
     if year_result.value not in config.supported_years_census:
         raise CensusASMClientError(
             f"Year {year_result.value} is outside supported Census ASM range "
-            f"{config.supported_years_census.start}-{config.supported_years_census.stop - 1}."
+            f"{config.supported_years_census.start}-"
+            f"{config.supported_years_census.stop - 1}."
         )
 
     options = normalization or NormalizationOptions()
@@ -88,7 +89,9 @@ def fetch_asm_manufacturing(
         if cached_result is not None:
             if isinstance(cached_result, Mapping):
                 frame = pd.DataFrame(cached_result.get("records", []))
-                frame.attrs["census_asm_metadata"] = dict(cached_result.get("metadata", {}))
+                frame.attrs["census_asm_metadata"] = dict(
+                    cached_result.get("metadata", {})
+                )
                 return frame
             return pd.DataFrame(cached_result)
 
@@ -106,12 +109,13 @@ def fetch_asm_manufacturing(
             asm_endpoint = candidate_template.format(year=year_value)
         except KeyError as exc:  # pragma: no cover - guarded by config validation
             raise CensusASMClientError(
-                "Census ASM endpoint template is misconfigured; expected '{year}' placeholder."
+                "Census ASM endpoint template is misconfigured; "
+                "expected '{year}' placeholder."
             ) from exc
 
     try:
         payload = safe_get_json(asm_endpoint, params=params)
-    except Exception as exc:  # pragma: no cover - network failures are mocked in tests
+    except Exception as exc:  # pragma: no cover - network failures are mocked
         raise CensusASMClientError(
             f"Failed to fetch Census ASM data for year {year_value}: {exc}"
         ) from exc
@@ -156,20 +160,32 @@ def _validate_census_payload(
     """Validate the Census list-of-lists response contract."""
 
     if isinstance(payload, Mapping):
-        detail = payload.get("error") or payload.get("message") or "unexpected object response"
-        raise CensusASMClientError(f"Census ASM API error for year {year}: {detail}")
+        detail = (
+            payload.get("error")
+            or payload.get("message")
+            or "unexpected object response"
+        )
+        raise CensusASMClientError(
+            f"Census ASM API error for year {year}: {detail}"
+        )
 
     try:
-        outer = require_sequence(payload, context=f"Census ASM response for year {year}")
+        outer = require_sequence(
+            payload,
+            context=f"Census ASM response for year {year}",
+        )
     except ContractValidationError as exc:
         raise CensusASMClientError(str(exc)) from exc
 
     if len(outer) < 2:
-        raise CensusASMClientError(f"No Census ASM data rows were returned for year {year}.")
+        raise CensusASMClientError(
+            f"No Census ASM data rows were returned for year {year}."
+        )
 
     try:
         header_values = require_sequence(
-            outer[0], context=f"Census ASM header for year {year}"
+            outer[0],
+            context=f"Census ASM header for year {year}",
         )
         header = [
             require_nonempty_text(
@@ -183,7 +199,9 @@ def _validate_census_payload(
         raise CensusASMClientError(str(exc)) from exc
 
     if len(set(header)) != len(header):
-        raise CensusASMClientError(f"Census ASM header for year {year} contains duplicate columns.")
+        raise CensusASMClientError(
+            f"Census ASM header for year {year} contains duplicate columns."
+        )
 
     missing = [field for field in _REQUIRED_FIELDS if field not in header]
     if missing:
@@ -199,21 +217,34 @@ def _validate_census_payload(
             row = list(require_sequence(raw_row, context=context))
             if len(row) != len(header):
                 raise ContractValidationError(
-                    f"{context} has {len(row)} values but the header has {len(header)} columns."
+                    f"{context} has {len(row)} values but the header has "
+                    f"{len(header)} columns."
                 )
             record = dict(zip(header, row, strict=True))
-            require_nonempty_text(record["NAICS2017"], field="NAICS2017", context=context)
             require_nonempty_text(
-                record["NAICS2017_LABEL"], field="NAICS2017_LABEL", context=context
+                record["NAICS2017"],
+                field="NAICS2017",
+                context=context,
+            )
+            require_nonempty_text(
+                record["NAICS2017_LABEL"],
+                field="NAICS2017_LABEL",
+                context=context,
             )
             for field in _NUMERIC_FIELDS:
-                require_finite_number(record[field], field=field, context=context)
+                require_finite_number(
+                    record[field],
+                    field=field,
+                    context=context,
+                )
         except ContractValidationError as exc:
             raise CensusASMClientError(str(exc)) from exc
         validated_rows.append(row)
 
     if not validated_rows:
-        raise CensusASMClientError(f"No Census ASM data rows were returned for year {year}.")
+        raise CensusASMClientError(
+            f"No Census ASM data rows were returned for year {year}."
+        )
     return header, validated_rows
 
 
