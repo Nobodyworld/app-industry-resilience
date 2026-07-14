@@ -46,7 +46,10 @@ from ._contracts import (
     require_sequence,
 )
 
-_HEADERS = {"Accept-Encoding": "gzip, deflate", "User-Agent": "industry-resilience/1.0"}
+_HEADERS = {
+    "Accept-Encoding": "gzip, deflate",
+    "User-Agent": "industry-resilience/1.0",
+}
 _HEALTH_PARAMS = {
     "method": "GetParameterValues",
     "datasetname": "GDPbyIndustry",
@@ -104,7 +107,11 @@ class BEARequestContext:
 
 
 BEA_TABLES: tuple[BEATable, ...] = (
-    BEATable(table_id="1", description="GDPbyIndustry Table 1", value_column="gross_output"),
+    BEATable(
+        table_id="1",
+        description="GDPbyIndustry Table 1",
+        value_column="gross_output",
+    ),
     BEATable(
         table_id="2",
         description="GDPbyIndustry Table 2",
@@ -119,7 +126,7 @@ def fetch_go_ii_by_industry(
     *,
     normalization: NormalizationOptions | None = None,
 ) -> pd.DataFrame:
-    """Fetch validated Gross Output and Intermediate Inputs for one or more years."""
+    """Fetch validated output and input values for one or more years."""
 
     start_time = time.time()
     config = load_config()
@@ -138,7 +145,8 @@ def fetch_go_ii_by_industry(
         if result.value not in config.supported_years_bea:
             raise BEAClientError(
                 f"Year {result.value} is outside supported BEA range "
-                f"{config.supported_years_bea.start}-{config.supported_years_bea.stop - 1}."
+                f"{config.supported_years_bea.start}-"
+                f"{config.supported_years_bea.stop - 1}."
             )
         years_clean.append(result.value)
     years_tuple = tuple(years_clean)
@@ -152,7 +160,9 @@ def fetch_go_ii_by_industry(
             log_cache_hit(cache_key, "api")
             if isinstance(cached_payload, Mapping):
                 frame = pd.DataFrame(cached_payload.get("records", []))
-                frame.attrs["bea_metadata"] = dict(cached_payload.get("metadata", {}))
+                frame.attrs["bea_metadata"] = dict(
+                    cached_payload.get("metadata", {})
+                )
             else:
                 frame = pd.DataFrame(cached_payload)
             log_performance("BEA API fetch (cached)", time.time() - start_time)
@@ -163,7 +173,10 @@ def fetch_go_ii_by_industry(
     data_frames: list[pd.DataFrame] = []
     metadata_notes: list[str] = []
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(years_tuple), 4)) as executor:
+    max_workers = min(len(years_tuple), 4)
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=max_workers
+    ) as executor:
         futures = {
             executor.submit(
                 _fetch_year_bundle,
@@ -181,8 +194,14 @@ def fetch_go_ii_by_industry(
             except BEAClientError:
                 raise
             except Exception as exc:  # pragma: no cover - defensive context
-                logger.error("Failed to fetch BEA data for %s: %s", year_value, exc)
-                raise BEAClientError(f"Failed to fetch BEA data for year {year_value}: {exc}") from exc
+                logger.error(
+                    "Failed to fetch BEA data for %s: %s",
+                    year_value,
+                    exc,
+                )
+                raise BEAClientError(
+                    f"Failed to fetch BEA data for year {year_value}: {exc}"
+                ) from exc
             data_frames.append(year_frame)
             metadata_notes.extend(year_meta.get("notes", []))
 
@@ -193,8 +212,11 @@ def fetch_go_ii_by_industry(
     combined = _enrich_with_naics_map(combined)
     unmapped_codes = sorted(
         combined.loc[
-            combined["naics_mapping_status"] == "unmapped", "industry_code"
-        ].astype(str).unique()
+            combined["naics_mapping_status"] == "unmapped",
+            "industry_code",
+        ]
+        .astype(str)
+        .unique()
     )
     if unmapped_codes:
         logger.warning(
@@ -203,7 +225,8 @@ def fetch_go_ii_by_industry(
             ", ".join(unmapped_codes[:10]),
         )
         metadata_notes.append(
-            f"NAICS enrichment used provider-label fallback for {len(unmapped_codes)} code(s)."
+            "NAICS enrichment used provider-label fallback for "
+            f"{len(unmapped_codes)} code(s)."
         )
 
     combined["materials_cost"] = pd.NA
@@ -215,7 +238,9 @@ def fetch_go_ii_by_industry(
             dtype_overrides=options.dtype_overrides,
         )
     except (TypeError, ValueError) as exc:
-        raise BEAClientError(f"Validated BEA data failed normalization: {exc}") from exc
+        raise BEAClientError(
+            f"Validated BEA data failed normalization: {exc}"
+        ) from exc
 
     metadata = {
         "years": years_tuple,
@@ -230,11 +255,17 @@ def fetch_go_ii_by_industry(
     if cache:
         cache.set(
             cache_key,
-            {"records": combined.to_dict(orient="records"), "metadata": metadata},
+            {
+                "records": combined.to_dict(orient="records"),
+                "metadata": metadata,
+            },
         )
 
     log_performance("BEA API fetch", time.time() - start_time)
-    log_data_processing("BEA industry processing", records_processed=len(combined))
+    log_data_processing(
+        "BEA industry processing",
+        records_processed=len(combined),
+    )
     return combined
 
 
@@ -248,18 +279,28 @@ def select_bea_endpoint(config: AppConfig) -> str:
                 base_url,
                 params={
                     **_HEALTH_PARAMS,
-                    **({"v": config.bea_api_version} if config.bea_api_version else {}),
+                    **(
+                        {"v": config.bea_api_version}
+                        if config.bea_api_version
+                        else {}
+                    ),
                 },
                 headers=_HEADERS,
                 timeout=10.0,
             )
-        except Exception as exc:  # pragma: no cover - network errors mocked in tests
-            logger.warning("BEA endpoint health check failed for %s: %s", base_url, exc)
+        except Exception as exc:  # pragma: no cover - network errors mocked
+            logger.warning(
+                "BEA endpoint health check failed for %s: %s",
+                base_url,
+                exc,
+            )
             errors.append(f"{base_url}: {exc}")
             continue
         logger.debug("BEA endpoint healthy: %s", base_url)
         return base_url
-    raise BEAClientError("All BEA endpoints failed health check: " + "; ".join(errors))
+    raise BEAClientError(
+        "All BEA endpoints failed health check: " + "; ".join(errors)
+    )
 
 
 def _fetch_year_bundle(
@@ -270,13 +311,22 @@ def _fetch_year_bundle(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Fetch both required BEA tables for ``year`` and return merged rows."""
 
-    context = BEARequestContext(base_url=base_url, api_key=api_key, year=year, config=config)
+    context = BEARequestContext(
+        base_url=base_url,
+        api_key=api_key,
+        year=year,
+        config=config,
+    )
     frames: list[pd.DataFrame] = []
     notes_groups: list[list[str]] = []
 
     for table in BEA_TABLES:
         params = context.build_params(table)
-        rows, metadata = _fetch_table(base_url, params, description=table.description)
+        rows, metadata = _fetch_table(
+            base_url,
+            params,
+            description=table.description,
+        )
         frame = _process_bea_table(
             rows,
             value_column=table.value_column,
@@ -286,7 +336,9 @@ def _fetch_year_bundle(
         notes_groups.append(list(metadata.get("notes", [])))
 
     if len(frames) != len(BEA_TABLES):
-        raise BEAClientError(f"Incomplete BEA table set returned for year {year}.")
+        raise BEAClientError(
+            f"Incomplete BEA table set returned for year {year}."
+        )
 
     go_df, ii_df = frames
     merged = go_df.merge(
@@ -296,7 +348,9 @@ def _fetch_year_bundle(
         validate="one_to_one",
     )
     if merged.empty:
-        raise BEAClientError(f"BEA returned no merged industry rows for year {year}.")
+        raise BEAClientError(
+            f"BEA returned no merged industry rows for year {year}."
+        )
     merged["source"] = "BEA (Economy-wide)"
     return merged, {"notes": _merge_metadata_notes(*notes_groups)}
 
@@ -313,7 +367,11 @@ def _fetch_table(
     rows: list[dict[str, Any]] = []
     notes: list[str] = []
     page_params: MutableMapping[str, str] = dict(params)
-    retry_policy = RetryPolicy(max_attempts=3, base_delay=1.0, backoff_factor=2.0)
+    retry_policy = RetryPolicy(
+        max_attempts=3,
+        base_delay=1.0,
+        backoff_factor=2.0,
+    )
 
     while True:
         api_limiter.wait_for_api("bea")
@@ -324,8 +382,12 @@ def _fetch_table(
                 headers=_HEADERS,
                 retry_policy=retry_policy,
             )
-        except Exception as exc:  # pragma: no cover - network exceptions mocked in tests
-            safe_params = {key: value for key, value in page_params.items() if key != "UserID"}
+        except Exception as exc:  # pragma: no cover - network failures mocked
+            safe_params = {
+                key: value
+                for key, value in page_params.items()
+                if key != "UserID"
+            }
             raise BEAClientError(
                 f"Failed to fetch {description} with params {safe_params}: {exc}"
             ) from exc
@@ -348,8 +410,14 @@ def _parse_bea_response(
 
     try:
         root = require_mapping(payload, context="BEA API response")
-        bea_api = require_mapping(root.get("BEAAPI"), context="BEAAPI envelope")
-        results = require_mapping(bea_api.get("Results"), context="BEA Results")
+        bea_api = require_mapping(
+            root.get("BEAAPI"),
+            context="BEAAPI envelope",
+        )
+        results = require_mapping(
+            bea_api.get("Results"),
+            context="BEA Results",
+        )
     except ContractValidationError as exc:
         raise BEAClientError(str(exc)) from exc
 
@@ -357,7 +425,10 @@ def _parse_bea_response(
         error = results["Error"]
         if isinstance(error, Mapping):
             code = error.get("APIErrorCode", "Unknown")
-            description = error.get("APIErrorDescription", "Unknown error")
+            description = error.get(
+                "APIErrorDescription",
+                "Unknown error",
+            )
         else:
             code = "Unknown"
             description = str(error)
@@ -366,7 +437,10 @@ def _parse_bea_response(
     if "Data" not in results:
         raise BEAClientError("BEA Results is missing required 'Data' rows.")
     try:
-        data_rows = require_sequence(results["Data"], context="BEA Results.Data")
+        data_rows = require_sequence(
+            results["Data"],
+            context="BEA Results.Data",
+        )
     except ContractValidationError as exc:
         raise BEAClientError(str(exc)) from exc
     if not data_rows:
@@ -378,7 +452,10 @@ def _parse_bea_response(
 
     notes: list[str] = []
     raw_notes = results.get("Notes") or []
-    if isinstance(raw_notes, Sequence) and not isinstance(raw_notes, str | bytes | bytearray):
+    if isinstance(raw_notes, Sequence) and not isinstance(
+        raw_notes,
+        str | bytes | bytearray,
+    ):
         for note in raw_notes:
             if isinstance(note, Mapping):
                 text = str(note.get("Text", "")).strip()
@@ -396,25 +473,45 @@ def _parse_bea_response(
     return parsed_rows, notes, next_page
 
 
-def _validate_bea_row(item: object, *, row_index: int) -> dict[str, Any]:
+def _validate_bea_row(
+    item: object,
+    *,
+    row_index: int,
+) -> dict[str, Any]:
     """Validate required fields on one BEA table row."""
 
     context = f"BEA data row {row_index}"
     try:
         row = require_mapping(item, context=context)
-        missing = [field for field in _BEA_REQUIRED_ROW_FIELDS if field not in row]
+        missing = [
+            field
+            for field in _BEA_REQUIRED_ROW_FIELDS
+            if field not in row
+        ]
         if missing:
             raise ContractValidationError(
                 f"{context} is missing required fields: {', '.join(missing)}."
             )
-        code = require_nonempty_text(row["Industry"], field="Industry", context=context)
+        code = require_nonempty_text(
+            row["Industry"],
+            field="Industry",
+            context=context,
+        )
         label = require_nonempty_text(
             row["IndustrYDescription"],
             field="IndustrYDescription",
             context=context,
         )
-        year = require_positive_year(row["Year"], field="Year", context=context)
-        value = require_finite_number(row["DataValue"], field="DataValue", context=context)
+        year = require_positive_year(
+            row["Year"],
+            field="Year",
+            context=context,
+        )
+        value = require_finite_number(
+            row["DataValue"],
+            field="DataValue",
+            context=context,
+        )
     except ContractValidationError as exc:
         raise BEAClientError(str(exc)) from exc
 
@@ -435,7 +532,9 @@ def _process_bea_table(
     """Convert validated BEA table rows into canonical numeric columns."""
 
     if not data:
-        raise BEAClientError(f"BEA table for '{value_column}' contains no rows.")
+        raise BEAClientError(
+            f"BEA table for '{value_column}' contains no rows."
+        )
 
     records: list[dict[str, Any]] = []
     for index, raw in enumerate(data, start=1):
@@ -443,7 +542,8 @@ def _process_bea_table(
         row_year = int(row["Year"])
         if expected_year is not None and row_year != expected_year:
             raise BEAClientError(
-                f"BEA data row {index} reports year {row_year}; expected {expected_year}."
+                f"BEA data row {index} reports year {row_year}; "
+                f"expected {expected_year}."
             )
         records.append(
             {
@@ -455,9 +555,12 @@ def _process_bea_table(
         )
 
     frame = pd.DataFrame.from_records(records)
-    if frame.duplicated(["industry_code", "industry_name", "year"]).any():
+    if frame.duplicated(
+        ["industry_code", "industry_name", "year"]
+    ).any():
         raise BEAClientError(
-            f"BEA table for '{value_column}' contains duplicate industry/year rows."
+            f"BEA table for '{value_column}' contains duplicate "
+            "industry/year rows."
         )
     return frame
 
@@ -466,17 +569,24 @@ def _process_bea_table(
 def _load_naics_map() -> pd.DataFrame:
     """Load and validate the NAICS lookup table used to enrich BEA results."""
 
-    mapping = pd.read_csv("assets/naics_map.csv", dtype={"industry_code": "string"})
+    mapping = pd.read_csv(
+        "assets/naics_map.csv",
+        dtype={"industry_code": "string"},
+    )
     required = {"industry_code", "industry_name", "bea_group"}
     missing = sorted(required.difference(mapping.columns))
     if missing:
-        raise BEAClientError("NAICS mapping file is missing columns: " + ", ".join(missing))
-    mapping["industry_code"] = mapping["industry_code"].astype(str).str.strip()
+        raise BEAClientError(
+            "NAICS mapping file is missing columns: " + ", ".join(missing)
+        )
+    mapping["industry_code"] = (
+        mapping["industry_code"].astype(str).str.strip()
+    )
     return mapping
 
 
 def _enrich_with_naics_map(df: pd.DataFrame) -> pd.DataFrame:
-    """Attach sector metadata while preserving provider labels and unknown codes."""
+    """Attach sector metadata while preserving provider labels and codes."""
 
     mapping_records = _load_naics_map().to_dict(orient="records")
     enriched = df.copy()
@@ -506,7 +616,7 @@ def _find_naics_mapping(
     industry_code: str,
     mapping_records: Sequence[Mapping[str, Any]],
 ) -> Mapping[str, Any] | None:
-    """Resolve exact, two-digit, and two-digit-range NAICS map entries."""
+    """Resolve exact, two-digit, and two-digit-range map entries."""
 
     code = industry_code.strip()
     for record in mapping_records:
@@ -521,15 +631,23 @@ def _find_naics_mapping(
     for record in mapping_records:
         mapping_code = str(record.get("industry_code", "")).strip()
         range_match = _NAICS_RANGE.match(mapping_code)
-        if range_match and int(range_match.group(1)) <= prefix <= int(range_match.group(2)):
+        if range_match and (
+            int(range_match.group(1))
+            <= prefix
+            <= int(range_match.group(2))
+        ):
             return record
-        if mapping_code.isdigit() and len(mapping_code) == 2 and int(mapping_code) == prefix:
+        if (
+            mapping_code.isdigit()
+            and len(mapping_code) == 2
+            and int(mapping_code) == prefix
+        ):
             return record
     return None
 
 
 def _ensure_years(year: int | Iterable[int]) -> tuple[int, ...]:
-    """Normalise the ``year`` argument into a validated tuple of integers."""
+    """Normalise the ``year`` argument into a validated integer tuple."""
 
     if isinstance(year, int):
         years = (year,)
@@ -540,7 +658,9 @@ def _ensure_years(year: int | Iterable[int]) -> tuple[int, ...]:
             raise BEAClientError(f"Invalid BEA year value: {year}") from exc
 
     if not years:
-        raise BEAClientError("At least one year must be provided for BEA fetch.")
+        raise BEAClientError(
+            "At least one year must be provided for BEA fetch."
+        )
     if any(item <= 0 for item in years):
         raise BEAClientError("Years must be positive integers for BEA fetch.")
     if len(set(years)) != len(years):
@@ -551,7 +671,9 @@ def _ensure_years(year: int | Iterable[int]) -> tuple[int, ...]:
 def _cache_key(years: Sequence[int], version: str | None) -> str:
     """Return a stable cache key for a set of years and API version."""
 
-    years_component = "_".join(str(value) for value in sorted(set(years)))
+    years_component = "_".join(
+        str(value) for value in sorted(set(years))
+    )
     version_component = version or "default"
     return f"bea_go_ii_{years_component}_v{version_component}"
 
@@ -568,4 +690,8 @@ def _merge_metadata_notes(*note_groups: Sequence[str]) -> list[str]:
     return list(ordered.keys())
 
 
-__all__: tuple[str, ...] = ("BEAClientError", "fetch_go_ii_by_industry", "select_bea_endpoint")
+__all__: tuple[str, ...] = (
+    "BEAClientError",
+    "fetch_go_ii_by_industry",
+    "select_bea_endpoint",
+)
