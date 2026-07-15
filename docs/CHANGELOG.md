@@ -1,5 +1,9 @@
 # Changelog
 
+# 2026-07-15 – Automatic metric computation observability
+- Added bounded Streamlit auto-compute telemetry and a deterministic dependency-free benchmark
+  gate, while ensuring disabled-cache metric computation does not initialize the external cache.
+
 # 2025-11-12 – Connector catalog & automation scaffolds
 - Introduced a connector registry and `ConnectorExtension` contract so integrations publish metadata, health checks, and capabilities that surface via `/meta/connectors`, observability digests, Streamlit, and the new `make connectors-catalog` CLI.
 - Added a built-in connector catalog covering the bundled sample dataset, BEA API, and Census ASM source along with health diagnostics that flag missing credentials or stale datasets.

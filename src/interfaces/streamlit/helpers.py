@@ -15,9 +15,21 @@ import pandas as pd
 from src.application.scenario_planner import ScenarioResult
 from src.core import HealthSummary
 from src.core.metrics import MetricConfig, compute_metrics
+from src.infrastructure.observability import bootstrap_observability
 from src.infrastructure.observability.storage import (
     ObservabilitySnapshot,
     SnapshotStorage,
+)
+
+_AUTO_COMPUTE_METRIC = "industry_resilience_streamlit_auto_compute_total"
+_AUTO_COMPUTE_HELPERS = frozenset(
+    {
+        "build_comparison_table",
+        "calculate_benchmark",
+        "prepare_trend_data",
+        "build_scenario_comparison_table_baseline",
+        "build_scenario_comparison_table_scenario",
+    }
 )
 
 
@@ -107,7 +119,7 @@ def build_comparison_table(
     """Return metrics for ``selected_codes`` suitable for side-by-side display."""
 
     # Ensure dataframe contains derived metrics required by the UI helpers.
-    df = _ensure_metrics(df)
+    df = _ensure_metrics(df, helper="build_comparison_table")
 
     if not selected_codes:
         return pd.DataFrame(
@@ -144,7 +156,7 @@ def build_comparison_table(
 def calculate_benchmark(df: pd.DataFrame, industry_code: str | None) -> Mapping[str, float | None]:
     """Compute dataset benchmark values and optional industry deltas."""
 
-    df = _ensure_metrics(df)
+    df = _ensure_metrics(df, helper="calculate_benchmark")
 
     benchmark: dict[str, float | None] = {
         "idiot_index_avg": df["idiot_index"].mean(skipna=True),
@@ -288,7 +300,7 @@ def prepare_trend_data(
 ) -> pd.DataFrame:
     """Return time-series data for the provided industry codes."""
 
-    df = _ensure_metrics(df)
+    df = _ensure_metrics(df, helper="prepare_trend_data")
 
     if not selected_codes:
         return pd.DataFrame(columns=["year", "industry_name", "idiot_index"])
@@ -322,8 +334,8 @@ def build_scenario_comparison_table(
 ) -> pd.DataFrame:
     """Return baseline vs scenario metrics with delta columns."""
 
-    baseline = _ensure_metrics(result.baseline)
-    scenario = _ensure_metrics(result.scenario)
+    baseline = _ensure_metrics(result.baseline, helper="build_scenario_comparison_table_baseline")
+    scenario = _ensure_metrics(result.scenario, helper="build_scenario_comparison_table_scenario")
 
     if focus_codes:
         baseline = baseline[baseline["industry_code"].isin(focus_codes)]
@@ -365,7 +377,7 @@ def build_scenario_comparison_table(
     return pd.DataFrame(rows)
 
 
-def _ensure_metrics(df: pd.DataFrame) -> pd.DataFrame:
+def _ensure_metrics(df: pd.DataFrame, *, helper: str) -> pd.DataFrame:
     """Ensure the DataFrame has computed derived metrics.
 
     If derived metric columns are missing, compute them using compute_metrics
@@ -379,12 +391,19 @@ def _ensure_metrics(df: pd.DataFrame) -> pd.DataFrame:
         "materials_dependency_ratio",
         "shock_sensitivity_index",
     }
+    if helper not in _AUTO_COMPUTE_HELPERS:
+        raise ValueError(f"Unsupported auto-compute helper: {helper}")
     if not required.intersection(set(df.columns)):
         # If df already has some derived columns we still prefer to compute
         # only when none are present; compute_metrics will preserve base data.
         logging.getLogger("idiot_index.helpers").info(
-            "Auto-computing derived metrics for DataFrame passed into UI helper"
+            "Auto-computing derived metrics for Streamlit helper %s (rows=%d)", helper, len(df)
         )
+        bootstrap_observability().counter(
+            _AUTO_COMPUTE_METRIC,
+            "Counts implicit derived-metric calculations initiated by Streamlit helpers.",
+            label_names=("helper",),
+        ).increment(labels={"helper": helper})
         return compute_metrics(df.copy(), config=MetricConfig(use_cache=False))
     return df
 

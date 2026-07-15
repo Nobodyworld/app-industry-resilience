@@ -127,6 +127,19 @@ def test_compute_metrics_handles_zero_denominators() -> None:
     assert pd.isna(result.loc[0, "shock_sensitivity_index"])
 
 
+def test_compute_metrics_without_cache_does_not_initialize_external_cache(monkeypatch) -> None:
+    import src.core.metrics as metrics
+
+    monkeypatch.setattr(
+        metrics, "get_computation_cache", lambda *_: pytest.fail("cache initialized")
+    )
+    result = metrics.compute_metrics(
+        pd.DataFrame({"gross_output": [100.0], "materials_cost": [60.0], "value_added": [40.0]}),
+        config=MetricConfig(use_cache=False),
+    )
+    assert "idiot_index" in result.columns
+
+
 def test_cache_removes_corrupted_entries(tmp_path) -> None:
     cache = Cache(tmp_path, ttl_seconds=60)
     key = "corrupted"
