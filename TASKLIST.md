@@ -41,9 +41,9 @@ Completion note (indented, one line):
 - [x] Refactor metrics to avoid deprecated pandas options | owner: dev | priority: medium | added: 2025-11-14 | closed: 2026-07-14 – Metric calculations explicitly mask invalid denominators and replace infinities without using `mode.use_inf_as_na`. PR: https://github.com/Nobodyworld/app-industry-resilience/pull/75
 - [x] Add a pre-commit config or GitHub Action job to run ruff/black/mypy to avoid style drift | closed: 2026-07-14 – `config/.pre-commit-config.yaml` and the protected hosted `CI / Quality Gate` run Black, Ruff, mypy, tests, coverage, and security scans. PR: https://github.com/Nobodyworld/app-industry-resilience/pull/75
 - [x] Validate upstream schemas and degrade safely for missing NAICS mappings | closed: 2026-07-14 – BEA and Census ASM now validate provider envelopes and rows before normalization; unknown BEA industry codes retain provider labels and receive explicit unmapped metadata. Issue: https://github.com/Nobodyworld/app-industry-resilience/issues/76 — PR: https://github.com/Nobodyworld/app-industry-resilience/pull/81
+- [x] Instrument and benchmark automatic metric computation | closed: 2026-07-15 – Streamlit helper auto-computation now emits bounded telemetry, avoids external-cache initialization when disabled, and is covered by deterministic benchmark ceilings in the protected quality gate. Issue: https://github.com/Nobodyworld/app-industry-resilience/issues/77 — PR: https://github.com/Nobodyworld/app-industry-resilience/pull/83
 
 ## Active workstreams
 
-- [ ] Instrument and benchmark automatic metric computation — issue: [#77](https://github.com/Nobodyworld/app-industry-resilience/issues/77)
 - [ ] Complete the public-beta accessibility, onboarding, and Markdown-quality pass — issue: [#78](https://github.com/Nobodyworld/app-industry-resilience/issues/78)
 - [ ] Define API versioning and end-to-end data lineage — issue: [#79](https://github.com/Nobodyworld/app-industry-resilience/issues/79)
