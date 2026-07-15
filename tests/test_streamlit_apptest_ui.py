@@ -63,6 +63,15 @@ def test_explicit_source_query_and_session_selection_are_preserved() -> None:
     assert app.sidebar.selectbox[0].value == "Sample (offline)"
 
 
+def test_unresolved_source_query_defaults_to_sample() -> None:
+    app = AppTest.from_file("app.py")
+    app.query_params["mode"] = "retired-source"
+    app.run(timeout=30)
+    assert not app.exception
+    assert app.sidebar.selectbox[0].label == "Data source"
+    assert app.sidebar.selectbox[0].value == "Sample (offline)"
+
+
 def test_scenario_idle_and_validation_message() -> None:
     app = _load_app()
 

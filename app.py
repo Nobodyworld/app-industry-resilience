@@ -243,11 +243,13 @@ sidebar_modes = [
     "BEA (Economy-wide)",
 ]
 mode_raw = _last_value("mode")
+resolved_mode: str | None = None
 if mode_raw:
     slug_lookup = {option.lower().replace(" ", "-"): option for option in sidebar_modes}
     resolved_mode = slug_lookup.get(mode_raw)
-    if resolved_mode:
-        st.session_state[SOURCE_SESSION_KEY] = resolved_mode
+
+if resolved_mode:
+    st.session_state[SOURCE_SESSION_KEY] = resolved_mode
 elif SOURCE_SESSION_KEY not in st.session_state:
     st.session_state[SOURCE_SESSION_KEY] = "Sample (offline)"
 

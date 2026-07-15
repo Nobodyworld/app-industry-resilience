@@ -16,7 +16,7 @@ Requires Python 3.13 or newer. Create a virtual environment and install dependen
 
 ### Windows PowerShell
 
-```bash
+```powershell
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
