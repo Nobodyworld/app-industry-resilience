@@ -10,16 +10,29 @@ What the metric does: computes an informal cost-structure ratio (`gross_output /
 
 What the metric does not mean: it is not a credit model, insolvency predictor, or causal macroeconomic forecast. Composite bands are heuristic summaries and must be interpreted with methodology limits.
 
-## Demonstration
+## Quick Start
 
-```bash
+Requires Python 3.13 or newer. Create a virtual environment and install dependencies.
+
+### Windows PowerShell
+
+```powershell
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Open the local Streamlit URL and use the bundled sample dataset for an offline walkthrough. The same core service can be exercised through the API with `python src/scripts/run_api.py`.
+### macOS/Linux Bash
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+streamlit run app.py
+```
+
+On first run, the dashboard opens with **Sample (offline)**, the bundled no-credential dataset. Choose another option from **Data source** only when you need a different dataset. The same core service can be exercised through the API with `python src/scripts/run_api.py`.
 
 Suggested walkthrough in the UI:
 
@@ -28,25 +41,7 @@ Suggested walkthrough in the UI:
 3. In Scenario Lab, set at least one non-zero adjustment, click Run scenario, then use Reset scenario to return to idle state.
 4. Use the export panel for all-rows vs current-view outputs in CSV, JSON, or XLSX.
 
-Offline sample walkthrough command set:
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt -r requirements-dev.txt
-streamlit run app.py
-```
-
 Primary offline source for demos: `data/sample_industries.csv`.
-
-## Quick Start
-
-Requires Python 3.13 or newer.
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
 
 Optional live government adapters use environment variables:
 
@@ -193,6 +188,7 @@ GitHub Actions policy: hosted CI is required for current pull requests and relea
 - [Architecture overview](docs/ARCHITECTURE_OVERVIEW.md)
 - [Operations incident response](docs/OPERATIONS_INCIDENT_RESPONSE.md)
 - [Dependency register](docs/DEPENDENCIES.md)
+- [Public-beta accessibility audit](docs/ACCESSIBILITY_AUDIT.md)
 
 ## Governance and Support
 

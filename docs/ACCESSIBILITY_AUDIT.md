@@ -43,6 +43,12 @@ This connector-based audit did not perform a manual desktop-browser screen-reade
 - Observability charts are accompanied by snapshot-history tables.
 - The source-to-year-to-conditional-input order in the sidebar is logically structured in source code.
 
+## Remediation status (issue #78)
+
+- **Implemented:** A11Y-01, A11Y-02, A11Y-03, A11Y-04, A11Y-05, A11Y-07, and A11Y-08. New sessions begin with the bundled sample source, include a dismissible/reopenable native guide, expose clearer sidebar controls, add the historical-trend table alternative, darken muted text to `#5f7488`, and improve native/ARIA semantics where custom markup remains.
+- **Rendered browser evidence:** The local sample-data session showed the native sidebar source control before the tablist, the guide could be dismissed and reopened, and the single-year Compare caption remained clear. The bundled sample has no multi-year trend to render the table in that session.
+- **Manual verification remains required:** A11Y-06 and the browser/assistive-technology checks below. This implementation does not claim full keyboard traversal, screen-reader, 200% zoom, dark-mode, or Streamlit/Plotly focus verification.
+
 ## Findings
 
 | ID | Severity | Surface | Finding | Required remediation |
