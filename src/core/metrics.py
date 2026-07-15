@@ -37,7 +37,7 @@ def compute_metrics(
     metric_config = config or MetricConfig()
     app_config = load_config()
     cache_instance: Cache | None = cache
-    if cache_instance is None and app_config.cache.enabled:
+    if metric_config.use_cache and cache_instance is None and app_config.cache.enabled:
         cache_instance = get_computation_cache(app_config.cache)
 
     cache_key: str | None = None

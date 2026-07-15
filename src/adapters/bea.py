@@ -14,7 +14,7 @@ import time
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -553,7 +553,7 @@ def _load_naics_map() -> pd.DataFrame:
 def _enrich_with_naics_map(df: pd.DataFrame) -> pd.DataFrame:
     """Attach sector metadata while preserving provider labels and codes."""
 
-    mapping_records = _load_naics_map().to_dict(orient="records")
+    mapping_records = cast(list[Mapping[str, Any]], _load_naics_map().to_dict(orient="records"))
     enriched = df.copy()
     sector_names: list[str] = []
     bea_groups: list[str] = []

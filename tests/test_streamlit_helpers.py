@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from src.core.metrics import MetricConfig, compute_metrics
+from src.infrastructure.observability.instrumentation import ObservabilityRegistry
 from src.infrastructure.observability.storage import ObservabilitySnapshot
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
@@ -213,3 +214,48 @@ def test_build_scenario_comparison_table_auto_compute() -> None:
     assert not table.empty
     assert "idiot_index_baseline" in table.columns
     assert "idiot_index_scenario" in table.columns
+
+
+def test_auto_compute_counter_and_logging_are_bounded(monkeypatch, caplog) -> None:
+    import src.interfaces.streamlit.helpers as helpers
+
+    registry = ObservabilityRegistry()
+    monkeypatch.setattr(helpers, "bootstrap_observability", lambda: registry)
+    with caplog.at_level("INFO", logger="idiot_index.helpers"):
+        build_comparison_table(_sample_df(), ["311"])
+
+    counter = registry.metrics.counters["industry_resilience_streamlit_auto_compute_total"]
+    assert counter.label_names == ("helper",)
+    assert dict(counter.samples()) == {("build_comparison_table",): 1.0}
+    assert "Auto-computing derived metrics" in caplog.text
+    assert "Food" not in caplog.text
+
+
+def test_auto_compute_counter_does_not_increment_when_metrics_present(monkeypatch) -> None:
+    import src.interfaces.streamlit.helpers as helpers
+
+    registry = ObservabilityRegistry()
+    monkeypatch.setattr(helpers, "bootstrap_observability", lambda: registry)
+    build_comparison_table(
+        compute_metrics(_sample_df(), config=MetricConfig(use_cache=False)), ["311"]
+    )
+    assert "industry_resilience_streamlit_auto_compute_total" not in registry.metrics.counters
+
+
+def test_scenario_auto_compute_counter_tracks_baseline_and_scenario(monkeypatch) -> None:
+    import src.interfaces.streamlit.helpers as helpers
+    from src.application.scenario_planner import ScenarioResult
+
+    registry = ObservabilityRegistry()
+    monkeypatch.setattr(helpers, "bootstrap_observability", lambda: registry)
+    base = _sample_df()
+    result = ScenarioResult(base, base.copy(), None, None, None, base, None, None)
+    build_scenario_comparison_table(result)
+
+    samples = dict(
+        registry.metrics.counters["industry_resilience_streamlit_auto_compute_total"].samples()
+    )
+    assert samples == {
+        ("build_scenario_comparison_table_baseline",): 1.0,
+        ("build_scenario_comparison_table_scenario",): 1.0,
+    }

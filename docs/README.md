@@ -15,3 +15,4 @@ Additional quick links:
 
 - [DATA_DICTIONARY.md](DATA_DICTIONARY.md) – field-level definitions, units, and formulas for dashboard datasets.
 - [INDUSTRY_SHOCK_CASE_STUDY.md](INDUSTRY_SHOCK_CASE_STUDY.md) – reproducible scenario walkthrough with interpretation guidance.
+- [PERFORMANCE.md](PERFORMANCE.md) – automatic Streamlit metric computation telemetry and benchmark guidance.

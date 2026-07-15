@@ -1,4 +1,4 @@
-.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage coverage-runtime coverage-full coverage-scripts check pre-commit clean security sbom docs scenario prefetch-cache refresh-official-data analytics observability observability-snapshot audit quality-gate diagnostics
+.PHONY: help install pre-commit-install setup format format-check lint typecheck test coverage coverage-runtime coverage-full coverage-scripts check pre-commit clean security sbom docs scenario prefetch-cache refresh-official-data analytics observability observability-snapshot audit quality-gate diagnostics benchmark-metrics
 
 PYTHON := python
 SKIP_PIP ?= 0
@@ -39,6 +39,7 @@ help:
 	@echo "  extensions-catalog List registered extensions (pass extra args via ARGS=...)"
 	@echo "  connectors-catalog List registered connectors (pass extra args via ARGS=...)"
 	@echo "  audit              Compute stewardship audit metrics (pass extra args via ARGS=...)"
+	@echo "  benchmark-metrics  Benchmark metric computation against conservative ceilings"
 	@echo "  api                Launch the headless API service (pass extra args via ARGS=...)"
 
 install:
@@ -113,6 +114,7 @@ quality-gate:
 	$(MAKE) typecheck
 	$(MAKE) coverage-runtime
 	$(MAKE) coverage-full
+	$(MAKE) benchmark-metrics
 	$(MAKE) security
 
 check: quality-gate
@@ -196,6 +198,9 @@ connectors-catalog:
 # agent-safe-task: generates stewardship metrics for automated audits
 audit:
 	${PYTHON} src/scripts/audit_metrics.py ${ARGS}
+
+benchmark-metrics:
+	${PYTHON} src/scripts/benchmark_metrics.py --check
 
 api:
 	${PYTHON} src/scripts/run_api.py ${ARGS}
