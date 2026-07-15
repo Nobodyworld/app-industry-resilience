@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from html import escape
 from typing import TypeAlias, cast
 
 import pandas as pd
@@ -19,6 +20,9 @@ from .helpers import (
     snapshot_history_table,
     snapshot_timeline_frame,
 )
+
+SOURCE_SESSION_KEY = "Source"
+ONBOARDING_DISMISSED_SESSION_KEY = "first_run_onboarding_dismissed"
 
 
 @dataclass
@@ -57,7 +61,7 @@ def load_custom_styles() -> None:
             :root {
                 --ink-900: #0b1f33;
                 --ink-600: #33536f;
-                --ink-300: #8ca1b4;
+                --ink-300: #5f7488;
                 --ink-200: #c8d2dc;
                 --glow-500: #3cd0c9;
                 --glow-300: #8ee4df;
@@ -195,15 +199,15 @@ def render_page_header(
     with st.container():
         st.markdown(
             f"""
-            <div class="page-hero">
+            <section class="page-hero" aria-label="Dashboard overview">
                 <div class="page-hero__primary">
-                    <h1>{title}</h1>
-                    <p>{subtitle}</p>
+                    <h1>{escape(title)}</h1>
+                    <p>{escape(subtitle)}</p>
                 </div>
-                <div class="page-hero__meta">
-                    {''.join(f'<span class="meta-chip">{label}: {value}</span>' for label, value in meta.items())}
+                <div class="page-hero__meta" role="list" aria-label="Dashboard context">
+                    {''.join(f'<span class="meta-chip" role="listitem">{escape(label)}: {escape(value)}</span>' for label, value in meta.items())}
                 </div>
-            </div>
+            </section>
             """,
             unsafe_allow_html=True,
         )
@@ -242,7 +246,12 @@ def render_sidebar(
         "Census ASM (legacy)",
         "BEA (Economy-wide)",
     ]
-    data_mode = st.sidebar.selectbox("Source", options)
+    data_mode = st.sidebar.selectbox(
+        "Data source",
+        options,
+        key=SOURCE_SESSION_KEY,
+        help="Choose bundled sample data, an official snapshot, an upload, or a credentialed adapter.",
+    )
 
     source_status = {
         "Official snapshot (AIES 2023)": "Official benchmark",
@@ -263,6 +272,8 @@ def render_sidebar(
             value=reference_default,
             step=1,
             disabled=data_mode == "Official snapshot (AIES 2023)",
+            key="reference_year",
+            help="Select the reporting year for sources that support multiple years.",
         )
     )
 
@@ -280,19 +291,36 @@ def render_sidebar(
 
     uploaded_file = None
     if data_mode == "Upload CSV":
-        uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+        uploaded_file = st.sidebar.file_uploader(
+            "Industry data CSV",
+            type=["csv"],
+            key="industry_data_csv",
+            help="Required columns: industry_code, industry_name, and year.",
+        )
         if uploaded_file is None:
             st.sidebar.info("Drop a CSV to activate the canvas.")
     elif data_mode == "Census ASM (legacy)":
         st.sidebar.caption("Advanced adapter: requires a Census API key.")
-        census_val = st.sidebar.text_input("Census API Key", value=census_key, type="password")
+        census_val = st.sidebar.text_input(
+            "Census API Key",
+            value=census_key,
+            type="password",
+            key="census_api_key_input",
+            help="Used only for the legacy Census ASM adapter; the key remains masked.",
+        )
         key_result = security_utils.validate_api_key(census_val, "Census")
         if not key_result.ok:
             st.sidebar.error(key_result.message)
             errors.append(key_result.message)
     elif data_mode == "BEA (Economy-wide)":
         st.sidebar.caption("Experimental adapter: requires a BEA API key.")
-        bea_val = st.sidebar.text_input("BEA API Key", value=bea_key, type="password")
+        bea_val = st.sidebar.text_input(
+            "BEA API Key",
+            value=bea_key,
+            type="password",
+            key="bea_api_key_input",
+            help="Used only for the experimental BEA adapter; the key remains masked.",
+        )
         key_result = security_utils.validate_api_key(bea_val, "BEA")
         if not key_result.ok:
             st.sidebar.error(key_result.message)
@@ -331,6 +359,58 @@ def render_sidebar(
         errors=errors,
         halt=halt,
     )
+
+
+def render_first_run_onboarding() -> None:
+    """Render a session-dismissible guide for new dashboard visitors."""
+
+    if ONBOARDING_DISMISSED_SESSION_KEY not in st.session_state:
+        st.session_state[ONBOARDING_DISMISSED_SESSION_KEY] = False
+
+    if st.sidebar.button("Show first-run guide", key="show_first_run_guide"):
+        st.session_state[ONBOARDING_DISMISSED_SESSION_KEY] = False
+
+    if st.session_state[ONBOARDING_DISMISSED_SESSION_KEY]:
+        return
+
+    st.subheader("First-run guide")
+    st.info(
+        "Start with Sample (offline): bundled data needs no credentials. Choose another source in "
+        "the Data source control when you are ready."
+    )
+    st.markdown(
+        "1. **Overview**\n"
+        "2. **Explore**\n"
+        "3. **Compare**\n"
+        "4. **Scenario Lab**\n"
+        "5. **Export**"
+    )
+    st.caption(
+        "The output-to-cost ratio is descriptive. Composite indicators are experimental and "
+        "algebraically related; outputs are not credit, insolvency, causal, investment, or policy conclusions."
+    )
+    if st.button("Dismiss first-run guide", key="dismiss_first_run_guide"):
+        st.session_state[ONBOARDING_DISMISSED_SESSION_KEY] = True
+        st.rerun()
+
+
+def render_trend_data_table(trend_data: pd.DataFrame) -> None:
+    """Render the accessible table alternative for a historical trend chart."""
+
+    with st.expander("View historical trend data table", expanded=False):
+        trend_table = trend_data.rename(
+            columns={
+                "year": "Year",
+                "industry_name": "Industry",
+                "industry_code": "Industry code",
+                "idiot_index": "Output-to-cost ratio",
+            }
+        )
+        st.dataframe(
+            trend_table[["Year", "Industry", "Industry code", "Output-to-cost ratio"]],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None = None) -> None:
@@ -385,11 +465,11 @@ def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None 
         with col:
             st.markdown(
                 f"""
-                <div class="signal-card">
+                <section class="signal-card" role="group" aria-label="{escape(card['label'])}">
                     <div class="signal-card__label">{card['label']}</div>
                     <div class="signal-card__value">{card['value']}</div>
                     <div class="signal-card__hint">{card['hint']}</div>
-                </div>
+                </section>
                 """,
                 unsafe_allow_html=True,
             )
@@ -399,7 +479,7 @@ def render_state_banner(message: str) -> None:
     """Display an adaptive banner summarizing the current context."""
 
     st.markdown(
-        f"<div class='state-banner'>{message}</div>",
+        f"<div class='state-banner' role='status'>{escape(message)}</div>",
         unsafe_allow_html=True,
     )
 
@@ -420,9 +500,11 @@ def render_deep_dive(
 
     container = st.container()
     with container:
-        st.markdown("<div class='deep-dive'>", unsafe_allow_html=True)
         st.markdown(
-            f"<div class='deep-dive__heading'>{row['industry_name']}</div>",
+            "<section class='deep-dive' aria-label='Industry deep dive'>", unsafe_allow_html=True
+        )
+        st.markdown(
+            f"<h2 class='deep-dive__heading'>{escape(str(row['industry_name']))}</h2>",
             unsafe_allow_html=True,
         )
         st.caption(
@@ -471,7 +553,7 @@ def render_deep_dive(
         st.markdown("""<div class='deep-dive__story'>""", unsafe_allow_html=True)
         st.markdown(story)
         st.markdown("""</div>""", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</section>", unsafe_allow_html=True)
 
 
 def render_scenario_controls(

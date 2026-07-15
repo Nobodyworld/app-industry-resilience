@@ -31,10 +31,12 @@ from src.interfaces.streamlit.bootstrap import (
     get_bootstrap_state,
 )
 from src.interfaces.streamlit.components import (
+    SOURCE_SESSION_KEY,
     build_data_story,
     load_custom_styles,
     render_deep_dive,
     render_download_panel,
+    render_first_run_onboarding,
     render_insight_tabs,
     render_observability_snapshots,
     render_page_header,
@@ -43,6 +45,7 @@ from src.interfaces.streamlit.components import (
     render_sidebar,
     render_signal_bar,
     render_state_banner,
+    render_trend_data_table,
 )
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
@@ -244,7 +247,9 @@ if mode_raw:
     slug_lookup = {option.lower().replace(" ", "-"): option for option in sidebar_modes}
     resolved_mode = slug_lookup.get(mode_raw)
     if resolved_mode:
-        st.session_state["Source"] = resolved_mode
+        st.session_state[SOURCE_SESSION_KEY] = resolved_mode
+elif SOURCE_SESSION_KEY not in st.session_state:
+    st.session_state[SOURCE_SESSION_KEY] = "Sample (offline)"
 
 year_bounds = sidebar_context.year_bounds
 
@@ -325,19 +330,19 @@ else:
 fetch_status = st.sidebar.empty()
 spinner_message = "Computing industry metrics…"
 if data_mode == "Official snapshot (AIES 2023)":
-    fetch_status.info("Loading the latest official Census AIES snapshot…")
+    fetch_status.info("Loading: latest official Census AIES snapshot…")
     spinner_message = "Loading Census AIES survey-year 2023 data…"
 elif data_mode == "Sample (offline)":
-    fetch_status.info("Loading sample dataset…")
+    fetch_status.info("Loading: bundled sample dataset…")
     spinner_message = "Loading sample dataset…"
 elif data_mode == "Census ASM (legacy)":
-    fetch_status.info(f"Contacting Census ASM for {year_clean}…")
+    fetch_status.info(f"Loading: Census ASM data for {year_clean}…")
     spinner_message = f"Fetching Census ASM data for {year_clean}…"
 elif data_mode == "BEA (Economy-wide)":
-    fetch_status.info(f"Contacting BEA for {year_clean}…")
+    fetch_status.info(f"Loading: BEA tables for {year_clean}…")
     spinner_message = f"Fetching BEA tables for {year_clean}…"
 elif data_mode == "Upload CSV":
-    fetch_status.info("Validating uploaded dataset…")
+    fetch_status.info("Loading: validating uploaded dataset…")
     spinner_message = "Validating uploaded dataset…"
 
 try:
@@ -352,18 +357,18 @@ try:
             normalization_options=APP_NORMALIZATION,
         )
     if data_mode == "Official snapshot (AIES 2023)":
-        fetch_status.success("Census AIES 2023 benchmark ready (released February 26, 2026).")
+        fetch_status.success("Ready: Census AIES 2023 benchmark (released February 26, 2026).")
     elif data_mode == "Census ASM (legacy)":
-        fetch_status.success(f"Census ASM ready for {year_clean}.")
+        fetch_status.success(f"Ready: Census ASM data for {year_clean}.")
     elif data_mode == "BEA (Economy-wide)":
-        fetch_status.success(f"BEA tables ready for {year_clean}.")
+        fetch_status.success(f"Ready: BEA tables for {year_clean}.")
     elif data_mode == "Sample (offline)":
-        fetch_status.success("Sample dataset ready.")
+        fetch_status.success("Ready: bundled sample dataset.")
     else:
-        fetch_status.success("Industry metrics computed.")
+        fetch_status.success("Ready: industry metrics computed.")
 except Exception as exc:  # pylint: disable=broad-except
     error = str(exc)
-    fetch_status.error(f"{data_mode.split(' (')[0]} fetch failed: {exc}")
+    fetch_status.error(f"Error: {data_mode.split(' (')[0]} fetch failed: {exc}")
     summary = None
 
 if summary is None:
@@ -397,6 +402,8 @@ render_page_header(
 render_state_banner(
     "Start with source and vintage, then explore an industry, compare peers, and run a scenario before exporting outputs."
 )
+
+render_first_run_onboarding()
 
 st.markdown("### Start here")
 st.markdown(
@@ -615,6 +622,7 @@ with compare_tab:
         )
         trend_fig.update_layout(xaxis_title="Year", yaxis_title="Output-to-cost ratio")
         st.plotly_chart(trend_fig, use_container_width=True)
+        render_trend_data_table(trend_data)
 
     benchmark_stats = calculate_benchmark(df_display, selected_code)
     metric_cols = st.columns(3)

@@ -6,8 +6,11 @@ import pandas as pd
 import streamlit as st
 
 from src.interfaces.streamlit.components import (
+    ONBOARDING_DISMISSED_SESSION_KEY,
+    SOURCE_SESSION_KEY,
     build_data_story,
     render_download_panel,
+    render_first_run_onboarding,
     render_insight_tabs,
     render_observability_snapshots,
     render_page_header,
@@ -16,6 +19,7 @@ from src.interfaces.streamlit.components import (
     render_sidebar,
     render_signal_bar,
     render_state_banner,
+    render_trend_data_table,
 )
 
 
@@ -100,7 +104,7 @@ def test_render_sidebar_upload_requires_file(monkeypatch) -> None:
         def write(self, _text: str) -> None:
             return None
 
-        def selectbox(self, _label: str, _options: list[str]) -> str:
+        def selectbox(self, _label: str, _options: list[str], **_kwargs) -> str:
             return "Upload CSV"
 
         def number_input(self, *_args, **_kwargs) -> int:
@@ -112,7 +116,9 @@ def test_render_sidebar_upload_requires_file(monkeypatch) -> None:
         def text_input(self, _label: str, value: str, type: str = "default") -> str:  # noqa: A002
             return value
 
-        def file_uploader(self, _label: str, type: list[str] | None = None):  # noqa: A002
+        def file_uploader(
+            self, _label: str, type: list[str] | None = None, **_kwargs
+        ):  # noqa: A002
             return None
 
         def info(self, text: str) -> None:
@@ -158,7 +164,7 @@ def test_render_sidebar_bea_invalid_key(monkeypatch) -> None:
         def write(self, _text: str) -> None:
             return None
 
-        def selectbox(self, _label: str, _options: list[str]) -> str:
+        def selectbox(self, _label: str, _options: list[str], **_kwargs) -> str:
             return "BEA (Economy-wide)"
 
         def number_input(self, *_args, **_kwargs) -> int:
@@ -167,10 +173,14 @@ def test_render_sidebar_bea_invalid_key(monkeypatch) -> None:
         def error(self, _text: str) -> None:
             return None
 
-        def text_input(self, _label: str, value: str, type: str = "default") -> str:  # noqa: A002
+        def text_input(
+            self, _label: str, value: str, type: str = "default", **_kwargs
+        ) -> str:  # noqa: A002
             return "bad-key"
 
-        def file_uploader(self, _label: str, type: list[str] | None = None):  # noqa: A002
+        def file_uploader(
+            self, _label: str, type: list[str] | None = None, **_kwargs
+        ):  # noqa: A002
             return None
 
         def info(self, _text: str) -> None:
@@ -230,6 +240,106 @@ def test_render_signal_bar_and_state_banner(monkeypatch) -> None:
     render_state_banner("Current mode: sample")
 
     assert calls
+
+
+def test_first_run_onboarding_can_dismiss_and_reopen(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class SidebarStub:
+        def button(self, _label: str, **_kwargs) -> bool:
+            return False
+
+    monkeypatch.setattr(st, "sidebar", SidebarStub())
+    monkeypatch.setattr(st, "subheader", lambda value: calls.append(value))
+    monkeypatch.setattr(st, "info", lambda value: calls.append(value))
+    monkeypatch.setattr(st, "markdown", lambda value: calls.append(value))
+    monkeypatch.setattr(st, "caption", lambda value: calls.append(value))
+    monkeypatch.setattr(st, "button", lambda _label, **_kwargs: False)
+    monkeypatch.setattr(st, "rerun", lambda: None)
+    st.session_state.pop(ONBOARDING_DISMISSED_SESSION_KEY, None)
+    render_first_run_onboarding()
+    assert "First-run guide" in calls
+    assert st.session_state[ONBOARDING_DISMISSED_SESSION_KEY] is False
+
+    monkeypatch.setattr(st, "button", lambda _label, **_kwargs: True)
+    render_first_run_onboarding()
+    assert st.session_state[ONBOARDING_DISMISSED_SESSION_KEY] is True
+
+
+def test_sidebar_uses_stable_accessible_control_keys(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class SidebarStub:
+        def header(self, *_args) -> None:
+            pass
+
+        def write(self, *_args) -> None:
+            pass
+
+        def selectbox(self, label, _options, **kwargs):
+            captured["source_label"] = label
+            captured["source_key"] = kwargs["key"]
+            captured["source_help"] = kwargs["help"]
+            return "Sample (offline)"
+
+        def caption(self, *_args) -> None:
+            pass
+
+        def number_input(self, *_args, **kwargs):
+            captured["year_help"] = kwargs["help"]
+            return 2024
+
+        def markdown(self, *_args, **_kwargs) -> None:
+            pass
+
+    monkeypatch.setattr(st, "sidebar", SidebarStub())
+    state = render_sidebar(
+        default_year=2024,
+        year_bounds=(2000, 2025),
+        bea_key="",
+        census_key="",
+        security_utils=SimpleNamespace(
+            validate_year=lambda value: SimpleNamespace(ok=True, value=value, message="")
+        ),
+    )
+    assert state.data_mode == "Sample (offline)"
+    assert captured["source_label"] == "Data source"
+    assert captured["source_key"] == SOURCE_SESSION_KEY
+    assert captured["source_help"] and captured["year_help"]
+
+
+def test_trend_table_uses_readable_columns(monkeypatch) -> None:
+    captured: list[pd.DataFrame] = []
+
+    class ExpanderCtx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    monkeypatch.setattr(st, "expander", lambda *_args, **_kwargs: ExpanderCtx())
+    monkeypatch.setattr(st, "dataframe", lambda frame, **_kwargs: captured.append(frame))
+    render_trend_data_table(
+        pd.DataFrame(
+            [{"year": 2021, "industry_name": "Widgets", "industry_code": "999", "idiot_index": 1.5}]
+        )
+    )
+    assert list(captured[0].columns) == [
+        "Year",
+        "Industry",
+        "Industry code",
+        "Output-to-cost ratio",
+    ]
+
+
+def test_custom_style_uses_accessible_muted_text_token(monkeypatch) -> None:
+    from src.interfaces.streamlit.components import load_custom_styles
+
+    styles: list[str] = []
+    monkeypatch.setattr(st, "markdown", lambda value, **_kwargs: styles.append(value))
+    load_custom_styles()
+    assert "--ink-300: #5f7488;" in styles[0]
 
 
 def test_render_scenario_controls_and_results(monkeypatch) -> None:

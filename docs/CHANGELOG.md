@@ -1,5 +1,8 @@
 # Changelog
 
+# 2026-07-15 – Public-beta accessibility and onboarding
+- Defaulted true first-run Streamlit sessions to bundled sample data, added dismissible onboarding, clearer source controls, accessible trend tables, improved semantic structure, and a normal-text contrast-safe muted token.
+
 # 2026-07-15 – Automatic metric computation observability
 - Added bounded Streamlit auto-compute telemetry and a deterministic dependency-free benchmark
   gate, while ensuring disabled-cache metric computation does not initialize the external cache.
