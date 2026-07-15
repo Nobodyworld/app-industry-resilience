@@ -13,6 +13,7 @@ Refer back to the repository root [`README.md`](../README.md) for a project over
 
 Additional quick links:
 
+- [ACCESSIBILITY_AUDIT.md](ACCESSIBILITY_AUDIT.md) – public-beta accessibility findings, remediation targets, and manual browser verification requirements.
 - [DATA_DICTIONARY.md](DATA_DICTIONARY.md) – field-level definitions, units, and formulas for dashboard datasets.
 - [INDUSTRY_SHOCK_CASE_STUDY.md](INDUSTRY_SHOCK_CASE_STUDY.md) – reproducible scenario walkthrough with interpretation guidance.
 - [PERFORMANCE.md](PERFORMANCE.md) – automatic Streamlit metric computation telemetry and benchmark guidance.
