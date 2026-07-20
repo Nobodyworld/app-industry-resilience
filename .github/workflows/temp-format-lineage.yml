@@ -31,28 +31,62 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Black check
-        run: python -m black --check src/core/__init__.py src/core/lineage.py tests/test_lineage.py
+      - name: Capture Black result
+        shell: bash
+        run: |
+          set +e
+          python -m black --check src/core/__init__.py src/core/lineage.py tests/test_lineage.py > black.txt 2>&1
+          echo $? > black.exit
+          exit 0
 
-      - name: Ruff check
-        run: python -m ruff check src/core/__init__.py src/core/lineage.py tests/test_lineage.py
+      - name: Capture Ruff result
+        shell: bash
+        run: |
+          set +e
+          python -m ruff check src/core/__init__.py src/core/lineage.py tests/test_lineage.py > ruff.txt 2>&1
+          echo $? > ruff.exit
+          exit 0
 
-      - name: Mypy check
-        run: python -m mypy src
+      - name: Capture mypy result
+        shell: bash
+        run: |
+          set +e
+          python -m mypy src > mypy.txt 2>&1
+          echo $? > mypy.exit
+          exit 0
 
-      - name: Focused lineage tests
-        run: python -m pytest -q tests/test_lineage.py
+      - name: Capture focused tests
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q tests/test_lineage.py > tests.txt 2>&1
+          echo $? > tests.exit
+          exit 0
 
-      - name: Runtime coverage gate
-        run: >-
-          python -m pytest -q
-          --cov=src/adapters
-          --cov=src/agents
-          --cov=src/application
-          --cov=src/core
-          --cov=src/extensions
-          --cov=src/infrastructure
-          --cov=src/interfaces/api
-          --cov=src/interfaces/streamlit
-          --cov-report=term-missing
-          --cov-fail-under=85
+      - name: Capture runtime coverage gate
+        shell: bash
+        run: |
+          set +e
+          python -m pytest -q \
+            --cov=src/adapters \
+            --cov=src/agents \
+            --cov=src/application \
+            --cov=src/core \
+            --cov=src/extensions \
+            --cov=src/infrastructure \
+            --cov=src/interfaces/api \
+            --cov=src/interfaces/streamlit \
+            --cov-report=term-missing \
+            --cov-fail-under=85 > coverage.txt 2>&1
+          echo $? > coverage.exit
+          exit 0
+
+      - name: Upload diagnostic outputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: lineage-quality-diagnostics
+          path: |
+            *.txt
+            *.exit
+          if-no-files-found: error
+          retention-days: 1
