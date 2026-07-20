@@ -1,0 +1,129 @@
+name: Temporary Evaluation Lineage Correction
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - architecture/evaluation-lineage
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    name: Correct Evaluation Lineage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: architecture/evaluation-lineage
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Apply patch and focused corrections
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          import re
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/temp-evaluation-lineage-patch.yml').read_text()
+          match = re.search(r"echo '([^']+)' \| base64 --decode", workflow)
+          if match is None:
+              raise SystemExit('Embedded patch was not found')
+          Path('/tmp/evaluation-lineage.patch').write_bytes(base64.b64decode(match.group(1)))
+          PY
+          git apply --whitespace=nowarn /tmp/evaluation-lineage.patch
+          python - <<'PY'
+          from pathlib import Path
+
+          app_path = Path('src/interfaces/api/app.py')
+          app = app_path.read_text(encoding='utf-8')
+          marker = 'from typing import Any, cast\n\n'
+          if marker not in app:
+              raise SystemExit('API import marker not found')
+          app = app.replace(marker, 'from typing import Any, cast\n\nimport pandas as pd\n\n', 1)
+          app_path.write_text(app, encoding='utf-8')
+
+          tests_path = Path('tests/test_api_contract_compatibility.py')
+          tests = tests_path.read_text(encoding='utf-8')
+          old = '''def _normalise_payload(payload: Any) -> Any:
+              normalised = deepcopy(payload)
+              if isinstance(normalised, dict):
+                  metadata = normalised.get("metadata")
+                  if isinstance(metadata, dict):
+                      telemetry = metadata.get("telemetry")
+                      if isinstance(telemetry, dict):
+                          telemetry.pop("trace_id", None)
+                          if not telemetry:
+                              metadata.pop("telemetry", None)
+              return normalised
+          '''.replace('          ', '')
+          new = '''def _normalise_payload(payload: Any) -> Any:
+              normalised = deepcopy(payload)
+              if isinstance(normalised, dict):
+                  lineage = normalised.get("lineage")
+                  if isinstance(lineage, dict):
+                      lineage.pop("acquired_at", None)
+          
+                  metadata = normalised.get("metadata")
+                  if isinstance(metadata, dict):
+                      metadata_lineage = metadata.get("lineage")
+                      if isinstance(metadata_lineage, dict):
+                          metadata_lineage.pop("acquired_at", None)
+          
+                      telemetry = metadata.get("telemetry")
+                      if isinstance(telemetry, dict):
+                          telemetry.pop("trace_id", None)
+                          if not telemetry:
+                              metadata.pop("telemetry", None)
+              return normalised
+          '''.replace('          ', '')
+          if old not in tests:
+              raise SystemExit('Compatibility normalization helper not found')
+          tests_path.write_text(tests.replace(old, new, 1), encoding='utf-8')
+          PY
+
+      - name: Format approved files
+        run: >-
+          python -m black
+          src/application/idiot_index_service.py
+          src/interfaces/api/schemas.py
+          src/interfaces/api/app.py
+          tests/test_evaluation_lineage.py
+          tests/test_api_contract_compatibility.py
+
+      - name: Validate approved files
+        run: |
+          python -m ruff check src/application/idiot_index_service.py src/interfaces/api/schemas.py src/interfaces/api/app.py tests/test_evaluation_lineage.py tests/test_api_contract_compatibility.py
+          python -m mypy src
+          python -m pytest -q tests/test_evaluation_lineage.py tests/test_lineage.py tests/test_api_contract_compatibility.py tests/test_api.py
+
+      - name: Commit validated files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/application/idiot_index_service.py \
+            src/interfaces/api/schemas.py \
+            src/interfaces/api/app.py \
+            tests/test_evaluation_lineage.py \
+            tests/test_api_contract_compatibility.py
+          git diff --cached --check
+          git commit -m "feat: propagate evaluation data lineage"
+          git push origin HEAD:architecture/evaluation-lineage
