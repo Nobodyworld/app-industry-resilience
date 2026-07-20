@@ -1,6 +1,9 @@
 name: Temporary Lineage Formatter
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - architecture/v1-lineage-contract
