@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
@@ -16,6 +16,7 @@ class _TestResponse:
     status_code: int
     data: Any
     media_type: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
 
     def json(self) -> Any:
         return self.data
@@ -48,6 +49,7 @@ class TestClient:
             status_code=response.status_code,
             data=response.json(),
             media_type=response.media_type,
+            headers=dict(response.headers),
         )
 
     def post(self, path: str, *, json: Any | None = None) -> _TestResponse:
@@ -56,6 +58,7 @@ class TestClient:
             status_code=response.status_code,
             data=response.json(),
             media_type=response.media_type,
+            headers=dict(response.headers),
         )
 
 
