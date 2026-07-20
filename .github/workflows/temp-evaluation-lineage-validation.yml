@@ -1,0 +1,77 @@
+name: Temporary Evaluation Lineage Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - architecture/evaluation-lineage
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Diagnose Evaluation Lineage Validation
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: architecture/evaluation-lineage
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Reapply exact patch and format
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          import re
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/temp-evaluation-lineage-patch.yml').read_text()
+          match = re.search(r"echo '([^']+)' \| base64 --decode", workflow)
+          if match is None:
+              raise SystemExit('Embedded patch was not found')
+          Path('/tmp/evaluation-lineage.patch').write_bytes(base64.b64decode(match.group(1)))
+          PY
+          git apply --whitespace=nowarn /tmp/evaluation-lineage.patch
+          python -m black \
+            src/application/idiot_index_service.py \
+            src/interfaces/api/schemas.py \
+            src/interfaces/api/app.py \
+            tests/test_evaluation_lineage.py
+
+      - name: Capture validation outputs
+        shell: bash
+        run: |
+          set +e
+          python -m ruff check src/application/idiot_index_service.py src/interfaces/api/schemas.py src/interfaces/api/app.py tests/test_evaluation_lineage.py > ruff.txt 2>&1
+          echo $? > ruff.exit
+          python -m mypy src > mypy.txt 2>&1
+          echo $? > mypy.exit
+          python -m pytest -q tests/test_evaluation_lineage.py tests/test_lineage.py tests/test_api_contract_compatibility.py tests/test_api.py > tests.txt 2>&1
+          echo $? > tests.exit
+          exit 0
+
+      - name: Upload validation outputs
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: evaluation-lineage-validation-diagnostics
+          path: |
+            *.txt
+            *.exit
+          if-no-files-found: error
+          retention-days: 1
