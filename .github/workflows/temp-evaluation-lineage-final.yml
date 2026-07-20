@@ -1,0 +1,185 @@
+name: Temporary Final Evaluation Lineage
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - architecture/evaluation-lineage
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    name: Finalize Evaluation Lineage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: architecture/evaluation-lineage
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Apply validated runtime patch and compatibility correction
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          import re
+          from pathlib import Path
+
+          source_workflow = Path('.github/workflows/temp-evaluation-lineage-patch.yml').read_text(
+              encoding='utf-8'
+          )
+          match = re.search(r"echo '([^']+)' \| base64 --decode", source_workflow)
+          if match is None:
+              raise SystemExit('Embedded runtime patch was not found')
+          Path('/tmp/evaluation-lineage.patch').write_bytes(base64.b64decode(match.group(1)))
+          PY
+          git apply --whitespace=nowarn /tmp/evaluation-lineage.patch
+          python - <<'PY'
+          import re
+          import textwrap
+          from pathlib import Path
+
+          app_path = Path('src/interfaces/api/app.py')
+          app = app_path.read_text(encoding='utf-8')
+          marker = 'from typing import Any, cast\n\n'
+          if marker not in app:
+              raise SystemExit('API typing import marker not found')
+          app = app.replace(marker, 'from typing import Any, cast\n\nimport pandas as pd\n\n', 1)
+          app_path.write_text(app, encoding='utf-8')
+
+          tests_path = Path('tests/test_api_contract_compatibility.py')
+          tests = tests_path.read_text(encoding='utf-8')
+          replacement = textwrap.dedent(
+              '''\
+              def _normalise_payload(payload: Any) -> Any:
+                  normalised = deepcopy(payload)
+                  if isinstance(normalised, dict):
+                      lineage = normalised.get("lineage")
+                      if isinstance(lineage, dict):
+                          lineage.pop("acquired_at", None)
+
+                      metadata = normalised.get("metadata")
+                      if isinstance(metadata, dict):
+                          metadata_lineage = metadata.get("lineage")
+                          if isinstance(metadata_lineage, dict):
+                              metadata_lineage.pop("acquired_at", None)
+
+                          telemetry = metadata.get("telemetry")
+                          if isinstance(telemetry, dict):
+                              telemetry.pop("trace_id", None)
+                              if not telemetry:
+                                  metadata.pop("telemetry", None)
+                  return normalised
+
+
+              def _request'''
+          )
+          updated, count = re.subn(
+              r'def _normalise_payload\(payload: Any\) -> Any:\n.*?\n\n\ndef _request',
+              replacement,
+              tests,
+              count=1,
+              flags=re.DOTALL,
+          )
+          if count != 1:
+              raise SystemExit('Compatibility normalization function was not replaced')
+          tests_path.write_text(updated, encoding='utf-8')
+          PY
+
+      - name: Format approved files
+        run: >-
+          python -m black
+          src/application/idiot_index_service.py
+          src/interfaces/api/schemas.py
+          src/interfaces/api/app.py
+          tests/test_evaluation_lineage.py
+          tests/test_api_contract_compatibility.py
+
+      - name: Validate approved files
+        run: |
+          python -m ruff check src/application/idiot_index_service.py src/interfaces/api/schemas.py src/interfaces/api/app.py tests/test_evaluation_lineage.py tests/test_api_contract_compatibility.py
+          python -m mypy src
+          python -m pytest -q tests/test_evaluation_lineage.py tests/test_lineage.py tests/test_api_contract_compatibility.py tests/test_api.py
+
+      - name: Commit and push validated files
+        shell: bash
+        run: |
+          set +e
+          exec > >(tee evaluation-lineage-commit.txt) 2>&1
+
+          mapfile -t temp_files < <(git ls-files '.github/workflows/temp-*evaluation*.yml')
+          printf 'Temporary workflow files (%s):\n' "${#temp_files[@]}"
+          printf '  %s\n' "${temp_files[@]}"
+
+          cleanup_exit=0
+          if [ "${#temp_files[@]}" -eq 0 ]; then
+            echo 'No temporary evaluation workflows were found.'
+            cleanup_exit=1
+          else
+            git rm -- "${temp_files[@]}" || cleanup_exit=$?
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/application/idiot_index_service.py \
+            src/interfaces/api/schemas.py \
+            src/interfaces/api/app.py \
+            tests/test_evaluation_lineage.py \
+            tests/test_api_contract_compatibility.py
+          git diff --cached --check
+          diff_exit=$?
+          git status --short
+          git diff --cached --name-status
+
+          commit_exit=0
+          git commit -m "feat: propagate evaluation data lineage" || commit_exit=$?
+
+          push_exit=99
+          if [ "$commit_exit" -eq 0 ]; then
+            push_exit=0
+            git push origin HEAD:architecture/evaluation-lineage || push_exit=$?
+          fi
+
+          {
+            echo "cleanup_exit=$cleanup_exit"
+            echo "diff_exit=$diff_exit"
+            echo "commit_exit=$commit_exit"
+            echo "push_exit=$push_exit"
+          } | tee evaluation-lineage-exits.txt
+          exit 0
+
+      - name: Upload commit diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: evaluation-lineage-commit-diagnostics
+          path: |
+            evaluation-lineage-commit.txt
+            evaluation-lineage-exits.txt
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Enforce commit success
+        shell: bash
+        run: |
+          grep -q '^cleanup_exit=0$' evaluation-lineage-exits.txt
+          grep -q '^diff_exit=0$' evaluation-lineage-exits.txt
+          grep -q '^commit_exit=0$' evaluation-lineage-exits.txt
+          grep -q '^push_exit=0$' evaluation-lineage-exits.txt
