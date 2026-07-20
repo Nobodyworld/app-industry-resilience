@@ -100,9 +100,10 @@ def test_openapi_contains_canonical_and_deprecated_alias_routes() -> None:
 
         assert canonical_operation.get("deprecated") is not True
         assert legacy_operation["deprecated"] is True
-        assert canonical_operation["responses"]["200"]["content"] == legacy_operation[
-            "responses"
-        ]["200"]["content"]
+        assert (
+            canonical_operation["responses"]["200"]["content"]
+            == legacy_operation["responses"]["200"]["content"]
+        )
         if method == "post":
             assert canonical_operation["requestBody"] == legacy_operation["requestBody"]
 
