@@ -1,0 +1,59 @@
+name: Temporary Evaluation Lineage Input Diagnostics
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - architecture/evaluation-lineage
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    name: Diagnose Evaluation Lineage Inputs
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Inspect expected source blocks
+        shell: bash
+        run: |
+          python - <<'PY' > generation-inputs.txt
+          from pathlib import Path
+
+          service = Path("src/application/idiot_index_service.py").read_text(encoding="utf-8")
+          schemas = Path("src/interfaces/api/schemas.py").read_text(encoding="utf-8")
+          app = Path("src/interfaces/api/app.py").read_text(encoding="utf-8")
+
+          checks = {
+              "service_import": "    AppConfig,\n    HealthSummary,\n    MetricConfig," in service,
+              "service_pipeline_start": "    normalized = normalize_columns(\n        dataset," in service,
+              "service_pipeline_end": "    filtered = _filter_dataframe(display, sanitized_search)\n" in service,
+              "service_resolve_marker": "def _resolve_dataset(\n" in service,
+              "schemas_core_import": "from src.core import HealthSummary" in schemas,
+              "schemas_evaluate_marker": "class EvaluateResponse(BaseModel):" in schemas,
+              "schemas_eval_fields": "    metadata: dict[str, Any] = Field(default_factory=dict)\n    health: HealthAnalyticsEnvelope | None = None\n" in schemas,
+              "schemas_health_fields": "    health: HealthAnalyticsEnvelope\n    metadata: dict[str, Any] = Field(default_factory=dict)\n" in schemas,
+              "schemas_summary_fields": "        metadata=metadata,\n        health=health_envelope,\n" in schemas,
+              "app_core_import": "from src.core import summarise_health" in app,
+              "app_schema_import": "    metadata_from_summary,\n    records_to_dataframe,\n" in app,
+              "app_evaluate_marker": "def _evaluate_response(\n" in app,
+              "app_eval_attrs": "            dataframe.attrs.setdefault(\"source\", \"api-inline\")\n            dataframe.attrs.setdefault(\"source_origin\", \"api\")\n" in app,
+              "app_health_attrs": "        dataframe.attrs.setdefault(\"source\", \"api-inline\")\n        dataframe.attrs.setdefault(\"source_origin\", \"api-health\")\n" in app,
+              "app_health_response": "        health=envelope,\n        metadata=metadata_from_summary(summary),\n" in app,
+          }
+          for name, found in checks.items():
+              print(f"{name}={found}")
+          PY
+
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: evaluation-lineage-input-diagnostics
+          path: generation-inputs.txt
+          if-no-files-found: error
+          retention-days: 1
