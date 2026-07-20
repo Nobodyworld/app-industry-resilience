@@ -1,0 +1,32 @@
+name: Temporary Evaluation Lineage Source Export
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - architecture/evaluation-lineage
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    name: Export Evaluation Lineage Sources
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+
+      - name: Upload source files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: evaluation-lineage-source-files
+          path: |
+            src/application/idiot_index_service.py
+            src/interfaces/api/schemas.py
+            src/interfaces/api/app.py
+            tests/test_evaluation_lineage.py
+          if-no-files-found: error
+          retention-days: 1
