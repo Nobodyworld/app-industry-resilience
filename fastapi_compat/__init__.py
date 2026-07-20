@@ -3,23 +3,26 @@
 The real project originally depended on the external :mod:`fastapi` package.
 Network restrictions in the execution environment make downloading that
 dependency unreliable, so this module implements the small subset of the API
-required by the Idiot Index service.  It supports route registration, simple
-dependency injection via :class:`Depends`, and error handling compatible with
-``fastapi.testclient`` semantics.
+required by the Idiot Index service. It supports route registration, simple
+dependency injection via :class:`Depends`, response headers, deterministic
+OpenAPI metadata, and error handling compatible with ``fastapi.testclient``
+semantics.
 
-Only the functions used by the code base are exposed.  When running the
+Only the functions used by the code base are exposed. When running the
 ``scripts/run_api.py`` helper the same implementation is used to execute
 requests without relying on third-party servers.
 """
 
 from __future__ import annotations
 
+import inspect
 import json
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from datetime import date, datetime, time
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
-from types import SimpleNamespace
-from typing import Any
+from enum import Enum
+from types import NoneType, SimpleNamespace, UnionType
+from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
 from urllib.parse import parse_qs
 
 from pydantic_compat import BaseModel, ValidationError
@@ -56,6 +59,9 @@ class Route:
     path: str
     endpoint: Callable[..., Any]
     status_code: int
+    response_model: type[Any] | None = None
+    tags: tuple[str, ...] = ()
+    deprecated: bool = False
 
 
 @dataclass(slots=True)
@@ -65,6 +71,7 @@ class Response:
     status_code: int
     data: Any
     media_type: str | None = None
+    headers: dict[str, str] = field(default_factory=dict)
 
     def json(self) -> Any:
         return self.data
@@ -99,7 +106,7 @@ def _match_path(pattern: str, path: str) -> tuple[bool, dict[str, str]]:
 class FastAPI:
     """Register HTTP routes and execute them synchronously."""
 
-    def __init__(self, *, title: str = "", version: str = "") -> None:
+    def __init__(self, *, title: str = "", version: str = "", **_: Any) -> None:
         self.title = title
         self.version = version
         self._routes: list[Route] = []
@@ -115,11 +122,21 @@ class FastAPI:
         response_model: type[Any] | None = None,
         tags: Iterable[str] | None = None,
         status_code: int = 200,
+        deprecated: bool = False,
+        **_: Any,
     ):
-        del response_model, tags  # Provided for parity only.
-
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-            self._routes.append(Route("GET", path, func, status_code))
+            self._routes.append(
+                Route(
+                    "GET",
+                    path,
+                    func,
+                    status_code,
+                    response_model=response_model,
+                    tags=tuple(tags or ()),
+                    deprecated=deprecated,
+                )
+            )
             return func
 
         return decorator
@@ -131,11 +148,21 @@ class FastAPI:
         response_model: type[Any] | None = None,
         tags: Iterable[str] | None = None,
         status_code: int = 200,
+        deprecated: bool = False,
+        **_: Any,
     ):
-        del response_model, tags  # Provided for parity only.
-
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-            self._routes.append(Route("POST", path, func, status_code))
+            self._routes.append(
+                Route(
+                    "POST",
+                    path,
+                    func,
+                    status_code,
+                    response_model=response_model,
+                    tags=tuple(tags or ()),
+                    deprecated=deprecated,
+                )
+            )
             return func
 
         return decorator
@@ -145,6 +172,58 @@ class FastAPI:
     # ------------------------------------------------------------------
     def add_middleware(self, middleware_cls: type[Any], **options: Any) -> None:
         self._middleware.append((middleware_cls, options))
+
+    # ------------------------------------------------------------------
+    # Contract metadata
+    # ------------------------------------------------------------------
+    def openapi(self) -> dict[str, Any]:
+        """Return a deterministic OpenAPI 3.1 document for registered routes."""
+
+        paths: dict[str, dict[str, Any]] = {}
+        components: dict[str, dict[str, Any]] = {"schemas": {}}
+        schemas = components["schemas"]
+
+        for route in self._routes:
+            operation: dict[str, Any] = {
+                "responses": {
+                    str(route.status_code): {
+                        "description": "Successful Response",
+                    }
+                }
+            }
+            if route.tags:
+                operation["tags"] = list(route.tags)
+            if route.deprecated:
+                operation["deprecated"] = True
+
+            request_model = _request_model_for_endpoint(route.endpoint)
+            if request_model is not None:
+                _register_model_schema(request_model, schemas)
+                operation["requestBody"] = {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {"$ref": f"#/components/schemas/{request_model.__name__}"}
+                        }
+                    },
+                }
+
+            if route.response_model is not None and _is_model_type(route.response_model):
+                _register_model_schema(route.response_model, schemas)
+                operation["responses"][str(route.status_code)]["content"] = {
+                    "application/json": {
+                        "schema": {"$ref": f"#/components/schemas/{route.response_model.__name__}"}
+                    }
+                }
+
+            paths.setdefault(route.path, {})[route.method.lower()] = operation
+
+        return {
+            "openapi": "3.1.0",
+            "info": {"title": self.title, "version": self.version},
+            "paths": paths,
+            "components": components,
+        }
 
     # ------------------------------------------------------------------
     # Request execution
@@ -222,7 +301,11 @@ class FastAPI:
                 media_type = "text/plain; charset=utf-8"
             else:
                 media_type = "application/json"
-        headers = [("Content-Type", media_type), ("Content-Length", str(len(body_bytes)))]
+        headers = [
+            ("Content-Type", media_type),
+            ("Content-Length", str(len(body_bytes))),
+            *response.headers.items(),
+        ]
         start_response(status_line, headers)
         return [body_bytes]
 
@@ -233,13 +316,8 @@ def _build_kwargs(
     path_params: dict[str, str],
     query_params: dict[str, str] | None,
 ) -> dict[str, Any]:
-    import inspect
-
     signature = inspect.signature(func)
-    type_hints = {}
     try:
-        from typing import get_type_hints
-
         type_hints = get_type_hints(func)
     except Exception:  # pragma: no cover - defensive fallback when annotations fail to resolve
         type_hints = {}
@@ -278,7 +356,7 @@ def _build_kwargs(
                 raise ValidationError([{"loc": (name,), "msg": "Missing value"}])
             continue
 
-        is_model = isinstance(annotation, type) and issubclass(annotation, BaseModel)
+        is_model = _is_model_type(annotation)
         if is_model:
             if payload is None:
                 raise ValidationError([{"loc": (name,), "msg": "Body required"}])
@@ -321,9 +399,6 @@ def _parse_query(raw: str) -> dict[str, str]:
 
 
 def _coerce_query_value(annotation: Any, raw_value: str | None) -> Any:
-    import inspect
-    from typing import get_args, get_origin
-
     if raw_value is None:
         return None
     if annotation is inspect._empty:
@@ -345,6 +420,102 @@ def _coerce_query_value(annotation: Any, raw_value: str | None) -> Any:
         except Exception:  # pragma: no cover - fallback to raw string
             continue
     return raw_value
+
+
+def _request_model_for_endpoint(endpoint: Callable[..., Any]) -> type[BaseModel] | None:
+    try:
+        hints = get_type_hints(endpoint)
+    except Exception:  # pragma: no cover - defensive
+        hints = {}
+    for name, parameter in inspect.signature(endpoint).parameters.items():
+        annotation = hints.get(name, parameter.annotation)
+        if _is_model_type(annotation):
+            return annotation
+    return None
+
+
+def _is_model_type(value: Any) -> bool:
+    return isinstance(value, type) and issubclass(value, BaseModel)
+
+
+def _register_model_schema(model: type[Any], schemas: dict[str, Any]) -> None:
+    if model.__name__ in schemas or not _is_model_type(model):
+        return
+
+    schemas[model.__name__] = {}
+    try:
+        hints = get_type_hints(model)
+    except Exception:  # pragma: no cover - defensive
+        hints = {}
+
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+    for name, model_field in model.__fields__.items():
+        annotation = hints.get(name, model_field.annotation)
+        property_schema = _annotation_schema(annotation, schemas)
+        if model_field.info.description:
+            property_schema = {
+                **property_schema,
+                "description": model_field.info.description,
+            }
+        properties[name] = property_schema
+        if (
+            model_field.info.default is inspect._empty
+            and model_field.info.default_factory is None
+        ):
+            required.append(name)
+
+    schema: dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+    }
+    if required:
+        schema["required"] = required
+    schemas[model.__name__] = schema
+
+
+def _annotation_schema(annotation: Any, schemas: dict[str, Any]) -> dict[str, Any]:
+    if annotation is Any or annotation is object:
+        return {}
+    if annotation is NoneType:
+        return {"type": "null"}
+    if _is_model_type(annotation):
+        _register_model_schema(annotation, schemas)
+        return {"$ref": f"#/components/schemas/{annotation.__name__}"}
+    if isinstance(annotation, type) and issubclass(annotation, Enum):
+        values = [member.value for member in annotation]
+        value_type = "string" if all(isinstance(value, str) for value in values) else "number"
+        return {"type": value_type, "enum": values}
+
+    origin = get_origin(annotation)
+    arguments = get_args(annotation)
+    if origin is Literal:
+        return {"enum": list(arguments)}
+    if origin in {list, tuple, set, Sequence}:
+        item_schema = _annotation_schema(arguments[0], schemas) if arguments else {}
+        return {"type": "array", "items": item_schema}
+    if origin in {dict, Mapping}:
+        value_schema = _annotation_schema(arguments[1], schemas) if len(arguments) > 1 else {}
+        return {"type": "object", "additionalProperties": value_schema}
+    if origin in {Union, UnionType}:
+        return {"anyOf": [_annotation_schema(candidate, schemas) for candidate in arguments]}
+
+    primitive_types: dict[Any, str] = {
+        str: "string",
+        int: "integer",
+        float: "number",
+        bool: "boolean",
+        datetime: "string",
+        date: "string",
+        time: "string",
+    }
+    schema_type = primitive_types.get(annotation)
+    if schema_type is None:
+        return {}
+    schema = {"type": schema_type}
+    if annotation in {datetime, date, time}:
+        schema["format"] = "date-time" if annotation is datetime else annotation.__name__
+    return schema
 
 
 status = SimpleNamespace(
