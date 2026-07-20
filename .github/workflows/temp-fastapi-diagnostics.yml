@@ -1,4 +1,4 @@
-name: Temporary FastAPI Compatibility Diagnostics
+name: Temporary FastAPI Compatibility Fix
 
 on:
   pull_request:
@@ -12,8 +12,8 @@ permissions:
   contents: read
 
 jobs:
-  diagnose:
-    name: Diagnose FastAPI Compatibility
+  fix:
+    name: Generate FastAPI Compatibility Fix
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
@@ -31,26 +31,67 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Capture checks
+      - name: Apply focused corrections
         shell: bash
         run: |
-          set +e
-          python -m black --check fastapi_compat tests/test_fastapi_compat_contracts.py > black.txt 2>&1
-          echo $? > black.exit
-          python -m ruff check fastapi_compat tests/test_fastapi_compat_contracts.py > ruff.txt 2>&1
-          echo $? > ruff.exit
-          python -m mypy src > mypy.txt 2>&1
-          echo $? > mypy.exit
-          python -m pytest -q tests/test_fastapi_compat_contracts.py tests/test_fastapi_compat_wsgi.py tests/test_api.py > tests.txt 2>&1
-          echo $? > tests.exit
-          exit 0
+          python - <<'PY'
+          from pathlib import Path
 
-      - name: Upload diagnostic outputs
+          path = Path("fastapi_compat/__init__.py")
+          content = path.read_text(encoding="utf-8")
+
+          old_import = "from typing import Any, Literal, Union, get_args, get_origin, get_type_hints"
+          new_import = "from typing import Any, Literal, Union, cast, get_args, get_origin, get_type_hints"
+          if old_import not in content:
+              raise SystemExit("Expected typing import was not found")
+          content = content.replace(old_import, new_import, 1)
+
+          old_return = "        if _is_model_type(annotation):\n            return annotation\n"
+          new_return = (
+              "        if _is_model_type(annotation):\n"
+              "            return cast(type[BaseModel], annotation)\n"
+          )
+          if old_return not in content:
+              raise SystemExit("Expected request-model return was not found")
+          content = content.replace(old_return, new_return, 1)
+
+          old_required = (
+              "        if (\n"
+              "            model_field.info.default is inspect._empty\n"
+              "            and model_field.info.default_factory is None\n"
+              "        ):\n"
+              "            required.append(name)\n"
+          )
+          new_required = (
+              "        if (\n"
+              "            model_field.info.default is inspect._empty\n"
+              "            or model_field.info.default is Ellipsis\n"
+              "        ) and model_field.info.default_factory is None:\n"
+              "            required.append(name)\n"
+          )
+          if old_required not in content:
+              raise SystemExit("Expected required-field condition was not found")
+          content = content.replace(old_required, new_required, 1)
+
+          path.write_text(content, encoding="utf-8")
+          PY
+
+      - name: Format corrected files
+        run: python -m black fastapi_compat/__init__.py fastapi_compat/testclient.py tests/test_fastapi_compat_contracts.py
+
+      - name: Validate corrected files
+        run: |
+          python -m ruff check fastapi_compat tests/test_fastapi_compat_contracts.py
+          python -m mypy src
+          python -m pytest -q tests/test_fastapi_compat_contracts.py tests/test_fastapi_compat_wsgi.py tests/test_api.py
+
+      - name: Upload corrected files
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fastapi-compatibility-diagnostics
+          name: corrected-fastapi-compatibility-files
           path: |
-            *.txt
-            *.exit
+            fastapi_compat/__init__.py
+            fastapi_compat/testclient.py
+            tests/test_fastapi_compat_contracts.py
           if-no-files-found: error
           retention-days: 1
