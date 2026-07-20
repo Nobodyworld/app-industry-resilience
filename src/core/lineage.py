@@ -13,7 +13,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Any, TypeAlias
+from typing import Any
 
 import pandas as pd
 
@@ -22,7 +22,7 @@ LINEAGE_SCHEMA_VERSION = "1"
 CALCULATION_VERSION = "1"
 TRANSFORMATION_VERSION = "1"
 
-JSONScalar: TypeAlias = str | int | float | bool | None
+type JSONScalar = str | int | float | bool | None
 
 
 class LineageSourceKind(StrEnum):
