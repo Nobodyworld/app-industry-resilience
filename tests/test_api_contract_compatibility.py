@@ -70,8 +70,16 @@ def _health_payload() -> dict[str, object]:
 def _normalise_payload(payload: Any) -> Any:
     normalised = deepcopy(payload)
     if isinstance(normalised, dict):
+        lineage = normalised.get("lineage")
+        if isinstance(lineage, dict):
+            lineage.pop("acquired_at", None)
+
         metadata = normalised.get("metadata")
         if isinstance(metadata, dict):
+            metadata_lineage = metadata.get("lineage")
+            if isinstance(metadata_lineage, dict):
+                metadata_lineage.pop("acquired_at", None)
+
             telemetry = metadata.get("telemetry")
             if isinstance(telemetry, dict):
                 telemetry.pop("trace_id", None)

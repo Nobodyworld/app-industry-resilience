@@ -6,12 +6,15 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import UTC, datetime
 from typing import Any, cast
+
+import pandas as pd
 
 from fastapi_compat import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi_compat.middleware.cors import CORSMiddleware
 from src.application import DataSource, IdiotIndexService, ScenarioPlanner
-from src.core import summarise_health
+from src.core import LineageStep, attach_lineage, build_lineage, summarise_health
 from src.extensions.manager import get_extension_manager
 from src.infrastructure.observability import (
     bootstrap_observability,
@@ -45,6 +48,7 @@ from src.interfaces.api.schemas import (
     ScenarioResponse,
     adjustments_to_domain,
     health_summary_to_model,
+    lineage_model_from_dataframe,
     metadata_from_summary,
     records_to_dataframe,
     scenario_to_response,
@@ -351,6 +355,28 @@ def list_connectors() -> Response:
     return _legacy_alias_response(_list_connectors_response(), "/v1/meta/connectors")
 
 
+def _attach_api_inline_lineage(frame: pd.DataFrame, *, year: int) -> None:
+    """Attach redacted source lineage for API-supplied inline records."""
+
+    lineage = build_lineage(
+        source="api-inline",
+        source_kind="inline_records",
+        dataset_id="api-inline",
+        observation_period=year,
+        acquired_at=datetime.now(UTC),
+        retrieval_mode="inline",
+        is_sample=False,
+        is_official=False,
+        transformations=(
+            LineageStep(
+                name="source_load",
+                details={"record_count": len(frame)},
+            ),
+        ),
+    )
+    attach_lineage(frame, lineage)
+
+
 def _evaluate_response(
     request: EvaluateRequest,
     service: IdiotIndexService,
@@ -371,6 +397,7 @@ def _evaluate_response(
                 ) from exc
             dataframe.attrs.setdefault("source", "api-inline")
             dataframe.attrs.setdefault("source_origin", "api")
+            _attach_api_inline_lineage(dataframe, year=request.year)
 
         try:
             summary = service.evaluate(
@@ -523,6 +550,7 @@ def _analytics_health_response(
             ) from exc
         dataframe.attrs.setdefault("source", "api-inline")
         dataframe.attrs.setdefault("source_origin", "api-health")
+        _attach_api_inline_lineage(dataframe, year=request.year)
 
     with telemetry.tracer.start_span(
         "service.analytics_health",
@@ -562,6 +590,7 @@ def _analytics_health_response(
         filters=filters,
         health=envelope,
         metadata=metadata_from_summary(summary),
+        lineage=lineage_model_from_dataframe(summary.dataframe_full),
     )
     trace_id = telemetry.correlation_id()
     if trace_id:
