@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from enum import Enum
 from types import NoneType, SimpleNamespace, UnionType
-from typing import Any, Literal, Union, get_args, get_origin, get_type_hints
+from typing import Any, Literal, Union, cast, get_args, get_origin, get_type_hints
 from urllib.parse import parse_qs
 
 from pydantic_compat import BaseModel, ValidationError
@@ -430,7 +430,7 @@ def _request_model_for_endpoint(endpoint: Callable[..., Any]) -> type[BaseModel]
     for name, parameter in inspect.signature(endpoint).parameters.items():
         annotation = hints.get(name, parameter.annotation)
         if _is_model_type(annotation):
-            return annotation
+            return cast(type[BaseModel], annotation)
     return None
 
 
@@ -460,9 +460,8 @@ def _register_model_schema(model: type[Any], schemas: dict[str, Any]) -> None:
             }
         properties[name] = property_schema
         if (
-            model_field.info.default is inspect._empty
-            and model_field.info.default_factory is None
-        ):
+            model_field.info.default is inspect._empty or model_field.info.default is Ellipsis
+        ) and model_field.info.default_factory is None:
             required.append(name)
 
     schema: dict[str, Any] = {
