@@ -1,0 +1,347 @@
+name: Temporary Evaluation Lineage Apply
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - architecture/evaluation-lineage
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    name: Apply Evaluation Lineage
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout implementation branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: architecture/evaluation-lineage
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Apply deterministic lineage patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          service_path = Path("src/application/idiot_index_service.py")
+          service = service_path.read_text(encoding="utf-8")
+          service = service.replace(
+              """from src.core import (
+              AppConfig,
+              HealthSummary,
+              MetricConfig,
+              NormalizationOptions,
+              SecurityUtils,
+              apply_dtype_overrides,
+              compute_health_scores,
+              compute_metrics,
+              format_for_display,
+              load_config,
+              normalize_columns,
+              summarise_health,
+          )""".replace("              ", ""),
+              """from src.core import (
+              AppConfig,
+              HealthSummary,
+              LineageStep,
+              MetricConfig,
+              NormalizationOptions,
+              SecurityUtils,
+              append_lineage_step,
+              apply_dtype_overrides,
+              attach_lineage,
+              build_lineage,
+              compute_health_scores,
+              compute_metrics,
+              format_for_display,
+              lineage_from_dataframe,
+              load_config,
+              normalize_columns,
+              summarise_health,
+          )""".replace("              ", ""),
+              1,
+          )
+          old_pipeline = """    normalized = normalize_columns(
+              dataset,
+              column_aliases=(normalization_options.column_aliases if normalization_options else None),
+              dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
+          )
+              metrics = compute_metrics(normalized, config=metric_config)
+              display = format_for_display(
+              metrics,
+              dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
+          )
+              if normalization_options and normalization_options.dtype_overrides:
+              apply_dtype_overrides(display, normalization_options.dtype_overrides)
+              display = compute_health_scores(display)
+          
+              filtered = _filter_dataframe(display, sanitized_search)
+          """.replace("              ", "")
+          new_pipeline = """    dataset = _ensure_source_lineage(dataset, source=source, year=year)
+          
+              normalized = normalize_columns(
+              dataset,
+              column_aliases=(normalization_options.column_aliases if normalization_options else None),
+              dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
+          )
+              normalized = _append_frame_lineage_step(
+              normalized,
+              dataset,
+              "normalize_columns",
+              details={"column_count": len(normalized.columns)},
+          )
+              metrics = compute_metrics(normalized, config=metric_config)
+              metric_count = len(set(metrics.columns).difference(normalized.columns))
+              metrics = _append_frame_lineage_step(
+              metrics,
+              normalized,
+              "compute_metrics",
+              details={"metric_count": metric_count},
+          )
+              display = format_for_display(
+              metrics,
+              dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
+          )
+              if normalization_options and normalization_options.dtype_overrides:
+              apply_dtype_overrides(display, normalization_options.dtype_overrides)
+              display = compute_health_scores(display)
+              display = _append_frame_lineage_step(display, metrics, "compute_health_scores")
+          
+              filtered = _filter_dataframe(display, sanitized_search)
+              filtered = _append_frame_lineage_step(
+              filtered,
+              display,
+              "filter_records",
+              details={
+                  "filter_applied": sanitized_search is not None,
+                  "result_count": len(filtered),
+              },
+          )
+          """.replace("              ", "")
+          if old_pipeline not in service:
+              raise SystemExit("Evaluation pipeline block not found")
+          service = service.replace(old_pipeline, new_pipeline, 1)
+          helper_marker = "def _resolve_dataset(\n"
+          helpers = """def _ensure_source_lineage(
+              frame: pd.DataFrame,
+              *,
+              source: DataSource,
+              year: int,
+          ) -> pd.DataFrame:
+              """Attach source lineage when the source boundary has not already done so."""
+          
+              if lineage_from_dataframe(frame) is not None:
+                  return frame
+              if source is not DataSource.SAMPLE:
+                  return frame
+          
+              lineage = build_lineage(
+                  source="sample",
+                  source_kind="bundled_sample",
+                  dataset_id="sample_industries",
+                  observation_period=year,
+                  retrieval_mode="bundled",
+                  is_sample=True,
+                  is_official=False,
+                  transformations=(
+                      LineageStep(
+                          name="source_load",
+                          details={"record_count": len(frame)},
+                      ),
+                  ),
+              )
+              return attach_lineage(frame, lineage)
+          
+          
+          def _append_frame_lineage_step(
+              target: pd.DataFrame,
+              source: pd.DataFrame,
+              step_name: str,
+              *,
+              details: dict[str, str | int | float | bool | None] | None = None,
+          ) -> pd.DataFrame:
+              """Copy typed lineage from ``source`` and append one bounded step."""
+          
+              lineage = lineage_from_dataframe(source)
+              if lineage is None:
+                  return target
+              updated = append_lineage_step(lineage, step_name, details=details or {})
+              return attach_lineage(target, updated)
+          
+          
+          """.replace("          ", "")
+          if helper_marker not in service:
+              raise SystemExit("Dataset resolver marker not found")
+          service = service.replace(helper_marker, helpers + helper_marker, 1)
+          service_path.write_text(service, encoding="utf-8")
+
+          schemas_path = Path("src/interfaces/api/schemas.py")
+          schemas = schemas_path.read_text(encoding="utf-8")
+          schemas = schemas.replace(
+              "from src.core import HealthSummary",
+              """from src.core import (
+              HealthSummary,
+              lineage_from_dataframe,
+              lineage_to_dict,
+          )""".replace("              ", ""),
+              1,
+          )
+          marker = "class EvaluateResponse(BaseModel):\n"
+          models = """class LineageStepModel(BaseModel):
+              """Public API representation of one bounded lineage transformation."""
+          
+              name: str
+              version: str
+              details: dict[str, Any] = Field(default_factory=dict)
+          
+          
+          class LineageEnvelopeModel(BaseModel):
+              """Typed, redacted lineage returned with analytical responses."""
+          
+              schema_version: str
+              source: str
+              source_kind: str
+              dataset_id: str
+              provider: str | None = None
+              observation_period: str
+              acquired_at: str | None = None
+              snapshot_at: str | None = None
+              retrieval_mode: str
+              is_sample: bool
+              is_official: bool
+              calculation_version: str
+              transformations: list[LineageStepModel] = Field(default_factory=list)
+              cache_status: str
+          
+          
+          def lineage_model_from_dataframe(frame: pd.DataFrame) -> LineageEnvelopeModel | None:
+              """Return the allowlisted typed lineage model for ``frame`` when present."""
+          
+              lineage = lineage_from_dataframe(frame)
+              if lineage is None:
+                  return None
+              return LineageEnvelopeModel(**lineage_to_dict(lineage))
+          
+          
+          """.replace("          ", "")
+          if marker not in schemas:
+              raise SystemExit("Evaluate response marker not found")
+          schemas = schemas.replace(marker, models + marker, 1)
+          schemas = schemas.replace(
+              "    metadata: dict[str, Any] = Field(default_factory=dict)\n    health: HealthAnalyticsEnvelope | None = None\n",
+              "    metadata: dict[str, Any] = Field(default_factory=dict)\n    lineage: LineageEnvelopeModel | None = None\n    health: HealthAnalyticsEnvelope | None = None\n",
+              1,
+          )
+          schemas = schemas.replace(
+              "    health: HealthAnalyticsEnvelope\n    metadata: dict[str, Any] = Field(default_factory=dict)\n",
+              "    health: HealthAnalyticsEnvelope\n    metadata: dict[str, Any] = Field(default_factory=dict)\n    lineage: LineageEnvelopeModel | None = None\n",
+              1,
+          )
+          schemas = schemas.replace(
+              "        metadata=metadata,\n        health=health_envelope,\n",
+              "        metadata=metadata,\n        lineage=lineage_model_from_dataframe(summary.dataframe_full),\n        health=health_envelope,\n",
+              1,
+          )
+          schemas_path.write_text(schemas, encoding="utf-8")
+
+          app_path = Path("src/interfaces/api/app.py")
+          app = app_path.read_text(encoding="utf-8")
+          app = app.replace("import os\n", "import os\nfrom datetime import UTC, datetime\n", 1)
+          app = app.replace(
+              "from src.core import summarise_health",
+              "from src.core import LineageStep, attach_lineage, build_lineage, summarise_health",
+              1,
+          )
+          app = app.replace(
+              "    metadata_from_summary,\n    records_to_dataframe,\n",
+              "    lineage_model_from_dataframe,\n    metadata_from_summary,\n    records_to_dataframe,\n",
+              1,
+          )
+          marker = "def _evaluate_response(\n"
+          helper = """def _attach_api_inline_lineage(frame: pd.DataFrame, *, year: int) -> None:
+              """Attach redacted source lineage for API-supplied inline records."""
+          
+              lineage = build_lineage(
+                  source="api-inline",
+                  source_kind="inline_records",
+                  dataset_id="api-inline",
+                  observation_period=year,
+                  acquired_at=datetime.now(UTC),
+                  retrieval_mode="inline",
+                  is_sample=False,
+                  is_official=False,
+                  transformations=(
+                      LineageStep(
+                          name="source_load",
+                          details={"record_count": len(frame)},
+                      ),
+                  ),
+              )
+              attach_lineage(frame, lineage)
+          
+          
+          """.replace("          ", "")
+          if marker not in app:
+              raise SystemExit("Evaluate handler marker not found")
+          app = app.replace(marker, helper + marker, 1)
+          app = app.replace(
+              "            dataframe.attrs.setdefault(\"source\", \"api-inline\")\n            dataframe.attrs.setdefault(\"source_origin\", \"api\")\n",
+              "            dataframe.attrs.setdefault(\"source\", \"api-inline\")\n            dataframe.attrs.setdefault(\"source_origin\", \"api\")\n            _attach_api_inline_lineage(dataframe, year=request.year)\n",
+              1,
+          )
+          app = app.replace(
+              "        dataframe.attrs.setdefault(\"source\", \"api-inline\")\n        dataframe.attrs.setdefault(\"source_origin\", \"api-health\")\n",
+              "        dataframe.attrs.setdefault(\"source\", \"api-inline\")\n        dataframe.attrs.setdefault(\"source_origin\", \"api-health\")\n        _attach_api_inline_lineage(dataframe, year=request.year)\n",
+              1,
+          )
+          app = app.replace(
+              "        health=envelope,\n        metadata=metadata_from_summary(summary),\n",
+              "        health=envelope,\n        metadata=metadata_from_summary(summary),\n        lineage=lineage_model_from_dataframe(summary.dataframe_full),\n",
+              1,
+          )
+          app_path.write_text(app, encoding="utf-8")
+          PY
+
+      - name: Format approved files
+        run: >-
+          python -m black
+          src/application/idiot_index_service.py
+          src/interfaces/api/schemas.py
+          src/interfaces/api/app.py
+          tests/test_evaluation_lineage.py
+
+      - name: Validate approved files
+        run: |
+          python -m ruff check src/application/idiot_index_service.py src/interfaces/api/schemas.py src/interfaces/api/app.py tests/test_evaluation_lineage.py
+          python -m mypy src
+          python -m pytest -q tests/test_evaluation_lineage.py tests/test_lineage.py tests/test_api_contract_compatibility.py tests/test_api.py
+
+      - name: Commit validated files
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            src/application/idiot_index_service.py \
+            src/interfaces/api/schemas.py \
+            src/interfaces/api/app.py \
+            tests/test_evaluation_lineage.py
+          git diff --cached --check
+          git commit -m "feat: propagate evaluation data lineage"
+          git push origin HEAD:architecture/evaluation-lineage
