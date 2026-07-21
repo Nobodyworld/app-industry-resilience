@@ -92,9 +92,7 @@ def build_xlsx_lineage_rows(
         rendered = (
             json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
             if isinstance(value, (dict, list))
-            else ""
-            if value is None
-            else str(value)
+            else "" if value is None else str(value)
         )
         rows.append({"field": field_name, "value": rendered})
     return rows
