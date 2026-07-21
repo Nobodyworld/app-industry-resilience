@@ -1,0 +1,63 @@
+name: Temporary Export Lineage Diagnostics
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-export-lineage-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostics:
+    name: Export lineage diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Black changed files
+        id: black
+        if: ${{ always() }}
+        continue-on-error: true
+        run: black --check src/application/lineage_exports.py tests/test_lineage_exports.py
+
+      - name: Generate Black patch
+        if: ${{ always() && steps.black.outcome == 'failure' }}
+        run: |
+          black src/application/lineage_exports.py tests/test_lineage_exports.py
+          git diff -- src/application/lineage_exports.py tests/test_lineage_exports.py > black.patch
+
+      - name: Upload Black patch
+        if: ${{ always() && steps.black.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: export-lineage-black-patch
+          path: black.patch
+
+      - name: Ruff changed files
+        if: ${{ always() }}
+        run: ruff check src/application/lineage_exports.py tests/test_lineage_exports.py
+
+      - name: Mypy export module
+        if: ${{ always() }}
+        run: python -m mypy src/application/lineage_exports.py
+
+      - name: Focused export tests
+        if: ${{ always() }}
+        run: pytest -q tests/test_lineage_exports.py
