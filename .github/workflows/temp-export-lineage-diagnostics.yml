@@ -66,6 +66,21 @@ jobs:
         if: ${{ always() }}
         run: make coverage-runtime
 
+      - name: Full coverage pass
+        id: coverage_full
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          make coverage-full 2>&1 | tee coverage-full.log
+
+      - name: Upload full coverage log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: export-lineage-coverage-full-log
+          path: coverage-full.log
+
       - name: Benchmark gate
         if: ${{ always() }}
         run: make benchmark-metrics
