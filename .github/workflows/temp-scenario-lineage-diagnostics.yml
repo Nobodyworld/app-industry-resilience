@@ -35,6 +35,19 @@ jobs:
         if: ${{ always() }}
         run: black --check src/application/scenario_planner.py tests/test_scenario_planner.py
 
+      - name: Generate Black patch
+        if: ${{ always() }}
+        run: |
+          black src/application/scenario_planner.py tests/test_scenario_planner.py
+          git diff -- src/application/scenario_planner.py tests/test_scenario_planner.py > black.patch
+
+      - name: Upload Black patch
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scenario-lineage-black-patch
+          path: black.patch
+
       - name: Ruff changed files
         if: ${{ always() }}
         run: ruff check src/application/scenario_planner.py tests/test_scenario_planner.py
