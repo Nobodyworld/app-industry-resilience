@@ -1,0 +1,48 @@
+name: Temporary Scenario Lineage Diagnostics
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: temp-scenario-lineage-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostics:
+    name: Scenario lineage diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Black changed files
+        if: ${{ always() }}
+        run: black --check src/application/scenario_planner.py tests/test_scenario_planner.py
+
+      - name: Ruff changed files
+        if: ${{ always() }}
+        run: ruff check src/application/scenario_planner.py tests/test_scenario_planner.py
+
+      - name: Mypy application
+        if: ${{ always() }}
+        run: python -m mypy src/application/scenario_planner.py
+
+      - name: Focused scenario tests
+        if: ${{ always() }}
+        run: pytest -q tests/test_scenario_planner.py
