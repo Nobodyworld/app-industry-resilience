@@ -5,16 +5,22 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import Any, cast
 
 import pandas as pd
 
 from src.core import (
     HealthSummary,
+    LineageStep,
     MetricConfig,
+    append_lineage_step,
+    attach_lineage,
+    build_lineage,
     compute_health_scores,
     compute_metrics,
     format_for_display,
+    lineage_from_dataframe,
     summarise_health,
 )
 from src.extensions.manager import ExtensionManager, get_extension_manager
@@ -107,19 +113,57 @@ class ScenarioPlanner:
         with observability_cm:
             raw_base = _extract_inputs(base)
             raw_base.attrs.update(base.attrs)
+            raw_base = _ensure_scenario_input_lineage(raw_base)
 
-            baseline_metrics = _compute(raw_base, self.metric_config)
+            baseline_computed = _compute(raw_base, self.metric_config)
+            baseline_metric_count = len(set(baseline_computed.columns).difference(raw_base.columns))
+            baseline_computed = _append_frame_lineage_step(
+                baseline_computed,
+                raw_base,
+                "compute_metrics",
+                details={"metric_count": baseline_metric_count},
+            )
+
             adjusted_inputs = raw_base.copy()
-
+            adjusted_inputs.attrs.update(raw_base.attrs)
             for adjustment in adjustments:
                 _apply_adjustment(adjusted_inputs, adjustment)
+            adjusted_inputs = _append_frame_lineage_step(
+                adjusted_inputs,
+                raw_base,
+                "scenario_adjustment",
+                details=_scenario_adjustment_details(
+                    adjustments,
+                    row_count=len(adjusted_inputs),
+                ),
+            )
 
-            scenario_metrics = _compute(adjusted_inputs, self.metric_config)
+            scenario_computed = _compute(adjusted_inputs, self.metric_config)
+            scenario_metric_count = len(
+                set(scenario_computed.columns).difference(adjusted_inputs.columns)
+            )
+            scenario_computed = _append_frame_lineage_step(
+                scenario_computed,
+                adjusted_inputs,
+                "compute_metrics",
+                details={"metric_count": scenario_metric_count},
+            )
 
-            baseline_metrics = compute_health_scores(format_for_display(baseline_metrics))
-            scenario_metrics = compute_health_scores(format_for_display(scenario_metrics))
+            baseline_metrics = compute_health_scores(format_for_display(baseline_computed))
+            baseline_metrics = _append_frame_lineage_step(
+                baseline_metrics,
+                baseline_computed,
+                "compute_health_scores",
+            )
+            scenario_metrics = compute_health_scores(format_for_display(scenario_computed))
+            scenario_metrics = _append_frame_lineage_step(
+                scenario_metrics,
+                scenario_computed,
+                "compute_health_scores",
+            )
 
             deltas = _calculate_deltas(baseline_metrics, scenario_metrics)
+            deltas = _copy_frame_lineage(deltas, scenario_metrics)
 
             baseline_summary = _summarise(baseline_metrics)
             scenario_summary = _summarise(scenario_metrics)
@@ -183,6 +227,88 @@ def _extract_inputs(df: pd.DataFrame) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Dataframe missing required columns: {', '.join(missing)}")
     return df.loc[:, list(_INPUT_COLUMNS)].copy()
+
+
+def _ensure_scenario_input_lineage(frame: pd.DataFrame) -> pd.DataFrame:
+    """Attach a redacted inline-source envelope when callers provide raw records."""
+
+    if lineage_from_dataframe(frame) is not None:
+        return frame
+
+    source = "api-scenario" if frame.attrs.get("source") == "api-scenario" else "scenario-input"
+    periods = frame["year"].dropna().unique() if "year" in frame.columns else []
+    observation_period = str(periods[0]) if len(periods) == 1 else "mixed"
+    lineage = build_lineage(
+        source=source,
+        source_kind="inline_records",
+        dataset_id=source,
+        observation_period=observation_period,
+        acquired_at=datetime.now(UTC),
+        retrieval_mode="inline",
+        is_sample=False,
+        is_official=False,
+        transformations=(
+            LineageStep(
+                name="source_load",
+                details={"record_count": len(frame)},
+            ),
+        ),
+    )
+    return attach_lineage(frame, lineage)
+
+
+def _append_frame_lineage_step(
+    target: pd.DataFrame,
+    source: pd.DataFrame,
+    step_name: str,
+    *,
+    details: Mapping[str, str | int | float | bool | None] | None = None,
+) -> pd.DataFrame:
+    """Copy typed lineage from ``source`` and append one bounded step."""
+
+    lineage = lineage_from_dataframe(source)
+    if lineage is None:
+        return target
+    updated = append_lineage_step(lineage, step_name, details=details or {})
+    return attach_lineage(target, updated)
+
+
+def _copy_frame_lineage(target: pd.DataFrame, source: pd.DataFrame) -> pd.DataFrame:
+    """Copy typed lineage between frames without copying arbitrary attributes."""
+
+    lineage = lineage_from_dataframe(source)
+    if lineage is None:
+        return target
+    return attach_lineage(target, lineage)
+
+
+def _scenario_adjustment_details(
+    adjustments: Sequence[ScenarioAdjustment],
+    *,
+    row_count: int,
+) -> dict[str, str | int | float | bool | None]:
+    """Return bounded, non-secret adjustment metadata for lineage."""
+
+    all_industries = any(not adjustment.industry_codes for adjustment in adjustments)
+    targeted_codes = {
+        str(code) for adjustment in adjustments for code in (adjustment.industry_codes or ())
+    }
+    details: dict[str, str | int | float | bool | None] = {
+        "adjustment_count": len(adjustments),
+        "targeted_industry_count": row_count if all_industries else len(targeted_codes),
+        "all_industries": all_industries,
+    }
+    if len(adjustments) == 1:
+        adjustment = adjustments[0]
+        details.update(
+            {
+                "gross_output_delta_pct": adjustment.gross_output_delta_pct,
+                "materials_cost_delta_pct": adjustment.materials_cost_delta_pct,
+                "value_added_delta_pct": adjustment.value_added_delta_pct,
+                "intermediate_inputs_delta_pct": adjustment.intermediate_inputs_delta_pct,
+            }
+        )
+    return details
 
 
 def _apply_adjustment(df: pd.DataFrame, adjustment: ScenarioAdjustment) -> None:
