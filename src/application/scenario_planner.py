@@ -116,7 +116,9 @@ class ScenarioPlanner:
             raw_base = _ensure_scenario_input_lineage(raw_base)
 
             baseline_computed = _compute(raw_base, self.metric_config)
-            baseline_metric_count = len(set(baseline_computed.columns).difference(raw_base.columns))
+            baseline_metric_count = len(
+                set(baseline_computed.columns).difference(raw_base.columns)
+            )
             baseline_computed = _append_frame_lineage_step(
                 baseline_computed,
                 raw_base,
@@ -235,7 +237,9 @@ def _ensure_scenario_input_lineage(frame: pd.DataFrame) -> pd.DataFrame:
     if lineage_from_dataframe(frame) is not None:
         return frame
 
-    source = "api-scenario" if frame.attrs.get("source") == "api-scenario" else "scenario-input"
+    source = (
+        "api-scenario" if frame.attrs.get("source") == "api-scenario" else "scenario-input"
+    )
     periods = frame["year"].dropna().unique() if "year" in frame.columns else []
     observation_period = str(periods[0]) if len(periods) == 1 else "mixed"
     lineage = build_lineage(
