@@ -23,13 +23,18 @@ import pandas as pd
 from src.core import (
     AppConfig,
     HealthSummary,
+    LineageStep,
     MetricConfig,
     NormalizationOptions,
     SecurityUtils,
+    append_lineage_step,
     apply_dtype_overrides,
+    attach_lineage,
+    build_lineage,
     compute_health_scores,
     compute_metrics,
     format_for_display,
+    lineage_from_dataframe,
     load_config,
     normalize_columns,
     summarise_health,
@@ -285,12 +290,27 @@ def _evaluate_idiot_index(
         normalization_options=normalization_options,
     )
 
+    dataset = _ensure_source_lineage(dataset, source=source, year=year)
+
     normalized = normalize_columns(
         dataset,
         column_aliases=(normalization_options.column_aliases if normalization_options else None),
         dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
     )
+    normalized = _append_frame_lineage_step(
+        normalized,
+        dataset,
+        "normalize_columns",
+        details={"column_count": len(normalized.columns)},
+    )
     metrics = compute_metrics(normalized, config=metric_config)
+    metric_count = len(set(metrics.columns).difference(normalized.columns))
+    metrics = _append_frame_lineage_step(
+        metrics,
+        normalized,
+        "compute_metrics",
+        details={"metric_count": metric_count},
+    )
     display = format_for_display(
         metrics,
         dtype_overrides=(normalization_options.dtype_overrides if normalization_options else None),
@@ -298,8 +318,18 @@ def _evaluate_idiot_index(
     if normalization_options and normalization_options.dtype_overrides:
         apply_dtype_overrides(display, normalization_options.dtype_overrides)
     display = compute_health_scores(display)
+    display = _append_frame_lineage_step(display, metrics, "compute_health_scores")
 
     filtered = _filter_dataframe(display, sanitized_search)
+    filtered = _append_frame_lineage_step(
+        filtered,
+        display,
+        "filter_records",
+        details={
+            "filter_applied": sanitized_search is not None,
+            "result_count": len(filtered),
+        },
+    )
     leaderboard = _build_leaderboard(filtered, top_n)
     notes = _extract_notes(display)
     average = float(filtered["idiot_index"].mean()) if not filtered.empty else None
@@ -322,6 +352,53 @@ def _evaluate_idiot_index(
         health_summary_full=health_summary_full,
         health_summary_filtered=health_summary_filtered,
     )
+
+
+def _ensure_source_lineage(
+    frame: pd.DataFrame,
+    *,
+    source: DataSource,
+    year: int,
+) -> pd.DataFrame:
+    """Attach source lineage when the source boundary has not already done so."""
+
+    if lineage_from_dataframe(frame) is not None:
+        return frame
+    if source is not DataSource.SAMPLE:
+        return frame
+
+    lineage = build_lineage(
+        source="sample",
+        source_kind="bundled_sample",
+        dataset_id="sample_industries",
+        observation_period=year,
+        retrieval_mode="bundled",
+        is_sample=True,
+        is_official=False,
+        transformations=(
+            LineageStep(
+                name="source_load",
+                details={"record_count": len(frame)},
+            ),
+        ),
+    )
+    return attach_lineage(frame, lineage)
+
+
+def _append_frame_lineage_step(
+    target: pd.DataFrame,
+    source: pd.DataFrame,
+    step_name: str,
+    *,
+    details: dict[str, str | int | float | bool | None] | None = None,
+) -> pd.DataFrame:
+    """Copy typed lineage from ``source`` and append one bounded step."""
+
+    lineage = lineage_from_dataframe(source)
+    if lineage is None:
+        return target
+    updated = append_lineage_step(lineage, step_name, details=details or {})
+    return attach_lineage(target, updated)
 
 
 def _resolve_dataset(

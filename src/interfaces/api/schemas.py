@@ -19,7 +19,11 @@ from src.application import (
     ScenarioResult,
     ScenarioSummary,
 )
-from src.core import HealthSummary
+from src.core import (
+    HealthSummary,
+    lineage_from_dataframe,
+    lineage_to_dict,
+)
 from src.infrastructure.observability.storage import ObservabilitySnapshot
 
 
@@ -341,6 +345,42 @@ class HealthAnalyticsEnvelope(BaseModel):
     filtered: HealthAnalyticsSummaryModel
 
 
+class LineageStepModel(BaseModel):
+    """Public API representation of one bounded lineage transformation."""
+
+    name: str
+    version: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class LineageEnvelopeModel(BaseModel):
+    """Typed, redacted lineage returned with analytical responses."""
+
+    schema_version: str
+    source: str
+    source_kind: str
+    dataset_id: str
+    provider: str | None = None
+    observation_period: str
+    acquired_at: str | None = None
+    snapshot_at: str | None = None
+    retrieval_mode: str
+    is_sample: bool
+    is_official: bool
+    calculation_version: str
+    transformations: list[LineageStepModel] = Field(default_factory=list)
+    cache_status: str
+
+
+def lineage_model_from_dataframe(frame: pd.DataFrame) -> LineageEnvelopeModel | None:
+    """Return the allowlisted typed lineage model for ``frame`` when present."""
+
+    lineage = lineage_from_dataframe(frame)
+    if lineage is None:
+        return None
+    return LineageEnvelopeModel(**lineage_to_dict(lineage))
+
+
 class EvaluateResponse(BaseModel):
     source: DataSource
     year: int
@@ -350,6 +390,7 @@ class EvaluateResponse(BaseModel):
     leaderboard: list[LeaderboardEntry]
     dataset: EvaluateDataset
     metadata: dict[str, Any] = Field(default_factory=dict)
+    lineage: LineageEnvelopeModel | None = None
     health: HealthAnalyticsEnvelope | None = None
 
     model_config = ConfigDict(use_enum_values=True)
@@ -443,6 +484,7 @@ class HealthAnalyticsResponse(BaseModel):
     filters: EvaluateFilters
     health: HealthAnalyticsEnvelope
     metadata: dict[str, Any] = Field(default_factory=dict)
+    lineage: LineageEnvelopeModel | None = None
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -568,6 +610,7 @@ def summary_to_response(
             filtered=dataframe_to_records(summary.dataframe_filtered),
         ),
         metadata=metadata,
+        lineage=lineage_model_from_dataframe(summary.dataframe_full),
         health=health_envelope,
     )
 
