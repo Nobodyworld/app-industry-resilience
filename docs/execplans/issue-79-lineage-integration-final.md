@@ -17,7 +17,7 @@ After this change, users can distinguish live BEA and Census data, the official 
 - [x] (2026-07-21 00:00Z) Added typed scenario response lineage, canonical/legacy parity coverage, and OpenAPI coverage while retaining metadata.
 - [x] (2026-07-21 00:00Z) Integrated lineage export helpers into JSON, XLSX, and CSV companion Streamlit artifacts while preserving existing downloads.
 - [x] (2026-07-21 00:00Z) Updated exact API and export documentation examples without changing `TASKLIST.md`.
-- [ ] Commit and push remain; implementation, focused/full tests, direct quality-gate constituents, security scans, diff review, and Docker availability review are complete.
+- [x] (2026-07-21 00:00Z) Completed focused/full tests, direct quality-gate constituents, security scans, diff review, Docker availability review, implementation commit `9cd998b`, and non-force push to only `architecture/lineage-integration-final`.
 
 ## Surprises & Discoveries
 
@@ -47,7 +47,7 @@ After this change, users can distinguish live BEA and Census data, the official 
 
 ## Outcomes & Retrospective
 
-The implementation is complete and validated. Official provider/snapshot identity now reaches evaluation, scenario, caches, and downloads without copying unrestricted attributes. Cache hits retain original timestamps and transformations, legacy lineage-free payloads remain readable, and computation caches separate distinct source identities. The API and download contracts are additive: scenario metadata remains, CSV remains tabular, and existing artifact labels/files remain alongside lineage companions. Publication is the only remaining operational step at this revision.
+The implementation is complete, validated, committed, and published to the requested feature branch. Official provider/snapshot identity now reaches evaluation, scenario, caches, and downloads without copying unrestricted attributes. Cache hits retain original timestamps and transformations, legacy lineage-free payloads remain readable, and computation caches separate distinct source identities. The API and download contracts are additive: scenario metadata remains, CSV remains tabular, and existing artifact labels/files remain alongside lineage companions. No product behavior remains to implement for this plan.
 
 ## Context and Orientation
 
@@ -122,3 +122,5 @@ Use existing `src.core` exports: `LineageStep`, `attach_lineage`, `build_lineage
 Revision note (2026-07-21): Created after preflight and repository/issue inspection to guide the final issue 79 implementation in the isolated worktree.
 
 Revision note (2026-07-21): Updated after implementation and validation to record completed behavior, the computation-cache identity decision, exact evidence, and environment-only limitations before publication.
+
+Revision note (2026-07-21): Closed after implementation commit `9cd998b` was pushed without force to `architecture/lineage-integration-final`; this plan-only closure will be the final synchronized branch commit.
