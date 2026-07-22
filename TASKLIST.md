@@ -48,4 +48,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-- [ ] Publish truthful no-auth public-data readiness catalog through canonical v1 API — issue: [#104](https://github.com/Nobodyworld/app-industry-resilience/issues/104)
+- [ ] Publish truthful no-auth public-data readiness catalog through typed canonical v1 API — issue: [#104](https://github.com/Nobodyworld/app-industry-resilience/issues/104)
