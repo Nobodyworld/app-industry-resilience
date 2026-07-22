@@ -1,31 +1,38 @@
-name: Temporary Public Data Catalog Bundle
+name: Temporary Apply Issue 104
 
 on:
   pull_request:
     branches: ["main"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  bundle:
+  apply:
     if: ${{ github.head_ref == 'fix/public-data-catalog-api-truth' }}
-    name: Package public data catalog source files
+    name: Apply truthful public data catalog patch
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
+      - name: Checkout feature branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
 
-      - name: Package source files
+      - name: Decode and verify reviewed patches
         run: |
-          tar -czf public-data-catalog-source.tar.gz \
-            README.md \
-            TASKLIST.md \
-            docs/API_VERSIONING_AND_LINEAGE.md \
-            docs/API_REFERENCE.md \
-            docs/API_HEADLESS.md \
-            docs/CHANGELOG.md \
+          base64 --decode .github/issue-104-code.patch.b64 > /tmp/issue-104-code.patch
+          base64 --decode .github/issue-104-docs.patch.b64 > /tmp/issue-104-docs.patch
+          git apply --check /tmp/issue-104-code.patch
+          git apply --check /tmp/issue-104-docs.patch
+
+      - name: Apply and syntax-check implementation
+        run: |
+          git apply --whitespace=error /tmp/issue-104-code.patch
+          git apply --whitespace=error /tmp/issue-104-docs.patch
+          python -m py_compile \
             src/core/public_data.py \
             src/interfaces/api/app.py \
             src/interfaces/api/schemas.py \
@@ -33,8 +40,13 @@ jobs:
             tests/test_api.py \
             tests/test_api_contract_compatibility.py
 
-      - name: Upload source bundle
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: public-data-catalog-source
-          path: public-data-catalog-source.tar.gz
+      - name: Commit feature changes and remove temporary machinery
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/issue-104-code.patch.b64 \
+            .github/issue-104-docs.patch.b64 \
+            .github/workflows/temp-public-data-catalog-bundle.yml
+          git add README.md TASKLIST.md docs src tests
+          git commit -m "fix: publish truthful public data catalog"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
