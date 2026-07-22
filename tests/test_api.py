@@ -237,6 +237,13 @@ def test_scenario_endpoint_returns_delta_metrics() -> None:
     assert "manufacturing_cost_driver" in metadata["extensions"]
     assert data["baseline_health"] is not None
     assert data["scenario_health"] is not None
+    assert data["metadata"]
+    lineage = data["lineage"]
+    assert lineage["source"] == "api-scenario"
+    assert lineage["source_kind"] == "inline_records"
+    assert lineage["retrieval_mode"] == "inline"
+    assert lineage["is_official"] is False
+    assert any(step["name"] == "scenario_adjustment" for step in lineage["transformations"])
 
 
 def test_scenario_rejects_empty_dataset() -> None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,12 +11,20 @@ import pytest
 
 from src.adapters.bea import (
     BEAClientError,
+    _cache_key,
     _ensure_years,
     _merge_metadata_notes,
     fetch_go_ii_by_industry,
     select_bea_endpoint,
 )
-from src.core import AppConfig, Cache, CacheConfig, Environment, RateLimitConfig
+from src.core import (
+    AppConfig,
+    Cache,
+    CacheConfig,
+    Environment,
+    RateLimitConfig,
+    lineage_from_dataframe,
+)
 from src.core.config import DEFAULT_CENSUS_ASM_ENDPOINT_TEMPLATE
 
 
@@ -63,6 +73,16 @@ def test_fetch_bea(mock_get_json, _cache) -> None:
     assert metadata.get("years") == (2021,)
     assert metadata.get("endpoint")
     assert metadata.get("notes") == ["note", "Different"]
+    lineage = lineage_from_dataframe(frame)
+    assert lineage is not None
+    assert lineage.source == "bea"
+    assert lineage.source_kind.value == "live_provider"
+    assert lineage.dataset_id == "gdpbyindustry"
+    assert lineage.provider == "U.S. Bureau of Economic Analysis"
+    assert lineage.observation_period == "2021"
+    assert lineage.retrieval_mode.value == "live"
+    assert lineage.is_official is True
+    assert lineage.transformations[0].details == {"record_count": 1}
 
 
 @patch("src.adapters.bea.safe_get_json")
@@ -107,18 +127,43 @@ def test_fetch_bea_multi_year_caches(mock_get_json, tmp_path) -> None:
 
     mock_get_json.side_effect = response_for_request
 
-    with patch("src.adapters.bea.get_api_cache", side_effect=fake_cache):
+    acquired_at = datetime(2026, 7, 21, 12, 0, tzinfo=UTC)
+    with (
+        patch("src.adapters.bea.get_api_cache", side_effect=fake_cache),
+        patch("src.adapters.bea.datetime") as clock,
+    ):
+        clock.now.return_value = acquired_at
         frame = fetch_go_ii_by_industry("valid_api_key_12345", [2021, 2020])
         assert sorted(frame["year"].unique().tolist()) == [2020, 2021]
         metadata = frame.attrs["bea_metadata"]
         assert set(metadata["years"]) == {2020, 2021}
         assert cache.stats().files == 1
         assert metadata["notes"] == []
+        miss_lineage = lineage_from_dataframe(frame)
+        assert miss_lineage is not None
+        assert miss_lineage.cache_status.value == "miss"
+        assert miss_lineage.retrieval_mode.value == "live"
+        assert miss_lineage.acquired_at == acquired_at
+
+        cached_payload = cache.get(_cache_key((2021, 2020), None))
+        assert isinstance(cached_payload, dict)
+        serialized_lineage = json.dumps(cached_payload["lineage"])
+        assert "valid_api_key_12345" not in serialized_lineage
+        assert "cache_key" not in serialized_lineage
+        assert "redis" not in serialized_lineage.casefold()
+        assert "BEAAPI" not in serialized_lineage
 
         call_count = mock_get_json.call_count
         cached = fetch_go_ii_by_industry("valid_api_key_12345", [2020, 2021])
         assert len(cached) == len(frame)
         assert mock_get_json.call_count == call_count  # cache hit, no new calls
+        hit_lineage = lineage_from_dataframe(cached)
+        assert hit_lineage is not None
+        assert hit_lineage.source == miss_lineage.source
+        assert hit_lineage.acquired_at == miss_lineage.acquired_at
+        assert hit_lineage.transformations == miss_lineage.transformations
+        assert hit_lineage.cache_status.value == "hit"
+        assert hit_lineage.retrieval_mode.value == "cache"
 
 
 @patch("src.adapters.bea.get_api_cache", return_value=None)

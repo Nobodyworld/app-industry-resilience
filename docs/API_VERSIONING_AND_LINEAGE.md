@@ -170,6 +170,29 @@ Scenario details may include bounded percentages and the number of targeted indu
 - Live BEA and Census adapters must identify the public provider, requested observation period, and acquisition time.
 - Official snapshots must identify the provider dataset, observation period, and snapshot time when known.
 
+A successful live BEA result for 2021 exposes this source boundary before later calculation steps are appended (the timestamp shown is illustrative):
+
+```json
+{
+  "source": "bea",
+  "source_kind": "live_provider",
+  "dataset_id": "gdpbyindustry",
+  "provider": "U.S. Bureau of Economic Analysis",
+  "observation_period": "2021",
+  "acquired_at": "2026-07-21T12:00:00Z",
+  "snapshot_at": null,
+  "retrieval_mode": "live",
+  "is_sample": false,
+  "is_official": true,
+  "cache_status": "not_used",
+  "transformations": [
+    {"name": "source_load", "version": "1", "details": {"record_count": 1}}
+  ]
+}
+```
+
+Census ASM uses `source=census`, `dataset_id=asm`, and the same `live_provider`/`live` truth. The dashboard's Census AIES 2023 file is an official snapshot with `source=census`, `dataset_id=aies`, `observation_period=2023`, `snapshot_at=2026-02-26T00:00:00Z`, `retrieval_mode=snapshot`, and `is_official=true`. Neither envelope contains provider URLs, payload fields, credentials, filenames, or local paths.
+
 ### Evaluation pipeline
 
 Normalization, metric calculation, health scoring, and filtering append ordered transformation steps. Filtering does not change source identity or acquisition time.
@@ -182,16 +205,67 @@ The baseline preserves its incoming lineage. Scenario and delta frames preserve 
 
 Cached values preserve the original source and transformation history. A cache hit changes only `retrieval_mode`/`cache_status`; it must not replace the original acquisition or snapshot timestamp. Cache keys, directories, and backend connection details are never exposed.
 
+For example, the cached form of the BEA envelope above retains `source=bea`, `source_kind=live_provider`, `dataset_id=gdpbyindustry`, `acquired_at=2026-07-21T12:00:00Z`, and every ordered transformation, while its cache fields are exactly:
+
+```json
+{
+  "retrieval_mode": "cache",
+  "cache_status": "hit"
+}
+```
+
+A cache miss instead sets `cache_status=miss` and leaves `retrieval_mode=live`. Serialized cache entries retain only the typed, allowlisted lineage mapping; legacy entries with no lineage remain readable without inventing an acquisition or snapshot timestamp.
+
 ### API responses
 
 `EvaluateResponse`, `ScenarioResponse`, and `HealthAnalyticsResponse` expose `lineage: LineageEnvelope`. The existing `metadata` object remains during the v1 compatibility period. Telemetry trace identifiers remain telemetry, not lineage.
 
+Both `POST /v1/scenario` and deprecated `POST /scenario` return the same typed scenario lineage (apart from request-time acquisition timestamps and telemetry trace identifiers). A response excerpt is:
+
+```json
+{
+  "metadata": {"extensions": {}},
+  "lineage": {
+    "source": "api-scenario",
+    "source_kind": "inline_records",
+    "dataset_id": "api-scenario",
+    "retrieval_mode": "inline",
+    "is_sample": false,
+    "is_official": false,
+    "transformations": [
+      {"name": "source_load", "version": "1", "details": {"record_count": 3}},
+      {"name": "scenario_adjustment", "version": "1", "details": {"adjustment_count": 1, "all_industries": true}}
+    ]
+  }
+}
+```
+
+The actual envelope also includes all required version, period, timestamp, calculation, and cache fields. The generic `metadata` field remains present for v1 clients; arbitrary baseline/scenario dataframe attributes are not copied into typed lineage.
+
 ### Exports
 
-- JSON exports embed the lineage envelope at a stable top-level metadata location.
-- XLSX exports include a dedicated `Lineage` sheet.
-- CSV data remains tabular and backward compatible; the UI supplies a companion lineage JSON artifact sharing the export identifier.
+- JSON exports use the stable top-level document `{"lineage": {...}, "records": [...]}`. The lineage ends with a non-mutating `export_serialization` step whose details identify `format=json`, `scope=full` or `filtered`, and the record count.
+- XLSX exports retain the `Cost Structure` data sheet and include a dedicated `Lineage` sheet containing `field` and `value` columns.
+- CSV data remains tabular and backward compatible; the UI supplies a companion lineage JSON artifact sharing the safe export base and scope. For the default downloads, the exact names are `industry_cost_structure_results_full.lineage.json` and `industry_cost_structure_results_filtered.lineage.json` alongside the existing CSV files.
 - Export serialization appends an `export_serialization` step without mutating the in-memory source lineage.
+
+An exact JSON export shape is:
+
+```json
+{
+  "lineage": {
+    "source": "census",
+    "transformations": [
+      {"name": "export_serialization", "version": "1", "details": {"format": "json", "record_count": 2, "scope": "full"}}
+    ]
+  },
+  "records": [
+    {"industry_code": "311", "industry_name": "Food"}
+  ]
+}
+```
+
+The abbreviated lineage above illustrates placement; produced exports contain the complete typed envelope.
 
 ## Privacy and security constraints
 

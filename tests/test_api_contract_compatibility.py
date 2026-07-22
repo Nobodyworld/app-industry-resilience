@@ -201,4 +201,7 @@ def test_compatibility_sensitive_schema_fields_remain_present() -> None:
         "scenario",
         "deltas",
         "metadata",
+        "lineage",
     }.issubset(schemas["ScenarioResponse"]["properties"])
+    lineage_schema = schemas["ScenarioResponse"]["properties"]["lineage"]
+    assert "LineageEnvelopeModel" in json.dumps(lineage_schema)

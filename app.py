@@ -18,6 +18,7 @@ import plotly.express as px
 import streamlit as st
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
+from src.adapters.aies import attach_aies_snapshot_lineage
 from src.application import (
     DataSource,
     NormalizationOptions,
@@ -118,7 +119,7 @@ def load_sample() -> pd.DataFrame:
 def load_official_snapshot() -> pd.DataFrame:
     """Return the refreshed, keyless Census AIES snapshot."""
 
-    return pd.read_csv("data/official_industry_snapshot.csv")
+    return attach_aies_snapshot_lineage(pd.read_csv("data/official_industry_snapshot.csv"))
 
 
 def process_uploaded_file(
