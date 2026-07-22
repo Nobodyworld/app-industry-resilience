@@ -1,4 +1,4 @@
-name: Temporary Verify Issue 104
+name: Temporary Inspect Issue 104
 
 on:
   pull_request:
@@ -8,9 +8,9 @@ permissions:
   contents: read
 
 jobs:
-  verify:
+  inspect:
     if: ${{ github.head_ref == 'fix/public-data-catalog-api-truth' }}
-    name: Verify public data catalog patches
+    name: Inspect public data catalog patch bytes
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -19,23 +19,19 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Decode and capture verification
+      - name: Decode staged patches
         run: |
           tr -d '[:space:]' < .github/issue-104-code.patch.b64 | base64 --decode > /tmp/issue-104-code.patch || true
           tr -d '[:space:]' < .github/issue-104-docs.patch.b64 | base64 --decode > /tmp/issue-104-docs.patch || true
-          {
-            echo '== sizes =='
-            wc -c .github/issue-104-code.patch.b64 .github/issue-104-docs.patch.b64 /tmp/issue-104-code.patch /tmp/issue-104-docs.patch
-            echo '== hashes =='
-            sha256sum /tmp/issue-104-code.patch /tmp/issue-104-docs.patch
-            echo '== code verification =='
-            git apply --check --verbose /tmp/issue-104-code.patch
-            echo '== docs verification =='
-            git apply --check --verbose /tmp/issue-104-docs.patch
-          } > /tmp/verification.log 2>&1 || true
+          cp .github/issue-104-code.patch.b64 /tmp/issue-104-code.patch.b64
+          cp .github/issue-104-docs.patch.b64 /tmp/issue-104-docs.patch.b64
 
-      - name: Upload verification log
+      - name: Upload staged patch bytes
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: issue-104-patch-verification
-          path: /tmp/verification.log
+          name: issue-104-staged-patches
+          path: |
+            /tmp/issue-104-code.patch
+            /tmp/issue-104-docs.patch
+            /tmp/issue-104-code.patch.b64
+            /tmp/issue-104-docs.patch.b64
