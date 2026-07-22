@@ -100,9 +100,7 @@ def test_v1_meta_public_data_lists_truthful_readiness_catalog() -> None:
         "listener_validated": True,
     }
     assert by_id["bls_ppi_monthly"]["implementation_status"]["adapter_implemented"]
-    assert not by_id["census_m3_monthly"]["implementation_status"][
-        "adapter_implemented"
-    ]
+    assert not by_id["census_m3_monthly"]["implementation_status"]["adapter_implemented"]
     assert by_id["gdelt_events_daily"]["source_type"] == "event_context"
     assert by_id["gdelt_events_daily"]["economic_ground_truth"] is False
     assert client.get("/meta/public-data").status_code == 404

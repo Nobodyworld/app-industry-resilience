@@ -165,13 +165,9 @@ class MetaPublicDataResponse(BaseModel):
     by_frequency: dict[str, int] = Field(default_factory=dict)
 
     @classmethod
-    def from_definitions(
-        cls, definitions: Sequence[DatasetDefinition]
-    ) -> MetaPublicDataResponse:
+    def from_definitions(cls, definitions: Sequence[DatasetDefinition]) -> MetaPublicDataResponse:
         datasets = [PublicDatasetDescriptorModel.from_definition(item) for item in definitions]
-        implemented_count = sum(
-            item.implementation_status.adapter_implemented for item in datasets
-        )
+        implemented_count = sum(item.implementation_status.adapter_implemented for item in datasets)
         readiness_complete_count = sum(
             item.implementation_status.readiness_complete for item in datasets
         )
