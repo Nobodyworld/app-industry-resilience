@@ -22,7 +22,7 @@ from src.core.public_data import (
 def test_default_public_catalog_covers_readiness_sources() -> None:
     catalog = validate_dataset_catalog(DEFAULT_PUBLIC_DATASETS)
 
-    assert len(catalog) >= 10
+    assert len(catalog) >= 9
     assert {definition.auth_requirement for definition in catalog} == {AUTH_NONE}
     assert "annual" in {definition.update_cadence for definition in catalog}
     assert "monthly" in {definition.update_cadence for definition in catalog}
@@ -33,6 +33,7 @@ def test_default_public_catalog_covers_readiness_sources() -> None:
         definition.dataset_id: definition.implementation_status for definition in catalog
     }
     assert status_by_id["census_aies_annual"].backfill_validated is True
+    assert "census_asm_annual" not in status_by_id
     assert status_by_id["bls_ppi_monthly"].listener_validated is True
     assert status_by_id["census_m3_monthly"].adapter_implemented is False
     assert status_by_id["gdelt_events_daily"].backfill_validated is False

@@ -14,7 +14,13 @@ import pandas as pd
 from fastapi_compat import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi_compat.middleware.cors import CORSMiddleware
 from src.application import DataSource, IdiotIndexService, ScenarioPlanner
-from src.core import LineageStep, attach_lineage, build_lineage, summarise_health
+from src.core import (
+    LineageStep,
+    attach_lineage,
+    build_lineage,
+    public_dataset_catalog,
+    summarise_health,
+)
 from src.extensions.manager import get_extension_manager
 from src.infrastructure.observability import (
     bootstrap_observability,
@@ -35,6 +41,7 @@ from src.interfaces.api.schemas import (
     HealthAnalyticsResponse,
     HealthResponse,
     MetaConnectorsResponse,
+    MetaPublicDataResponse,
     MetaSourcesResponse,
     ObservabilityDigestResponse,
     ObservabilityEventsResponse,
@@ -353,6 +360,17 @@ def list_connectors() -> Response:
     """List connectors through the deprecated unversioned compatibility alias."""
 
     return _legacy_alias_response(_list_connectors_response(), "/v1/meta/connectors")
+
+
+def _list_public_data_response() -> MetaPublicDataResponse:
+    return MetaPublicDataResponse.from_definitions(public_dataset_catalog())
+
+
+@app.get("/v1/meta/public-data", response_model=MetaPublicDataResponse, tags=["meta"])
+def list_public_data_v1() -> MetaPublicDataResponse:
+    """List the validated no-auth public-data readiness catalog."""
+
+    return _list_public_data_response()
 
 
 def _attach_api_inline_lineage(frame: pd.DataFrame, *, year: int) -> None:

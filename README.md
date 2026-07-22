@@ -59,6 +59,12 @@ python src/scripts/public_data_readiness.py listen --dataset-id bls_ppi_monthly 
 python src/scripts/public_data_readiness.py backfill --dataset-id bls_ppi_monthly --start-year 2023 --end-year 2024 --storage-root build/public-smoke --dry-run --pretty
 ```
 
+The same validated no-auth readiness catalog is available to API clients at:
+
+```bash
+curl http://localhost:9000/v1/meta/public-data
+```
+
 ## Data Sources
 
 Verified and implemented:
@@ -69,7 +75,7 @@ Verified and implemented:
 
 Optional environment-dependent integrations:
 
-- BEA adapter and Census ASM adapter paths require configured API keys.
+- BEA adapter and Census ASM adapter paths require configured API keys and are intentionally excluded from the no-auth public-data readiness catalog.
 
 ## Capability Status
 

@@ -584,7 +584,8 @@ def test_public_data_readiness_catalog_outputs_json(capsys) -> None:
     payload = json.loads(output)
 
     assert exit_code == 0
-    assert len(payload) >= 10
+    assert len(payload) >= 9
+    assert "census_asm_annual" not in {item["dataset_id"] for item in payload}
     assert all(item["auth_requirement"] == "none" for item in payload)
 
 

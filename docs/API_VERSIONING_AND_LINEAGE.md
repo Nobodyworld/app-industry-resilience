@@ -22,7 +22,10 @@ Canonical consumer-facing endpoints will use a major path prefix:
 /v1/analytics/health
 /v1/meta/sources
 /v1/meta/connectors
+/v1/meta/public-data
 ```
+
+New additive consumer endpoints that did not previously exist, such as `/v1/meta/public-data`, are canonical-only and do not receive a newly invented unversioned alias.
 
 The current unversioned forms remain compatibility aliases during migration:
 
@@ -109,6 +112,7 @@ Breaking consumer changes require a new major path such as `/v2`. A new major pa
 | GET | `/observability/snapshots/{snapshot_id}` | unchanged | path identifier | `ObservabilitySnapshotResponse` | Returns 400 for invalid identifiers and 404 for missing snapshots. |
 | GET | `/meta/sources` | `/v1/meta/sources` | none | `MetaSourcesResponse` | Source identifiers are client-visible enum values. |
 | GET | `/meta/connectors` | `/v1/meta/connectors` | none | `MetaConnectorsResponse` | Connector identifiers, kinds, versions, capabilities, metadata, and health shape are client-visible. |
+| GET | `/v1/meta/public-data` | unchanged | none | `MetaPublicDataResponse` | No-auth public dataset identity, implementation stages, canonical schemas, access notes, and ground-truth flags are client-visible; no legacy alias exists. |
 | POST | `/evaluate` | `/v1/evaluate` | `EvaluateRequest` | `EvaluateResponse` | Dataset record fields, filters, leaderboard, notes, dataset rows, metadata, health envelope, status codes, and metric units are contract-sensitive. |
 | POST | `/scenario` | `/v1/scenario` | `ScenarioRequest` | `ScenarioResponse` | Adjustment semantics, baseline/scenario/delta rows, summaries, metadata, and health envelopes are contract-sensitive. |
 | POST | `/analytics/health` | `/v1/analytics/health` | `HealthAnalyticsRequest` | `HealthAnalyticsResponse` | Grouping choices, risk limits, aggregate fields, metadata, and status codes are contract-sensitive. |
