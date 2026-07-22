@@ -1,49 +1,55 @@
-name: Temporary Public Data Catalog Diagnostics
+name: Temporary Apply Issue 104 Quality Fixes
 
 on:
   pull_request:
     branches: ["main"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  diagnostics:
+  apply:
     if: ${{ github.head_ref == 'fix/public-data-catalog-api-truth' }}
-    name: Capture public data catalog coverage failures
+    name: Apply public data catalog quality fixes
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     steps:
-      - name: Checkout repository
+      - name: Checkout feature branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: "3.13"
-          cache: pip
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
 
-      - name: Install dependencies
+      - name: Correct catalog script regression test
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          python - <<'PY'
+          from pathlib import Path
 
-      - name: Capture runtime coverage
-        continue-on-error: true
+          path = Path("tests/test_scripts.py")
+          text = path.read_text(encoding="utf-8")
+          old = "    assert len(payload) >= 10\n"
+          new = (
+              "    assert len(payload) >= 9\n"
+              "    assert \"census_asm_annual\" not in {item[\"dataset_id\"] for item in payload}\n"
+          )
+          if old not in text:
+              raise SystemExit("expected catalog-size assertion not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
+
+      - name: Apply Black formatting
         run: |
-          set -o pipefail
-          make coverage-runtime 2>&1 | tee runtime-coverage.log
+          black src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py tests/test_scripts.py
+          ruff check src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py tests/test_scripts.py
+          python -m mypy src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py
+          pytest -q tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py tests/test_scripts.py::test_public_data_readiness_catalog_outputs_json
 
-      - name: Capture full coverage
-        continue-on-error: true
+      - name: Commit fixes and remove temporary workflow
         run: |
-          set -o pipefail
-          make coverage-full 2>&1 | tee full-coverage.log
-
-      - name: Upload coverage logs
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: public-data-catalog-coverage-logs
-          path: |
-            runtime-coverage.log
-            full-coverage.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/temp-public-data-catalog-diagnostics.yml
+          git add src tests
+          git commit -m "test: align public data catalog truth checks"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
