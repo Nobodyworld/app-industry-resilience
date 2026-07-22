@@ -11,6 +11,14 @@ import pandas as pd
 
 from .cache import Cache, get_computation_cache
 from .config import load_config
+from .lineage import (
+    LineageCacheStatus,
+    attach_lineage,
+    lineage_from_dataframe,
+    lineage_from_mapping,
+    lineage_to_dict,
+    update_lineage_cache,
+)
 
 
 @dataclass(frozen=True)
@@ -41,12 +49,29 @@ def compute_metrics(
         cache_instance = get_computation_cache(app_config.cache)
 
     cache_key: str | None = None
+    input_lineage = lineage_from_dataframe(df)
     if metric_config.use_cache and cache_instance is not None:
         cache_key = _hash_dataframe(df)
         cached = cache_instance.get(cache_key)
         if cached is not None:
-            cached_df = pd.DataFrame(cached)
+            cached_lineage = None
+            if isinstance(cached, Mapping) and "records" in cached:
+                cached_df = pd.DataFrame(cached.get("records", []))
+                raw_lineage = cached.get("lineage")
+                if isinstance(raw_lineage, Mapping):
+                    try:
+                        cached_lineage = lineage_from_mapping(raw_lineage)
+                    except (KeyError, TypeError, ValueError):
+                        cached_lineage = None
+            else:
+                cached_df = pd.DataFrame(cached)
             cached_df.attrs.update(df.attrs)
+            lineage = cached_lineage or input_lineage
+            if lineage is not None:
+                attach_lineage(
+                    cached_df,
+                    update_lineage_cache(lineage, LineageCacheStatus.HIT),
+                )
             return cached_df
 
     work = df.copy()
@@ -106,10 +131,18 @@ def compute_metrics(
     # Normalise any remaining infinities to NA given pandas deprecation warnings
     work = work.replace([float("inf"), float("-inf")], pd.NA)
 
-    if metric_config.use_cache and cache_instance is not None and cache_key is not None:
-        cache_instance.set(cache_key, work.to_dict(orient="records"))
-
     work.attrs.update(df.attrs)
+    output_lineage = input_lineage
+    if output_lineage is not None and cache_instance is not None and cache_key is not None:
+        output_lineage = update_lineage_cache(output_lineage, LineageCacheStatus.MISS)
+        attach_lineage(work, output_lineage)
+
+    if metric_config.use_cache and cache_instance is not None and cache_key is not None:
+        payload: dict[str, Any] = {"records": work.to_dict(orient="records")}
+        if output_lineage is not None:
+            payload["lineage"] = lineage_to_dict(output_lineage)
+        cache_instance.set(cache_key, payload)
+
     return work
 
 
@@ -142,7 +175,16 @@ def format_for_display(
 def _hash_dataframe(df: pd.DataFrame) -> str:
     import hashlib
 
-    payload = json.dumps(df.to_dict(orient="records"), sort_keys=True, default=str)
+    records = df.to_dict(orient="records")
+    lineage = lineage_from_dataframe(df)
+    if lineage is None:
+        payload_value: Any = records
+    else:
+        cache_identity = lineage_to_dict(lineage)
+        cache_identity.pop("cache_status", None)
+        cache_identity.pop("retrieval_mode", None)
+        payload_value = {"records": records, "lineage": cache_identity}
+    payload = json.dumps(payload_value, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

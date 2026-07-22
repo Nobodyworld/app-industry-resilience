@@ -236,7 +236,7 @@ def _ensure_scenario_input_lineage(frame: pd.DataFrame) -> pd.DataFrame:
         return frame
 
     source = "api-scenario" if frame.attrs.get("source") == "api-scenario" else "scenario-input"
-    periods = frame["year"].dropna().unique() if "year" in frame.columns else []
+    periods: Any = frame["year"].dropna().unique() if "year" in frame.columns else []
     observation_period = str(periods[0]) if len(periods) == 1 else "mixed"
     lineage = build_lineage(
         source=source,

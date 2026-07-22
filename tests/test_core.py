@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -13,6 +14,7 @@ from src.adapters import fetch_asm_manufacturing
 from src.core import (
     Cache,
     HTTPRequestError,
+    LineageStep,
     MetricConfig,
     RetryPolicy,
     compute_metrics,
@@ -106,6 +108,96 @@ def test_compute_metrics_uses_cache(tmp_path) -> None:
         result_second = compute_metrics(data, cache=cache, config=MetricConfig(use_cache=True))
         mocked_set.assert_not_called()
     pd.testing.assert_frame_equal(result_first, result_second)
+
+
+def test_compute_metrics_cache_preserves_typed_lineage(tmp_path) -> None:
+    from src.core import attach_lineage, build_lineage, lineage_from_dataframe
+
+    cache = Cache(tmp_path, ttl_seconds=60)
+    data = pd.DataFrame(
+        {
+            "industry_code": ["311"],
+            "industry_name": ["Food"],
+            "year": [2021],
+            "gross_output": [1000.0],
+            "materials_cost": [500.0],
+        }
+    )
+    acquired_at = datetime(2026, 7, 21, 14, 0, tzinfo=UTC)
+    attach_lineage(
+        data,
+        build_lineage(
+            source="bea",
+            source_kind="live_provider",
+            dataset_id="gdpbyindustry",
+            provider="U.S. Bureau of Economic Analysis",
+            observation_period=2021,
+            acquired_at=acquired_at,
+            retrieval_mode="live",
+            is_sample=False,
+            is_official=True,
+            transformations=(LineageStep(name="source_load", details={"record_count": 1}),),
+        ),
+    )
+
+    missed = compute_metrics(data, cache=cache, config=MetricConfig(use_cache=True))
+    hit = compute_metrics(data, cache=cache, config=MetricConfig(use_cache=True))
+    missed_lineage = lineage_from_dataframe(missed)
+    hit_lineage = lineage_from_dataframe(hit)
+
+    assert missed_lineage is not None
+    assert hit_lineage is not None
+    assert missed_lineage.cache_status.value == "miss"
+    assert missed_lineage.retrieval_mode.value == "live"
+    assert hit_lineage.cache_status.value == "hit"
+    assert hit_lineage.retrieval_mode.value == "cache"
+    assert hit_lineage.source == "bea"
+    assert hit_lineage.acquired_at == acquired_at
+    assert hit_lineage.transformations == missed_lineage.transformations
+
+
+def test_compute_metrics_cache_separates_source_lineage(tmp_path) -> None:
+    from src.core import attach_lineage, build_lineage, lineage_from_dataframe
+
+    cache = Cache(tmp_path, ttl_seconds=60)
+    base = pd.DataFrame(
+        {
+            "industry_code": ["311"],
+            "industry_name": ["Food"],
+            "year": [2021],
+            "gross_output": [1000.0],
+            "materials_cost": [500.0],
+        }
+    )
+    bea = base.copy()
+    census = base.copy()
+    for frame, source, dataset in (
+        (bea, "bea", "gdpbyindustry"),
+        (census, "census", "asm"),
+    ):
+        attach_lineage(
+            frame,
+            build_lineage(
+                source=source,
+                source_kind="live_provider",
+                dataset_id=dataset,
+                provider="Official provider",
+                observation_period=2021,
+                acquired_at=datetime(2026, 7, 21, 15, 0, tzinfo=UTC),
+                retrieval_mode="live",
+                is_sample=False,
+                is_official=True,
+            ),
+        )
+
+    compute_metrics(bea, cache=cache, config=MetricConfig(use_cache=True))
+    census_result = compute_metrics(census, cache=cache, config=MetricConfig(use_cache=True))
+    census_lineage = lineage_from_dataframe(census_result)
+
+    assert cache.stats().files == 2
+    assert census_lineage is not None
+    assert census_lineage.source == "census"
+    assert census_lineage.cache_status.value == "miss"
 
 
 def test_compute_metrics_handles_zero_denominators() -> None:

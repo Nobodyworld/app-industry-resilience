@@ -8,6 +8,7 @@ from io import BytesIO
 import pandas as pd
 import pytest
 
+from src.core import attach_lineage, build_lineage, lineage_from_dataframe
 from src.core.metrics import MetricConfig, compute_metrics
 from src.infrastructure.observability.instrumentation import ObservabilityRegistry
 from src.infrastructure.observability.storage import ObservabilitySnapshot
@@ -55,25 +56,44 @@ def _sample_df():
 def test_prepare_download_artifacts_csv_json() -> None:
     pytest.importorskip("xlsxwriter")
     df = _sample_df()
+    attach_lineage(
+        df,
+        build_lineage(
+            source="census",
+            source_kind="official_snapshot",
+            dataset_id="aies",
+            provider="U.S. Census Bureau",
+            observation_period=2023,
+            snapshot_at=datetime(2026, 2, 26, tzinfo=UTC),
+            retrieval_mode="snapshot",
+            is_sample=False,
+            is_official=True,
+        ),
+    )
+    before = lineage_from_dataframe(df)
     artifacts = prepare_download_artifacts(df, df, base_name="industry_cost_structure_results")
 
     labels = {artifact.label for artifact in artifacts}
     file_names = {artifact.file_name for artifact in artifacts}
 
-    assert len(artifacts) == 6
+    assert len(artifacts) == 8
     assert labels == {
         "All rows – CSV",
+        "All rows – CSV lineage",
         "All rows – JSON",
         "All rows – Excel",
         "Current view – CSV",
+        "Current view – CSV lineage",
         "Current view – JSON",
         "Current view – Excel",
     }
     assert file_names == {
         "industry_cost_structure_results_full.csv",
+        "industry_cost_structure_results_full.lineage.json",
         "industry_cost_structure_results_full.json",
         "industry_cost_structure_results_full.xlsx",
         "industry_cost_structure_results_filtered.csv",
+        "industry_cost_structure_results_filtered.lineage.json",
         "industry_cost_structure_results_filtered.json",
         "industry_cost_structure_results_filtered.xlsx",
     }
@@ -94,9 +114,24 @@ def test_prepare_download_artifacts_csv_json() -> None:
         for artifact in artifacts
         if artifact.file_name == "industry_cost_structure_results_full.json"
     )
-    json_rows = json.loads(json_artifact.data.decode())
-    assert json_rows[0]["industry_code"] == "311"
-    assert json_rows[0]["industry_name"] == "Food"
+    json_document = json.loads(json_artifact.data.decode())
+    assert set(json_document) == {"lineage", "records"}
+    assert json_document["records"][0]["industry_code"] == "311"
+    assert json_document["records"][0]["industry_name"] == "Food"
+    assert json_document["lineage"]["source"] == "census"
+    assert json_document["lineage"]["transformations"][-1]["name"] == "export_serialization"
+
+    companion = next(
+        artifact
+        for artifact in artifacts
+        if artifact.file_name == "industry_cost_structure_results_full.lineage.json"
+    )
+    companion_document = json.loads(companion.data.decode())
+    assert companion_document["lineage"]["transformations"][-1]["details"] == {
+        "format": "csv",
+        "record_count": 2,
+        "scope": "full",
+    }
 
     xlsx_artifact = next(
         artifact
@@ -107,6 +142,8 @@ def test_prepare_download_artifacts_csv_json() -> None:
     with zipfile.ZipFile(BytesIO(xlsx_artifact.data)) as workbook:
         workbook_xml = workbook.read("xl/workbook.xml").decode()
     assert 'name="Cost Structure"' in workbook_xml
+    assert 'name="Lineage"' in workbook_xml
+    assert lineage_from_dataframe(df) == before
 
 
 def test_build_comparison_table_empty_and_with_codes() -> None:

@@ -8,18 +8,26 @@ responses fail at the adapter boundary with contextual, credential-safe errors.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from typing import Any
 
 import pandas as pd
 
 from ..core import (
     DEFAULT_COLUMN_ALIASES,
+    LineageCacheStatus,
+    LineageStep,
     NormalizationOptions,
     SecurityUtils,
+    attach_lineage,
+    build_lineage,
     get_api_cache,
+    lineage_from_mapping,
+    lineage_to_dict,
     load_config,
     normalize_columns,
     safe_get_json,
+    update_lineage_cache,
 )
 from ..infrastructure import api_limiter
 from ._contracts import (
@@ -90,6 +98,7 @@ def fetch_asm_manufacturing(
             if isinstance(cached_result, Mapping):
                 frame = pd.DataFrame(cached_result.get("records", []))
                 frame.attrs["census_asm_metadata"] = dict(cached_result.get("metadata", {}))
+                _attach_cached_lineage(frame, cached_result)
                 return frame
             return pd.DataFrame(cached_result)
 
@@ -139,14 +148,49 @@ def fetch_asm_manufacturing(
         "required_fields": list(_REQUIRED_FIELDS),
     }
     normalized.attrs["census_asm_metadata"] = metadata
+    lineage = build_lineage(
+        source="census",
+        source_kind="live_provider",
+        dataset_id="asm",
+        provider="U.S. Census Bureau",
+        observation_period=year_value,
+        acquired_at=datetime.now(UTC),
+        retrieval_mode="live",
+        is_sample=False,
+        is_official=True,
+        transformations=(
+            LineageStep(name="source_load", details={"record_count": len(normalized)}),
+        ),
+        cache_status=(
+            LineageCacheStatus.MISS if cache is not None else LineageCacheStatus.NOT_USED
+        ),
+    )
+    attach_lineage(normalized, lineage)
 
     if cache:
         cache.set(
             cache_key,
-            {"records": normalized.to_dict("records"), "metadata": metadata},
+            {
+                "records": normalized.to_dict("records"),
+                "metadata": metadata,
+                "lineage": lineage_to_dict(lineage),
+            },
         )
 
     return normalized
+
+
+def _attach_cached_lineage(frame: pd.DataFrame, payload: Mapping[str, Any]) -> None:
+    """Restore allowlisted Census lineage when present in a compatible cache payload."""
+
+    raw_lineage = payload.get("lineage")
+    if not isinstance(raw_lineage, Mapping):
+        return
+    try:
+        lineage = lineage_from_mapping(raw_lineage)
+    except (KeyError, TypeError, ValueError):
+        return
+    attach_lineage(frame, update_lineage_cache(lineage, LineageCacheStatus.HIT))
 
 
 def _validate_census_payload(

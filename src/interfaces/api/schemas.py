@@ -461,6 +461,7 @@ class ScenarioResponse(BaseModel):
     scenario: list[dict[str, Any]]
     deltas: list[dict[str, Any]]
     metadata: dict[str, Any] = Field(default_factory=dict)
+    lineage: LineageEnvelopeModel | None = None
     baseline_health: HealthAnalyticsSummaryModel | None = None
     scenario_health: HealthAnalyticsSummaryModel | None = None
 
@@ -627,6 +628,7 @@ def scenario_to_response(result: ScenarioResult) -> ScenarioResponse:
         scenario=dataframe_to_records(result.scenario),
         deltas=dataframe_to_records(result.deltas),
         metadata=metadata,
+        lineage=lineage_model_from_dataframe(result.scenario),
         baseline_health=baseline_health,
         scenario_health=scenario_health,
     )

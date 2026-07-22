@@ -53,7 +53,10 @@ def test_prepare_download_artifacts_creates_outputs() -> None:
         for item in artifacts
     )
     assert has_excel
-    assert len(artifacts) == 6
+    assert len(artifacts) == 8
+    assert {item.file_name for item in artifacts}.issuperset(
+        {"idiot_full.lineage.json", "idiot_filtered.lineage.json"}
+    )
     csv_artifact = next(
         item for item in artifacts if item.mime == "text/csv" and "full" in item.file_name
     )

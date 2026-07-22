@@ -13,6 +13,7 @@ import re
 import time
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any, cast
 
@@ -20,13 +21,20 @@ import pandas as pd
 
 from ..core import (
     AppConfig,
+    LineageCacheStatus,
+    LineageStep,
     NormalizationOptions,
     RetryPolicy,
     SecurityUtils,
+    attach_lineage,
+    build_lineage,
     get_api_cache,
+    lineage_from_mapping,
+    lineage_to_dict,
     load_config,
     normalize_columns,
     safe_get_json,
+    update_lineage_cache,
 )
 from ..infrastructure import (
     api_limiter,
@@ -161,6 +169,7 @@ def fetch_go_ii_by_industry(
             if isinstance(cached_payload, Mapping):
                 frame = pd.DataFrame(cached_payload.get("records", []))
                 frame.attrs["bea_metadata"] = dict(cached_payload.get("metadata", {}))
+                _attach_cached_lineage(frame, cached_payload)
             else:
                 frame = pd.DataFrame(cached_payload)
             log_performance("BEA API fetch (cached)", time.time() - start_time)
@@ -244,6 +253,22 @@ def fetch_go_ii_by_industry(
         "unmapped_naics_codes": unmapped_codes,
     }
     combined.attrs["bea_metadata"] = metadata
+    lineage = build_lineage(
+        source="bea",
+        source_kind="live_provider",
+        dataset_id="gdpbyindustry",
+        provider="U.S. Bureau of Economic Analysis",
+        observation_period=_observation_period(years_tuple),
+        acquired_at=datetime.now(UTC),
+        retrieval_mode="live",
+        is_sample=False,
+        is_official=True,
+        transformations=(LineageStep(name="source_load", details={"record_count": len(combined)}),),
+        cache_status=(
+            LineageCacheStatus.MISS if cache is not None else LineageCacheStatus.NOT_USED
+        ),
+    )
+    attach_lineage(combined, lineage)
 
     if cache:
         cache.set(
@@ -251,6 +276,7 @@ def fetch_go_ii_by_industry(
             {
                 "records": combined.to_dict(orient="records"),
                 "metadata": metadata,
+                "lineage": lineage_to_dict(lineage),
             },
         )
 
@@ -260,6 +286,25 @@ def fetch_go_ii_by_industry(
         records_processed=len(combined),
     )
     return combined
+
+
+def _attach_cached_lineage(frame: pd.DataFrame, payload: Mapping[str, Any]) -> None:
+    """Restore allowlisted BEA lineage when present in a compatible cache payload."""
+
+    raw_lineage = payload.get("lineage")
+    if not isinstance(raw_lineage, Mapping):
+        return
+    try:
+        lineage = lineage_from_mapping(raw_lineage)
+    except (KeyError, TypeError, ValueError):
+        return
+    attach_lineage(frame, update_lineage_cache(lineage, LineageCacheStatus.HIT))
+
+
+def _observation_period(years: Sequence[int]) -> str:
+    """Return a stable public period for one or more requested BEA years."""
+
+    return str(years[0]) if len(years) == 1 else ",".join(str(year) for year in sorted(years))
 
 
 def select_bea_endpoint(config: AppConfig) -> str:

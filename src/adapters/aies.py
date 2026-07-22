@@ -5,9 +5,12 @@ from __future__ import annotations
 import io
 import zipfile
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pandas as pd
 import requests
+
+from ..core import LineageStep, attach_lineage, build_lineage
 
 AIES_SURVEY_YEAR = 2023
 AIES_RELEASE_DATE = "2026-02-26"
@@ -82,7 +85,29 @@ def build_aies_snapshot(basic: pd.DataFrame, expenses: pd.DataFrame) -> pd.DataF
             "This view is a cost-efficiency proxy, not the strict BEA gross-output/intermediate-inputs ratio.",
         ],
     }
-    return output
+    return attach_aies_snapshot_lineage(output)
+
+
+def attach_aies_snapshot_lineage(frame: pd.DataFrame) -> pd.DataFrame:
+    """Attach the public official-snapshot envelope to an AIES dataframe."""
+
+    return attach_lineage(
+        frame,
+        build_lineage(
+            source="census",
+            source_kind="official_snapshot",
+            dataset_id="aies",
+            provider="U.S. Census Bureau",
+            observation_period=AIES_SURVEY_YEAR,
+            snapshot_at=datetime.fromisoformat(AIES_RELEASE_DATE).replace(tzinfo=UTC),
+            retrieval_mode="snapshot",
+            is_sample=False,
+            is_official=True,
+            transformations=(
+                LineageStep(name="source_load", details={"record_count": len(frame)}),
+            ),
+        ),
+    )
 
 
 def _download(url: str) -> bytes:
@@ -134,6 +159,7 @@ __all__ = [
     "AIES_EXPENSE_URL",
     "AIES_RELEASE_DATE",
     "AIES_SURVEY_YEAR",
+    "attach_aies_snapshot_lineage",
     "build_aies_snapshot",
     "fetch_latest_aies_snapshot",
 ]

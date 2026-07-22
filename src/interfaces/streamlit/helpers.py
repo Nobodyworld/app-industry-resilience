@@ -12,6 +12,12 @@ from typing import Any, cast
 
 import pandas as pd
 
+from src.application.lineage_exports import (
+    ExportScope,
+    build_csv_lineage_companion,
+    build_json_export_document,
+    build_xlsx_lineage_rows,
+)
 from src.application.scenario_planner import ScenarioResult
 from src.core import HealthSummary
 from src.core.metrics import MetricConfig, compute_metrics
@@ -63,10 +69,11 @@ def prepare_download_artifacts(
         frame.to_csv(buffer, index=False)
         return buffer.getvalue().encode()
 
-    def _json_bytes(frame: pd.DataFrame) -> bytes:
-        return json.dumps(frame.to_dict(orient="records"), ensure_ascii=False).encode()
+    def _json_bytes(frame: pd.DataFrame, *, scope: ExportScope) -> bytes:
+        document = build_json_export_document(frame, scope=scope)
+        return json.dumps(document, ensure_ascii=False).encode()
 
-    def _excel_bytes(frame: pd.DataFrame) -> bytes | None:
+    def _excel_bytes(frame: pd.DataFrame, *, scope: ExportScope) -> bytes | None:
         try:
             import xlsxwriter  # noqa: F401
         except ModuleNotFoundError:
@@ -74,9 +81,15 @@ def prepare_download_artifacts(
         buffer = io.BytesIO()
         with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
             frame.to_excel(writer, index=False, sheet_name="Cost Structure")
+            lineage_rows = build_xlsx_lineage_rows(frame, scope=scope)
+            pd.DataFrame(lineage_rows, columns=["field", "value"]).to_excel(
+                writer,
+                index=False,
+                sheet_name="Lineage",
+            )
         return buffer.getvalue()
 
-    options = {
+    options: dict[ExportScope, pd.DataFrame] = {
         "full": df_full,
         "filtered": df_filtered,
     }
@@ -92,14 +105,20 @@ def prepare_download_artifacts(
                     data=_csv_bytes(frame),
                 ),
                 DownloadArtifact(
+                    label=f"{label_hint} – CSV lineage",
+                    file_name=f"{safe_base}_{suffix}.lineage.json",
+                    mime="application/json",
+                    data=build_csv_lineage_companion(frame, scope=suffix),
+                ),
+                DownloadArtifact(
                     label=f"{label_hint} – JSON",
                     file_name=f"{safe_base}_{suffix}.json",
                     mime="application/json",
-                    data=_json_bytes(frame),
+                    data=_json_bytes(frame, scope=suffix),
                 ),
             ]
         )
-        excel_payload = _excel_bytes(frame)
+        excel_payload = _excel_bytes(frame, scope=suffix)
         if excel_payload is not None:
             artifacts.append(
                 DownloadArtifact(
