@@ -1,0 +1,75 @@
+name: Temporary Public Data Catalog Diagnostics
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostics:
+    if: ${{ github.head_ref == 'fix/public-data-catalog-api-truth' }}
+    name: Public data catalog diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Black changed files
+        id: black
+        continue-on-error: true
+        run: black --check src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py
+
+      - name: Generate Black patch
+        if: ${{ always() && steps.black.outcome == 'failure' }}
+        run: |
+          black src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py
+          git diff -- src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py > black.patch
+
+      - name: Upload Black patch
+        if: ${{ always() && steps.black.outcome == 'failure' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: public-data-catalog-black-patch
+          path: black.patch
+
+      - name: Ruff changed files
+        if: ${{ always() }}
+        run: ruff check src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py
+
+      - name: Mypy API and catalog
+        if: ${{ always() }}
+        run: python -m mypy src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py
+
+      - name: Focused catalog and API tests
+        if: ${{ always() }}
+        run: pytest -q tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py
+
+      - name: Runtime coverage gate
+        if: ${{ always() }}
+        run: make coverage-runtime
+
+      - name: Full coverage pass
+        if: ${{ always() }}
+        run: make coverage-full
+
+      - name: Benchmark gate
+        if: ${{ always() }}
+        run: make benchmark-metrics
+
+      - name: Security gate
+        if: ${{ always() }}
+        run: make security
