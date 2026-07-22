@@ -23,8 +23,8 @@ jobs:
 
       - name: Decode and verify reviewed patches
         run: |
-          base64 --decode .github/issue-104-code.patch.b64 > /tmp/issue-104-code.patch
-          base64 --decode .github/issue-104-docs.patch.b64 > /tmp/issue-104-docs.patch
+          tr -d '[:space:]' < .github/issue-104-code.patch.b64 | base64 --decode > /tmp/issue-104-code.patch
+          tr -d '[:space:]' < .github/issue-104-docs.patch.b64 | base64 --decode > /tmp/issue-104-docs.patch
           git apply --check /tmp/issue-104-code.patch
           git apply --check /tmp/issue-104-docs.patch
 
