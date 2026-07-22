@@ -83,12 +83,12 @@ Licensed under the Apache License 2.0. See [LICENSE](../LICENSE).
 
 ### `src.interfaces.api.app`
 
-- `app` – FastAPI-compatible application exposing `/health`, `/healthz`, `/meta/sources`, `/meta/connectors`, `/evaluate`, `/scenario`, `/analytics/health`, `/metrics`, `/observability/status`, and `/observability/digest` endpoints backed by the application services. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
+- `app` – FastAPI-compatible application exposing canonical `/v1` consumer routes for metadata, evaluation, scenarios, and analytics alongside unversioned operational endpoints. `GET /v1/meta/public-data` returns the validated no-auth readiness catalog with typed implementation stages and ground-truth flags; credentialed BEA and Census ASM adapters remain available through source/connector surfaces rather than this public catalog. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
 - `ObservabilityRegistry` – Singleton registry (see `src/infrastructure/observability/instrumentation.py`) aggregating metrics, traces, and health checks. Extensions register instrumentation hooks through it instead of modifying services directly.
 
 ### `src.interfaces.api.schemas`
 
-- Lightweight Pydantic-style models (`EvaluateRequest`, `EvaluateResponse`, `ScenarioRequest`, etc.) plus helpers to convert pandas dataframes and service summaries into JSON-safe payloads.
+- Lightweight Pydantic-style models (`EvaluateRequest`, `EvaluateResponse`, `ScenarioRequest`, `MetaPublicDataResponse`, etc.) plus helpers to convert pandas dataframes, catalog definitions, and service summaries into JSON-safe payloads.
 
 ### `src/scripts/run_api.py`
 

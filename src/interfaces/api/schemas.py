@@ -20,6 +20,7 @@ from src.application import (
     ScenarioSummary,
 )
 from src.core import (
+    DatasetDefinition,
     HealthSummary,
     lineage_from_dataframe,
     lineage_to_dict,
@@ -82,6 +83,112 @@ class HealthResponse(BaseModel):
 
 class MetaSourcesResponse(BaseModel):
     sources: list[str]
+
+
+class PublicDataImplementationStatusModel(BaseModel):
+    """Implementation progress for one public no-auth dataset."""
+
+    cataloged: bool
+    endpoint_verified: bool
+    adapter_implemented: bool
+    backfill_validated: bool
+    listener_validated: bool
+
+    @property
+    def readiness_complete(self) -> bool:
+        return all(self.model_dump(mode="python").values())
+
+
+class PublicDatasetDescriptorModel(BaseModel):
+    """Typed public metadata for one cataloged no-auth dataset."""
+
+    dataset_id: str
+    name: str
+    agency: str
+    endpoint: str
+    update_cadence: str
+    frequency: str
+    observation_period: str
+    release_period: str
+    units: str
+    historical_coverage: str
+    canonical_schema: list[str] = Field(default_factory=list)
+    canonical_field_mappings: dict[str, str] = Field(default_factory=dict)
+    auth_requirement: str
+    source_type: str
+    phase: str
+    schema_version: str
+    implementation_status: PublicDataImplementationStatusModel
+    economic_ground_truth: bool
+    public_access_notes: str
+    release_monitor: str | None = None
+    steward_notes: list[str] = Field(default_factory=list)
+
+    @classmethod
+    def from_definition(cls, definition: DatasetDefinition) -> PublicDatasetDescriptorModel:
+        return cls(
+            dataset_id=definition.dataset_id,
+            name=definition.name,
+            agency=definition.agency,
+            endpoint=definition.endpoint,
+            update_cadence=definition.update_cadence,
+            frequency=definition.frequency,
+            observation_period=definition.observation_period,
+            release_period=definition.release_period,
+            units=definition.units,
+            historical_coverage=definition.historical_coverage,
+            canonical_schema=list(definition.canonical_schema),
+            canonical_field_mappings=dict(definition.canonical_field_mappings),
+            auth_requirement=definition.auth_requirement,
+            source_type=definition.source_type,
+            phase=definition.phase,
+            schema_version=definition.schema_version,
+            implementation_status=PublicDataImplementationStatusModel(
+                **definition.implementation_status.to_dict()
+            ),
+            economic_ground_truth=definition.economic_ground_truth,
+            public_access_notes=definition.public_access_notes,
+            release_monitor=definition.release_monitor,
+            steward_notes=list(definition.steward_notes),
+        )
+
+
+class MetaPublicDataResponse(BaseModel):
+    """No-auth public-data catalog with explicit implementation aggregates."""
+
+    datasets: list[PublicDatasetDescriptorModel] = Field(default_factory=list)
+    count: int = 0
+    implemented_count: int = 0
+    readiness_complete_count: int = 0
+    roadmap_count: int = 0
+    by_phase: dict[str, int] = Field(default_factory=dict)
+    by_frequency: dict[str, int] = Field(default_factory=dict)
+
+    @classmethod
+    def from_definitions(
+        cls, definitions: Sequence[DatasetDefinition]
+    ) -> MetaPublicDataResponse:
+        datasets = [PublicDatasetDescriptorModel.from_definition(item) for item in definitions]
+        implemented_count = sum(
+            item.implementation_status.adapter_implemented for item in datasets
+        )
+        readiness_complete_count = sum(
+            item.implementation_status.readiness_complete for item in datasets
+        )
+        by_phase: dict[str, int] = {}
+        by_frequency: dict[str, int] = {}
+        for item in datasets:
+            by_phase[item.phase] = by_phase.get(item.phase, 0) + 1
+            by_frequency[item.frequency] = by_frequency.get(item.frequency, 0) + 1
+        return cls(
+            datasets=datasets,
+            count=len(datasets),
+            implemented_count=implemented_count,
+            readiness_complete_count=readiness_complete_count,
+            roadmap_count=len(datasets) - implemented_count,
+            by_phase=dict(sorted(by_phase.items())),
+            by_frequency=dict(sorted(by_frequency.items())),
+        )
 
 
 class ConnectorHealthModel(BaseModel):

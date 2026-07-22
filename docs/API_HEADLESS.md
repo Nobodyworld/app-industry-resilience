@@ -19,6 +19,8 @@ Inside Docker, set `APP_MODE=api` to boot the same service from the container en
 
 ## Endpoints
 
+Consumer-facing analytical and metadata routes use the canonical `/v1` prefix. Deprecated unversioned aliases remain only for routes that existed before versioning; the new `/v1/meta/public-data` endpoint intentionally has no `/meta/public-data` alias.
+
 ### `GET /health`
 
 Returns service metadata, component-level health status, and a trace identifier useful for correlating logs.
@@ -57,16 +59,28 @@ Returns service metadata, component-level health status, and a trace identifier 
 Returns the same payload as `/health` and is intended for Kubernetes probes. Trace IDs rotate per request, while component
 status and metadata remain aligned.
 
-### `GET /meta/sources`
+### `GET /v1/meta/sources`
 
 Lists supported data sources (`sample`, `bea`, `census`). Use this to drive UI dropdowns or validation in clients.
 
-### `POST /evaluate`
+### `GET /v1/meta/connectors`
+
+Lists registered connector descriptors and health metadata, including credentialed BEA and Census ASM adapters.
+
+### `GET /v1/meta/public-data`
+
+Returns the validated no-auth public-data readiness catalog. Each entry identifies its agency, public endpoint, cadence, schema, implementation stages, release monitor, and whether it is economic ground truth. Aggregate counts distinguish implemented adapters, fully validated readiness paths, and roadmap entries. Credentialed Census ASM and BEA adapters are intentionally absent, and there is no unversioned alias.
+
+```bash
+curl http://localhost:9000/v1/meta/public-data
+```
+
+### `POST /v1/evaluate`
 
 Compute Idiot Index metrics for a given year. Provide either a `source` (which will use configured API keys) or `records` containing inline data. Inline datasets must include at least `industry_code`, `industry_name`, `year`, and `gross_output` columns.
 
 ```bash
-curl -X POST http://localhost:9000/evaluate \
+curl -X POST http://localhost:9000/v1/evaluate \
   -H "Content-Type: application/json" \
   -d '{
     "source": "sample",
@@ -126,12 +140,12 @@ Successful responses include leaderboard entries, metadata, and the full/filtere
 }
 ```
 
-### `POST /scenario`
+### `POST /v1/scenario`
 
 Runs Scenario Lab adjustments on a supplied dataset. The baseline records should typically be taken from an `/evaluate` response.
 
 ```bash
-curl -X POST http://localhost:9000/scenario \
+curl -X POST http://localhost:9000/v1/scenario \
   -H "Content-Type: application/json" \
   -d '{
     "base_records": [...],
@@ -144,12 +158,12 @@ curl -X POST http://localhost:9000/scenario \
 
 The response contains baseline/scenario summaries, per-industry deltas, and metadata copied from the dataset.
 
-### `POST /analytics/health`
+### `POST /v1/analytics/health`
 
 Returns only the health analytics envelope for the supplied dataset. Accepts the same payload as `/evaluate` plus optional `group_by` (`overall`, `sector`, or `all`) and `top_risks` parameters.
 
 ```bash
-curl -X POST http://localhost:9000/analytics/health \
+curl -X POST http://localhost:9000/v1/analytics/health \
   -H "Content-Type: application/json" \
   -d '{
     "source": "sample",

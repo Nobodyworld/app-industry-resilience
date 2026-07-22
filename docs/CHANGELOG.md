@@ -1,5 +1,10 @@
 # Changelog
 
+# 2026-07-22 – Truthful public-data readiness API
+- Removed credentialed Census ASM from the catalog that is validated as no-auth; the adapter remains available through source and connector surfaces with its API-key requirement.
+- Added typed canonical-only `GET /v1/meta/public-data` metadata exposing public dataset schemas, implementation stages, release monitors, access notes, and ground-truth flags without network calls.
+- Added API/OpenAPI compatibility coverage and aligned the README, API guide, architecture inventory, and reference documentation.
+
 # 2026-07-22 – Uploaded lineage and dashboard provenance
 - Corrected validated CSV uploads to use generic `user-upload` lineage instead of bundled-sample provenance, without retaining filenames or arbitrary dataframe metadata.
 - Added a privacy-safe Streamlit Data provenance panel showing typed source identity, vintage, cache state, official/sample truth, calculation version, and ordered transformations.

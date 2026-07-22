@@ -48,4 +48,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-- None.
+- [ ] Publish truthful public-data readiness catalog through v1 API — issue: [#104](https://github.com/Nobodyworld/app-industry-resilience/issues/104)

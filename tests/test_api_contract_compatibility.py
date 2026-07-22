@@ -22,6 +22,7 @@ ROUTE_PAIRS = (
     ("post", "/v1/scenario", "/scenario"),
     ("post", "/v1/analytics/health", "/analytics/health"),
 )
+CANONICAL_ONLY_PATHS = {"/v1/meta/public-data"}
 OPERATIONAL_PATHS = {
     "/health",
     "/healthz",
@@ -115,6 +116,11 @@ def test_openapi_contains_canonical_and_deprecated_alias_routes() -> None:
         if method == "post":
             assert canonical_operation["requestBody"] == legacy_operation["requestBody"]
 
+    for canonical in CANONICAL_ONLY_PATHS:
+        assert canonical in paths
+        assert paths[canonical]["get"].get("deprecated") is not True
+    assert "/meta/public-data" not in paths
+
     assert OPERATIONAL_PATHS.issubset(paths)
     assert not any(path.startswith("/v1/health") for path in paths)
     assert not any(path.startswith("/v1/metrics") for path in paths)
@@ -205,3 +211,21 @@ def test_compatibility_sensitive_schema_fields_remain_present() -> None:
     }.issubset(schemas["ScenarioResponse"]["properties"])
     lineage_schema = schemas["ScenarioResponse"]["properties"]["lineage"]
     assert "LineageEnvelopeModel" in json.dumps(lineage_schema)
+    assert {
+        "datasets",
+        "count",
+        "implemented_count",
+        "readiness_complete_count",
+        "roadmap_count",
+        "by_phase",
+        "by_frequency",
+    }.issubset(schemas["MetaPublicDataResponse"]["properties"])
+    public_dataset_fields = schemas["PublicDatasetDescriptorModel"]["properties"]
+    assert {
+        "dataset_id",
+        "agency",
+        "auth_requirement",
+        "implementation_status",
+        "economic_ground_truth",
+        "release_monitor",
+    }.issubset(public_dataset_fields)
