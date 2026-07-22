@@ -12,7 +12,7 @@ jobs:
     if: ${{ github.head_ref == 'fix/public-data-catalog-api-truth' }}
     name: Apply public data catalog quality fixes
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout feature branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -20,6 +20,17 @@ jobs:
           ref: ${{ github.event.pull_request.head.ref }}
           fetch-depth: 0
           persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Correct catalog script regression test
         run: |
@@ -38,7 +49,7 @@ jobs:
           path.write_text(text.replace(old, new, 1), encoding="utf-8")
           PY
 
-      - name: Apply Black formatting
+      - name: Apply Black formatting and focused validation
         run: |
           black src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py tests/test_scripts.py
           ruff check src/core/public_data.py src/interfaces/api/app.py src/interfaces/api/schemas.py tests/test_public_data.py tests/test_api.py tests/test_api_contract_compatibility.py tests/test_scripts.py
