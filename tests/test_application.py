@@ -16,7 +16,8 @@ from src.application.idiot_index_service import (
     LoggerHooks,
     sanitize_search,
 )
-from src.core import AppConfig, load_config
+from src.core import AppConfig, lineage_from_dataframe, load_config
+from src.interfaces.streamlit.provenance import attach_uploaded_file_lineage
 
 
 def _sample_frame() -> pd.DataFrame:
@@ -64,6 +65,47 @@ def test_evaluate_sample_uses_loader() -> None:
     assert "health_score" in summary.dataframe_full.columns
     assert summary.health_summary_full is not None
     assert summary.health_summary_filtered is not None
+
+
+def test_evaluation_preserves_uploaded_lineage() -> None:
+    uploaded = _sample_frame()
+    uploaded.attrs.update(
+        {
+            "uploaded_filename": "private-client-data.csv",
+            "api_key": "sentinel-secret",
+            "source_path": r"C:\\Users\\private\\client.csv",
+        }
+    )
+    attach_uploaded_file_lineage(uploaded)
+
+    summary = evaluate_idiot_index(
+        year=2021,
+        source=DataSource.SAMPLE,
+        dataframe=uploaded,
+        search="alpha",
+    )
+
+    full_lineage = lineage_from_dataframe(summary.dataframe_full)
+    filtered_lineage = lineage_from_dataframe(summary.dataframe_filtered)
+    assert full_lineage is not None
+    assert filtered_lineage is not None
+    assert full_lineage.source == "user-upload"
+    assert full_lineage.source_kind.value == "uploaded_file"
+    assert full_lineage.dataset_id == "user-upload"
+    assert full_lineage.retrieval_mode.value == "upload"
+    assert full_lineage.is_sample is False
+    assert full_lineage.is_official is False
+    assert [step.name for step in full_lineage.transformations] == [
+        "source_load",
+        "normalize_columns",
+        "compute_metrics",
+        "compute_health_scores",
+    ]
+    assert filtered_lineage.transformations[-1].name == "filter_records"
+    serialized = str(filtered_lineage.as_dict())
+    assert "private-client-data.csv" not in serialized
+    assert "sentinel-secret" not in serialized
+    assert "C:\\Users" not in serialized
 
 
 def test_evaluate_with_search_filters_results() -> None:

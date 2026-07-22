@@ -39,7 +39,8 @@ Suggested walkthrough in the UI:
 1. Confirm source and reference year in the left Data Studio panel.
 2. Use the top tabs in order: Overview, Explore, Compare, then Scenario Lab.
 3. In Scenario Lab, set at least one non-zero adjustment, click Run scenario, then use Reset scenario to return to idle state.
-4. Use the export panel for all-rows vs current-view outputs in CSV, JSON, or XLSX.
+4. Open **Data provenance** to verify source identity, vintage, cache state, and transformations.
+5. Use the export panel for all-rows vs current-view outputs in CSV, JSON, or XLSX.
 
 Primary offline source for demos: `data/sample_industries.csv`.
 
@@ -78,7 +79,8 @@ Verified features:
 - Headless API for evaluation, scenario analysis, health, and metrics endpoints.
 - Public-data readiness workflow (catalog, listener checks, backfill manifests, duplicate/revision guardrails).
 - Rolling release-aware baseline backtest service.
-- Structured export paths (CSV, JSON, XLSX).
+- Typed, privacy-safe provenance in the dashboard, API, caches, scenarios, and exports.
+- Structured export paths (CSV, JSON, XLSX, plus CSV lineage companions).
 
 Experimental capabilities:
 
@@ -90,7 +92,7 @@ Roadmap-oriented catalog entries:
 
 ## Core Features
 
-- Streamlit dashboard for sample, BEA, Census ASM, uploaded CSV, and official snapshot workflows.
+- Streamlit dashboard for sample, BEA, Census ASM, uploaded CSV, and official snapshot workflows, with a typed Data provenance panel.
 - Headless API for evaluation, scenarios, analytics, metrics, and observability probes.
 - Normalization and metric computation for `industry_code`, `industry_name`, `year`, `gross_output`, `materials_cost`, `intermediate_inputs`, and `value_added`.
 - Scenario Lab recalculation for explicit percentage shocks.
