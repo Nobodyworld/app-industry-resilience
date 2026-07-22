@@ -58,6 +58,7 @@ def build_provenance_tables(
     payload = lineage_to_dict(lineage)
     summary_fields = (
         ("Source", "source"),
+        ("Source kind", "source_kind"),
         ("Provider", "provider"),
         ("Dataset", "dataset_id"),
         ("Observation period", "observation_period"),
