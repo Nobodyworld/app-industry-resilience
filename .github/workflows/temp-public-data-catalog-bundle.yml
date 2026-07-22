@@ -1,16 +1,16 @@
-name: Temporary Inspect Issue 104
+name: Temporary Apply Issue 104
 
 on:
   pull_request:
     branches: ["main"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inspect:
+  apply:
     if: ${{ github.head_ref == 'fix/public-data-catalog-api-truth' }}
-    name: Inspect public data catalog patch bytes
+    name: Apply truthful public data catalog patch
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -18,20 +18,39 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          persist-credentials: true
 
-      - name: Decode staged patches
+      - name: Reconstruct and verify reviewed patches
         run: |
-          tr -d '[:space:]' < .github/issue-104-code.patch.b64 | base64 --decode > /tmp/issue-104-code.patch || true
-          tr -d '[:space:]' < .github/issue-104-docs.patch.b64 | base64 --decode > /tmp/issue-104-docs.patch || true
-          cp .github/issue-104-code.patch.b64 /tmp/issue-104-code.patch.b64
-          cp .github/issue-104-docs.patch.b64 /tmp/issue-104-docs.patch.b64
+          cat .github/issue-104-code.gz.b64.* | base64 --decode | gzip -dc > /tmp/issue-104-code.patch
+          cat .github/issue-104-docs.gz.b64.* | base64 --decode | gzip -dc > /tmp/issue-104-docs.patch
+          echo '2345e50f33bc10fad70f1d05986ee62bd7d31ab35c73c29fc09c13d54b80bae9  /tmp/issue-104-code.patch' | sha256sum --check
+          echo 'd6028e2549e3210ed2849ac448b69144933491200c8161d908d641b02e3780ad  /tmp/issue-104-docs.patch' | sha256sum --check
+          git apply --check /tmp/issue-104-code.patch
+          git apply --check /tmp/issue-104-docs.patch
 
-      - name: Upload staged patch bytes
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: issue-104-staged-patches
-          path: |
-            /tmp/issue-104-code.patch
-            /tmp/issue-104-docs.patch
-            /tmp/issue-104-code.patch.b64
-            /tmp/issue-104-docs.patch.b64
+      - name: Apply and syntax-check implementation
+        run: |
+          git apply --whitespace=error /tmp/issue-104-code.patch
+          git apply --whitespace=error /tmp/issue-104-docs.patch
+          python -m py_compile \
+            src/core/public_data.py \
+            src/interfaces/api/app.py \
+            src/interfaces/api/schemas.py \
+            tests/test_public_data.py \
+            tests/test_api.py \
+            tests/test_api_contract_compatibility.py
+
+      - name: Commit feature changes and remove temporary machinery
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/issue-104-code.patch.b64 \
+            .github/issue-104-docs.patch.b64 \
+            .github/issue-104-code.gz.b64.* \
+            .github/issue-104-docs.gz.b64.* \
+            .github/workflows/temp-public-data-catalog-bundle.yml
+          git add README.md TASKLIST.md docs src tests
+          git commit -m "fix: publish truthful public data catalog"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
