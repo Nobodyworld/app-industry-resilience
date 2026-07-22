@@ -35,6 +35,7 @@ from src.interfaces.streamlit.components import (
     SOURCE_SESSION_KEY,
     build_data_story,
     load_custom_styles,
+    render_data_provenance,
     render_deep_dive,
     render_download_panel,
     render_first_run_onboarding,
@@ -60,6 +61,7 @@ from src.interfaces.streamlit.helpers import (
     prepare_trend_data,
     summarise_scenario_deltas,
 )
+from src.interfaces.streamlit.provenance import attach_uploaded_file_lineage
 
 
 def _get_query_params() -> dict[str, list[str]]:
@@ -164,7 +166,7 @@ def process_uploaded_file(
                 ),
             )
 
-        return temp_df, None
+        return attach_uploaded_file_lineage(temp_df), None
     except Exception as exc:  # pragma: no cover - Streamlit runtime safeguard
         return None, f"Error reading CSV: {exc}"
 
@@ -401,6 +403,8 @@ render_page_header(
     focus_mode=False,
     show_focus_toggle=False,
 )
+
+render_data_provenance(df_display)
 
 render_state_banner(
     "Start with source and vintage, then explore an industry, compare peers, and run a scenario before exporting outputs."

@@ -9,6 +9,7 @@ from src.interfaces.streamlit.components import (
     ONBOARDING_DISMISSED_SESSION_KEY,
     SOURCE_SESSION_KEY,
     build_data_story,
+    render_data_provenance,
     render_download_panel,
     render_first_run_onboarding,
     render_insight_tabs,
@@ -21,6 +22,7 @@ from src.interfaces.streamlit.components import (
     render_state_banner,
     render_trend_data_table,
 )
+from src.interfaces.streamlit.provenance import attach_uploaded_file_lineage
 
 
 def test_build_data_story_with_materials_share() -> None:
@@ -86,6 +88,52 @@ def test_render_page_header_toggle(monkeypatch) -> None:
     monkeypatch.setattr(st, "toggle", lambda label, value, help=None: True)
     focus = render_page_header("Title", "Subtitle", {"Environment": "dev"}, focus_mode=False)
     assert focus is True
+
+
+def test_render_data_provenance_uses_typed_lineage_only(monkeypatch) -> None:
+    captured: list[pd.DataFrame] = []
+    captions: list[str] = []
+
+    class ExpanderCtx:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    frame = pd.DataFrame(
+        {
+            "industry_code": ["311"],
+            "industry_name": ["Food"],
+            "year": [2023],
+        }
+    )
+    frame.attrs.update(
+        {
+            "uploaded_filename": "private-client-data.csv",
+            "api_key": "sentinel-secret",
+        }
+    )
+    attach_uploaded_file_lineage(frame)
+
+    monkeypatch.setattr(st, "expander", lambda *_args, **_kwargs: ExpanderCtx())
+    monkeypatch.setattr(st, "caption", lambda value: captions.append(value))
+    monkeypatch.setattr(st, "markdown", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        st,
+        "dataframe",
+        lambda frame, **_kwargs: captured.append(frame.copy()),
+    )
+
+    render_data_provenance(frame)
+
+    assert len(captured) == 2
+    rendered = " ".join(table.to_string() for table in captured)
+    assert "user-upload" in rendered
+    assert "uploaded_file" in rendered
+    assert "private-client-data.csv" not in rendered
+    assert "sentinel-secret" not in rendered
+    assert any("typed lineage contract" in caption for caption in captions)
 
 
 def test_render_download_panel_empty(monkeypatch) -> None:

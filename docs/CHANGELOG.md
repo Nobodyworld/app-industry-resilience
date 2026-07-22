@@ -1,5 +1,14 @@
 # Changelog
 
+# 2026-07-22 – Uploaded lineage and dashboard provenance
+- Corrected validated CSV uploads to use generic `user-upload` lineage instead of bundled-sample provenance, without retaining filenames or arbitrary dataframe metadata.
+- Added a privacy-safe Streamlit Data provenance panel showing typed source identity, vintage, cache state, official/sample truth, calculation version, and ordered transformations.
+- Aligned the root and detailed specifications with canonical `/v1` routes, typed lineage, cache propagation, scenario lineage, and export companions.
+
+# 2026-07-22 – End-to-end data lineage and API versioning
+- Added canonical `/v1` consumer routes with deprecated compatibility aliases, typed lineage across provider, cache, evaluation, scenario, API, and export paths, and privacy-focused regression coverage.
+- Added JSON top-level lineage, XLSX `Lineage` sheets, CSV lineage companions, official BEA/Census/AIES source identity, and protected hosted CI/Docker validation.
+
 # 2026-07-15 – Public-beta accessibility and onboarding
 - Defaulted true first-run Streamlit sessions to bundled sample data, added dismissible onboarding, clearer source controls, accessible trend tables, improved semantic structure, and a normal-text contrast-safe muted token.
 

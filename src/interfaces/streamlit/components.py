@@ -20,6 +20,7 @@ from .helpers import (
     snapshot_history_table,
     snapshot_timeline_frame,
 )
+from .provenance import build_provenance_tables
 
 SOURCE_SESSION_KEY = "Source"
 ONBOARDING_DISMISSED_SESSION_KEY = "first_run_onboarding_dismissed"
@@ -473,6 +474,28 @@ def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None 
                 """,
                 unsafe_allow_html=True,
             )
+
+
+def render_data_provenance(frame: pd.DataFrame) -> None:
+    """Render typed, allowlisted provenance without copying arbitrary attributes."""
+
+    with st.expander("Data provenance", expanded=False):
+        tables = build_provenance_tables(frame)
+        if tables is None:
+            st.caption("Typed provenance is unavailable for this dataset.")
+            return
+
+        summary, transformations = tables
+        st.caption(
+            "This panel uses the typed lineage contract. Filenames, credentials, cache keys, "
+            "private paths, raw provider payloads, and arbitrary dataframe attributes are excluded."
+        )
+        st.dataframe(summary, use_container_width=True, hide_index=True)
+        st.markdown("**Transformation history**")
+        if transformations.empty:
+            st.caption("No recorded transformations.")
+        else:
+            st.dataframe(transformations, use_container_width=True, hide_index=True)
 
 
 def render_state_banner(message: str) -> None:
