@@ -1,6 +1,8 @@
 # v0.2.0 Public Beta Release Notes
 
 **Status:** Release candidate draft  
+**Candidate branch:** `release/v0.2.0-rc1`  
+**Starting main SHA:** `f98962ddd8e6490115cf2ac6b332a9ae86bbea76`  
 **Candidate package version:** `0.2.0rc1`  
 **Final intended version/tag:** `0.2.0` / `v0.2.0`  
 **Release issue:** [#107](https://github.com/Nobodyworld/app-industry-resilience/issues/107)
