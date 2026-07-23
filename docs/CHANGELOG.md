@@ -1,5 +1,10 @@
 # Changelog
 
+# 2026-07-23 – v0.2.0 public-beta release candidate
+- Aligned the package, fallback, and Commitizen development versions at PEP 440 `0.2.0rc1`.
+- Added the issue #107 release gate and durable Windows/Edge acceptance record; final `0.2.0` publication remains blocked pending manual acceptance and fresh exact-head validation.
+- Preserved Public Beta classification and all experimental-methodology limitations; this candidate is not a `1.0.0` stability declaration.
+
 # 2026-07-22 – Truthful public-data readiness API
 - Removed credentialed Census ASM from the catalog that is validated as no-auth; the adapter remains available through source and connector surfaces with its API-key requirement.
 - Added typed canonical-only `GET /v1/meta/public-data` metadata exposing public dataset schemas, implementation stages, release monitors, access notes, and ground-truth flags without network calls.
