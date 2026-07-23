@@ -1,0 +1,166 @@
+name: Temporary v0.2.0 RC Validation
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    if: ${{ github.head_ref == 'release/v0.2.0-rc1' }}
+    name: Candidate quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Verify candidate versions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tomllib
+
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          assert project["project"]["version"] == "0.2.0rc1"
+          assert project["tool"]["commitizen"]["version"] == "0.2.0rc1"
+          version_source = Path("src/version.py").read_text(encoding="utf-8")
+          assert '__version__ = "0.2.0rc1"' in version_source
+          print("candidate_version=0.2.0rc1")
+          PY
+
+      - name: Run repository quality gate
+        run: make quality-gate
+
+      - name: Upload coverage report
+        if: ${{ always() && hashFiles('coverage.xml') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v0.2.0rc1-coverage-xml
+          path: coverage.xml
+
+  docker:
+    if: ${{ github.head_ref == 'release/v0.2.0-rc1' }}
+    name: Candidate Docker deployment smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      IMAGE_NAME: industry-resilience-rc:${{ github.sha }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Show Docker environment
+        run: docker version
+
+      - name: Build runtime image
+        run: docker build --pull --tag "$IMAGE_NAME" .
+
+      - name: Verify non-root runtime user
+        run: |
+          runtime_user="$(docker image inspect "$IMAGE_NAME" --format '{{.Config.User}}')"
+          echo "Configured runtime user: $runtime_user"
+          test "$runtime_user" = "app"
+
+      - name: Start and verify Streamlit mode
+        run: |
+          docker run --detach --name industry-resilience-rc-streamlit --publish 8501:8501 "$IMAGE_NAME"
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8501/_stcore/health > /tmp/streamlit-health.txt; then
+              cat /tmp/streamlit-health.txt
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-rc-streamlit
+              exit 1
+            fi
+            sleep 2
+          done
+          for attempt in {1..60}; do
+            status="$(docker inspect industry-resilience-rc-streamlit --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}')"
+            if [ "$status" = "healthy" ]; then
+              break
+            fi
+            if [ "$status" = "unhealthy" ] || [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-rc-streamlit
+              exit 1
+            fi
+            sleep 2
+          done
+          docker rm --force industry-resilience-rc-streamlit
+
+      - name: Start and verify API mode
+        run: |
+          docker run --detach --name industry-resilience-rc-api --env APP_MODE=api --publish 9000:9000 "$IMAGE_NAME"
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:9000/health > /tmp/api-health.json && \
+               curl --fail --silent --show-error http://127.0.0.1:9000/metrics > /tmp/api-metrics.txt && \
+               curl --fail --silent --show-error http://127.0.0.1:9000/v1/meta/public-data > /tmp/public-data.json; then
+              cat /tmp/api-health.json
+              head -n 20 /tmp/api-metrics.txt
+              python -m json.tool /tmp/public-data.json > /dev/null
+              break
+            fi
+            if [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-rc-api
+              exit 1
+            fi
+            sleep 2
+          done
+          for attempt in {1..60}; do
+            status="$(docker inspect industry-resilience-rc-api --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}')"
+            if [ "$status" = "healthy" ]; then
+              break
+            fi
+            if [ "$status" = "unhealthy" ] || [ "$attempt" -eq 60 ]; then
+              docker logs industry-resilience-rc-api
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Record candidate Docker evidence
+        run: |
+          {
+            echo "candidate_version=0.2.0rc1"
+            echo "candidate_sha=${{ github.event.pull_request.head.sha }}"
+            echo "docker_client_version=$(docker version --format '{{.Client.Version}}')"
+            echo "docker_server_version=$(docker version --format '{{.Server.Version}}')"
+            echo "image_id=$(docker image inspect "$IMAGE_NAME" --format '{{.Id}}')"
+            echo "configured_runtime_user=$(docker image inspect "$IMAGE_NAME" --format '{{.Config.User}}')"
+            echo "streamlit_health_url=http://127.0.0.1:8501/_stcore/health"
+            echo "api_health_url=http://127.0.0.1:9000/health"
+            echo "api_metrics_url=http://127.0.0.1:9000/metrics"
+            echo "public_data_url=http://127.0.0.1:9000/v1/meta/public-data"
+          } | tee v0.2.0rc1-docker-validation.txt
+
+      - name: Upload candidate Docker evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v0.2.0rc1-docker-validation
+          path: v0.2.0rc1-docker-validation.txt
+
+      - name: Show logs on failure
+        if: ${{ failure() }}
+        run: |
+          docker logs industry-resilience-rc-streamlit 2>/dev/null || true
+          docker logs industry-resilience-rc-api 2>/dev/null || true
+
+      - name: Remove smoke-test containers
+        if: ${{ always() }}
+        run: |
+          docker rm --force industry-resilience-rc-streamlit 2>/dev/null || true
+          docker rm --force industry-resilience-rc-api 2>/dev/null || true
