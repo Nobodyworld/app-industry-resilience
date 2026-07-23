@@ -1,6 +1,6 @@
 [project]
 name = "industry-resilience-dashboard"
-version = "0.1.0"
+version = "0.2.0rc1"
 description = "U.S. Industry Cost Structure and Resilience Dashboard"
 requires-python = ">=3.13"
 readme = "README.md"
@@ -67,7 +67,6 @@ show_missing = true
 
 [tool.commitizen]
 name = "cz_conventional_commits"
-version = "0.1.0"
+version = "0.2.0rc1"
 tag_format = "v$version"
 update_changelog_on_bump = true
-
