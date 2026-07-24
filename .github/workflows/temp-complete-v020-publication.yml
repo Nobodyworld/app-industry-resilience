@@ -1,0 +1,41 @@
+name: Temporary Complete v0.2.0 Publication
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  complete:
+    if: ${{ github.head_ref == 'docs/complete-v0.2.0-publication' }}
+    name: Complete v0.2.0 publication record
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout bookkeeping branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: docs/complete-v0.2.0-publication
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply publication evidence
+        run: python scripts/_temp_complete_v020_publication.py
+
+      - name: Verify publication record
+        run: |
+          grep -F 'Published and verified' docs/execplans/v0.2.0-public-beta-release-candidate.md
+          grep -F '5e600a301e36287449742738260f4f66f218f416' docs/execplans/v0.2.0-public-beta-release-candidate.md
+          grep -F 'releases/tag/v0.2.0' docs/RELEASE_NOTES_V0.2.0.md
+          git diff --check
+
+      - name: Commit evidence and remove temporary machinery
+        run: |
+          rm .github/workflows/temp-complete-v020-publication.yml scripts/_temp_complete_v020_publication.py
+          git config user.name "Nobodyworld Release Automation"
+          git config user.email "127373451+Nobodyworld@users.noreply.github.com"
+          git add docs/RELEASE_NOTES_V0.2.0.md docs/execplans/v0.2.0-public-beta-release-candidate.md .github/workflows/temp-complete-v020-publication.yml scripts/_temp_complete_v020_publication.py
+          git commit -m "docs: record v0.2.0 publication evidence"
+          git push origin HEAD:docs/complete-v0.2.0-publication
