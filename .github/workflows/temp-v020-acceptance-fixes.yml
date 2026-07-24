@@ -1,0 +1,169 @@
+name: Temporary v0.2.0 Acceptance Fixes
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: ${{ github.head_ref == 'release/v0.2.0-rc1' }}
+    name: Apply interrupted release acceptance fixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout release candidate branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: release/v0.2.0-rc1
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Apply reviewed blocker fixes
+        run: |
+          cat > /tmp/v020-acceptance-fixes.patch <<'PATCH'
+          diff --git a/src/interfaces/api/app.py b/src/interfaces/api/app.py
+          index c8f9fd4..0000000 100644
+          --- a/src/interfaces/api/app.py
+          +++ b/src/interfaces/api/app.py
+          @@ -130,6 +130,13 @@ app.add_middleware(
+               allow_credentials=_allow_credentials(_origins),
+           )
+           
+          +
+          +@app.get("/openapi.json", tags=["system"])
+          +def openapi_document() -> Response:
+          +    """Expose the generated OpenAPI contract through the live application."""
+          +
+          +    return Response(status_code=status.HTTP_200_OK, data=app.openapi(), media_type="application/json")
+          +
+           
+           @app.get("/health", response_model=HealthResponse, tags=["system"])
+           def health() -> HealthResponse:
+          diff --git a/tests/test_api.py b/tests/test_api.py
+          index bf2a444..0000000 100644
+          --- a/tests/test_api.py
+          +++ b/tests/test_api.py
+          @@ -25,6 +25,19 @@ def _sample_records(limit: int = 5) -> list[dict[str, object]]:
+               return cast(list[dict[str, object]], json.loads(frame.to_json(orient="records")))
+           
+           
+          +def test_openapi_endpoint_exposes_live_contract() -> None:
+          +    response = client.get("/openapi.json")
+          +    payload = response.json()
+          +
+          +    assert response.status_code == 200
+          +    assert response.media_type == "application/json"
+          +    assert payload["openapi"] == "3.1.0"
+          +    assert payload["info"]["title"] == "Idiot Index API"
+          +    assert payload["info"]["version"] == app.version
+          +    assert "/openapi.json" in payload["paths"]
+          +    assert "/v1/meta/public-data" in payload["paths"]
+          +
+          +
+           def test_health_endpoint_reports_ok() -> None:
+               response = client.get("/health")
+               payload = response.json()
+          diff --git a/src/interfaces/streamlit/components.py b/src/interfaces/streamlit/components.py
+          index 7750505..0000000 100644
+          --- a/src/interfaces/streamlit/components.py
+          +++ b/src/interfaces/streamlit/components.py
+          @@ -73,10 +73,6 @@ def load_custom_styles() -> None:
+                   --surface-strong: #ecf1f5;
+               }
+           
+          -            .stApp {
+          -                background: var(--surface);
+          -            }
+          -
+               .page-hero {
+                   padding: 2.5rem 2rem 1.5rem 2rem;
+                   border-radius: 24px;
+          @@ -143,8 +139,8 @@ def load_custom_styles() -> None:
+               .state-banner {
+                   border-radius: 18px;
+                   padding: 1rem 1.2rem;
+          -                background: var(--accent-soft);
+          -                border: 1px solid rgba(60, 208, 201, 0.4);
+          +                background: #d9f7f4;
+          +                border: 1px solid #3aa8a2;
+                   color: var(--ink-900);
+                   margin-bottom: 1.25rem;
+               }
+          @@ -180,7 +176,7 @@ def load_custom_styles() -> None:
+           
+               .sidebar-guidance {
+                   font-size: 0.85rem;
+          -                color: var(--ink-300);
+          +                color: inherit;
+                   margin-top: 0.75rem;
+               }
+           </style>
+          diff --git a/tests/test_streamlit_components.py b/tests/test_streamlit_components.py
+          index f599245..0000000 100644
+          --- a/tests/test_streamlit_components.py
+          +++ b/tests/test_streamlit_components.py
+          @@ -11,6 +11,7 @@ from src.interfaces.streamlit.components import (
+               ONBOARDING_DISMISSED_SESSION_KEY,
+               SOURCE_SESSION_KEY,
+               build_data_story,
+          +    load_custom_styles,
+               render_data_provenance,
+               render_download_panel,
+               render_first_run_onboarding,
+          @@ -92,6 +93,19 @@ def test_render_page_header_toggle(monkeypatch) -> None:
+               assert focus is True
+           
+           
+          +def test_custom_styles_preserve_native_theme_contrast(monkeypatch) -> None:
+          +    rendered: list[str] = []
+          +    monkeypatch.setattr(
+          +        st,
+          +        "markdown",
+          +        lambda body, **_kwargs: rendered.append(body),
+          +    )
+          +
+          +    load_custom_styles()
+          +
+          +    css = rendered[0]
+          +    assert ".stApp {" not in css
+          +    assert "background: #d9f7f4;" in css
+          +    assert ".sidebar-guidance" in css and "color: inherit;" in css
+          +
+          +
+           def test_render_data_provenance_uses_typed_lineage_only(monkeypatch) -> None:
+               captured: list[pd.DataFrame] = []
+               captions: list[str] = []
+          PATCH
+          git apply --check /tmp/v020-acceptance-fixes.patch
+          git apply /tmp/v020-acceptance-fixes.patch
+
+      - name: Format and validate focused fixes
+        run: |
+          black src/interfaces/api/app.py tests/test_api.py src/interfaces/streamlit/components.py tests/test_streamlit_components.py
+          ruff check src/interfaces/api/app.py tests/test_api.py src/interfaces/streamlit/components.py tests/test_streamlit_components.py
+          python -m mypy src/interfaces/api/app.py src/interfaces/streamlit/components.py
+          pytest -q tests/test_api.py tests/test_streamlit_components.py
+          git diff --check
+
+      - name: Commit fixes and remove temporary workflow
+        run: |
+          rm .github/workflows/temp-v020-acceptance-fixes.yml
+          git config user.name "Nobodyworld Release Automation"
+          git config user.email "127373451+Nobodyworld@users.noreply.github.com"
+          git add src/interfaces/api/app.py tests/test_api.py src/interfaces/streamlit/components.py tests/test_streamlit_components.py .github/workflows/temp-v020-acceptance-fixes.yml
+          git commit -m "fix: expose OpenAPI and respect Streamlit themes"
+          git push origin HEAD:release/v0.2.0-rc1
