@@ -24,6 +24,31 @@ jobs:
       - name: Apply final release replacements
         run: python scripts/_temp_finalize_v020.py
 
+      - name: Normalize final release line breaks
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "docs/RELEASE_NOTES_V0.2.0.md": {
+                  "**Status:** Final Public Beta release  \n": "**Status:** Final Public Beta release<br>\n",
+                  "**Package version:** `0.2.0`  \n": "**Package version:** `0.2.0`<br>\n",
+                  "**Release version/tag:** `0.2.0` / `v0.2.0`  \n": "**Release version/tag:** `0.2.0` / `v0.2.0`<br>\n",
+              },
+              "docs/execplans/v0.2.0-public-beta-release-candidate.md": {
+                  "**Final package version:** `0.2.0`  \n": "**Final package version:** `0.2.0`<br>\n",
+              },
+          }
+          for filename, mapping in replacements.items():
+              path = Path(filename)
+              text = path.read_text(encoding="utf-8")
+              for old, new in mapping.items():
+                  if text.count(old) != 1:
+                      raise SystemExit(f"{filename}: expected exactly one occurrence of {old!r}")
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+          PY
+
       - name: Capture finalizer verification
         id: verify
         continue-on-error: true
