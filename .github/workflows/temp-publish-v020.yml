@@ -1,0 +1,92 @@
+name: Temporary Publish v0.2.0
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: ${{ github.head_ref == 'release/v0.2.0-publication' }}
+    name: Publish v0.2.0 Public Beta
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_SHA: 5e600a301e36287449742738260f4f66f218f416
+      RELEASE_TAG: v0.2.0
+    steps:
+      - name: Checkout publication branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: release/v0.2.0-publication
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Verify immutable publication target
+        run: |
+          git fetch origin main --tags
+          actual_main="$(git rev-parse origin/main)"
+          echo "origin_main=$actual_main"
+          echo "target_sha=$TARGET_SHA"
+          test "$actual_main" = "$TARGET_SHA"
+          test "$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          print(tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])
+          PY
+          )" = "0.2.0"
+
+      - name: Create or verify annotated tag
+        run: |
+          git config user.name "Nobodyworld Release Automation"
+          git config user.email "127373451+Nobodyworld@users.noreply.github.com"
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            resolved="$(git rev-list -n 1 "$RELEASE_TAG")"
+            echo "existing_tag_sha=$resolved"
+            test "$resolved" = "$TARGET_SHA"
+          else
+            git tag -a "$RELEASE_TAG" "$TARGET_SHA" -m "v0.2.0 Public Beta"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+
+      - name: Create or verify GitHub release
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists; verifying."
+          else
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "v0.2.0 Public Beta" \
+              --notes-file docs/RELEASE_NOTES_V0.2.0.md \
+              --verify-tag \
+              --prerelease
+          fi
+
+      - name: Record tag and release parity
+        run: |
+          git fetch origin --tags
+          tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+          release_url="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url')"
+          release_tag="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json tagName --jq '.tagName')"
+          is_prerelease="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')"
+          test "$tag_sha" = "$TARGET_SHA"
+          test "$release_tag" = "$RELEASE_TAG"
+          test "$is_prerelease" = "true"
+          {
+            echo "target_sha=$TARGET_SHA"
+            echo "tag=$RELEASE_TAG"
+            echo "tag_sha=$tag_sha"
+            echo "release_tag=$release_tag"
+            echo "release_url=$release_url"
+            echo "is_prerelease=$is_prerelease"
+            echo "sha_parity=true"
+          } | tee v0.2.0-publication-evidence.txt
+
+      - name: Upload publication evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v0.2.0-publication-evidence
+          path: v0.2.0-publication-evidence.txt
