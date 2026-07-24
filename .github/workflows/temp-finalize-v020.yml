@@ -1,0 +1,49 @@
+name: Temporary Finalize v0.2.0
+
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: ${{ github.head_ref == 'release/v0.2.0-rc1' }}
+    name: Finalize v0.2.0 release files
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: release/v0.2.0-rc1
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Apply final release replacements
+        run: python scripts/_temp_finalize_v020.py
+
+      - name: Verify final version consistency
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import tomllib
+
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          assert project["project"]["version"] == "0.2.0"
+          assert project["tool"]["commitizen"]["version"] == "0.2.0"
+          assert '__version__ = "0.2.0"' in Path("src/version.py").read_text(encoding="utf-8")
+          assert "0.2.0rc1 PUBLIC BETA RELEASE CANDIDATE" not in Path("README.md").read_text(encoding="utf-8")
+          print("release_version=0.2.0")
+          PY
+          git diff --check
+
+      - name: Commit final release files and remove temporary machinery
+        run: |
+          rm .github/workflows/temp-finalize-v020.yml scripts/_temp_finalize_v020.py
+          git config user.name "Nobodyworld Release Automation"
+          git config user.email "127373451+Nobodyworld@users.noreply.github.com"
+          git add README.md docs/CHANGELOG.md docs/RELEASE_NOTES_V0.2.0.md docs/execplans/v0.2.0-public-beta-release-candidate.md pyproject.toml src/version.py .github/workflows/temp-finalize-v020.yml scripts/_temp_finalize_v020.py
+          git commit -m "release: finalize v0.2.0 public beta"
+          git push origin HEAD:release/v0.2.0-rc1
