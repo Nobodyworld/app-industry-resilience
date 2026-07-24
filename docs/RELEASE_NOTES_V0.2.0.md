@@ -1,13 +1,13 @@
 # v0.2.0 Public Beta Release Notes
 
-**Status:** Release candidate draft  
+**Status:** Final Public Beta release<br>
 **Candidate branch:** `release/v0.2.0-rc1`  
 **Starting main SHA:** `f98962ddd8e6490115cf2ac6b332a9ae86bbea76`  
-**Candidate package version:** `0.2.0rc1`  
-**Final intended version/tag:** `0.2.0` / `v0.2.0`  
+**Package version:** `0.2.0`<br>
+**Release version/tag:** `0.2.0` / `v0.2.0`<br>
 **Release issue:** [#107](https://github.com/Nobodyworld/app-industry-resilience/issues/107)
 
-These notes describe the intended `v0.2.0` Public Beta release. Publication remains blocked until protected automated validation and the recorded Windows/Edge manual acceptance pass are complete.
+These notes describe the final `v0.2.0` Public Beta release. The complete Windows/Edge acceptance matrix passed, and publication proceeds only after fresh protected CI and Docker validation on the exact final release head.
 
 ## Highlights
 
@@ -57,7 +57,7 @@ This remains a **Public Beta analytical demonstration**.
 - Census AIES uses a revenue-to-operating-expense proxy and is not identical to the BEA gross-output-to-intermediate-inputs ratio.
 - Composite indicators are experimental and algebraically related; they do not independently establish industry health, resilience, or distress.
 - Event/context feeds must not be treated as official economic ground truth.
-- Manual keyboard, focus, screen-reader, 200% zoom, and light/dark rendered-browser acceptance must be recorded before publication.
+- Keyboard, focus, 200% zoom, light/dark appearance, and chart-alternative checks passed in Microsoft Edge; a screen reader was not run and no screen-reader PASS is claimed.
 
 ## Upgrade notes from 0.1.0
 
@@ -69,10 +69,10 @@ This remains a **Public Beta analytical demonstration**.
 
 ## Validation evidence
 
-Exact automated and manual results will be recorded in:
+Exact automated and manual results are recorded in:
 
 - [`docs/execplans/v0.2.0-public-beta-release-candidate.md`](execplans/v0.2.0-public-beta-release-candidate.md)
 - [issue #107](https://github.com/Nobodyworld/app-industry-resilience/issues/107)
-- the final release pull request and protected workflow runs
+- release pull request #110 and its protected workflow runs
 
-The final release notes must name the exact merged `main` SHA, CI run, Docker Smoke run, annotated tag, and GitHub release URL before publication is considered complete.
+Post-merge bookkeeping will record the exact merged `main` SHA, final CI and Docker runs, annotated tag, GitHub release URL, and tag/release SHA parity.

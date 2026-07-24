@@ -1,5 +1,10 @@
 # Changelog
 
+# 2026-07-24 – v0.2.0 Public Beta finalization
+- Accepted the completed Windows/Edge GO recommendation and promoted package, Commitizen, and fallback versions from `0.2.0rc1` to `0.2.0`.
+- Finalized Public Beta status and release notes while preserving all experimental-methodology limitations and explicit screen-reader NOT RUN disclosure.
+- Publication remains gated on fresh protected CI/Docker checks, exact-head merge, annotated tag, GitHub release, and post-release SHA-parity bookkeeping.
+
 # 2026-07-23 – v0.2.0 public-beta release candidate
 - Aligned the package, fallback, and Commitizen development versions at PEP 440 `0.2.0rc1`.
 - Added the issue #107 release gate and durable Windows/Edge acceptance record; final `0.2.0` publication remains blocked pending manual acceptance and fresh exact-head validation.
