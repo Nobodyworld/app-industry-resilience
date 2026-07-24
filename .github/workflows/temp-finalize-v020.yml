@@ -24,22 +24,47 @@ jobs:
       - name: Apply final release replacements
         run: python scripts/_temp_finalize_v020.py
 
-      - name: Verify final version consistency
+      - name: Capture finalizer verification
+        id: verify
+        continue-on-error: true
         run: |
-          python - <<'PY'
+          python - <<'PY' > finalizer-diagnostic.txt 2>&1
           from pathlib import Path
           import tomllib
 
           project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          fallback = Path("src/version.py").read_text(encoding="utf-8")
+          readme = Path("README.md").read_text(encoding="utf-8")
+          print(f"project_version={project['project']['version']}")
+          print(f"commitizen_version={project['tool']['commitizen']['version']}")
+          print(f"fallback_final_present={('__version__ = \"0.2.0\"' in fallback)}")
+          print(f"candidate_phrase_present={('0.2.0rc1 PUBLIC BETA RELEASE CANDIDATE' in readme)}")
           assert project["project"]["version"] == "0.2.0"
           assert project["tool"]["commitizen"]["version"] == "0.2.0"
-          assert '__version__ = "0.2.0"' in Path("src/version.py").read_text(encoding="utf-8")
-          assert "0.2.0rc1 PUBLIC BETA RELEASE CANDIDATE" not in Path("README.md").read_text(encoding="utf-8")
+          assert '__version__ = "0.2.0"' in fallback
+          assert "0.2.0rc1 PUBLIC BETA RELEASE CANDIDATE" not in readme
           print("release_version=0.2.0")
           PY
-          git diff --check
+          python_status=$?
+          set +e
+          git diff --check >> finalizer-diagnostic.txt 2>&1
+          diff_status=$?
+          set -e
+          echo "python_status=$python_status" >> finalizer-diagnostic.txt
+          echo "diff_status=$diff_status" >> finalizer-diagnostic.txt
+          cat finalizer-diagnostic.txt
+          test "$python_status" -eq 0
+          test "$diff_status" -eq 0
+
+      - name: Upload finalizer diagnostic
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: v0.2.0-finalizer-diagnostic
+          path: finalizer-diagnostic.txt
 
       - name: Commit final release files and remove temporary machinery
+        if: ${{ steps.verify.outcome == 'success' }}
         run: |
           rm .github/workflows/temp-finalize-v020.yml scripts/_temp_finalize_v020.py
           git config user.name "Nobodyworld Release Automation"
@@ -47,3 +72,7 @@ jobs:
           git add README.md docs/CHANGELOG.md docs/RELEASE_NOTES_V0.2.0.md docs/execplans/v0.2.0-public-beta-release-candidate.md pyproject.toml src/version.py .github/workflows/temp-finalize-v020.yml scripts/_temp_finalize_v020.py
           git commit -m "release: finalize v0.2.0 public beta"
           git push origin HEAD:release/v0.2.0-rc1
+
+      - name: Fail when verification failed
+        if: ${{ steps.verify.outcome != 'success' }}
+        run: exit 1
