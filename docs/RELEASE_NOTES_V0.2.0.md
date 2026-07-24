@@ -3,6 +3,7 @@
 **Status:** Final Public Beta release<br>
 **Candidate branch:** `release/v0.2.0-rc1`  
 **Starting main SHA:** `f98962ddd8e6490115cf2ac6b332a9ae86bbea76`  
+**Final pre-merge validation base:** `441f9b0f76f28358ee1c51bbbcf054ecd0d10897`<br>
 **Package version:** `0.2.0`<br>
 **Release version/tag:** `0.2.0` / `v0.2.0`<br>
 **Release issue:** [#107](https://github.com/Nobodyworld/app-industry-resilience/issues/107)
