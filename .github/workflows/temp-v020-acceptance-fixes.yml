@@ -34,122 +34,112 @@ jobs:
 
       - name: Apply reviewed blocker fixes
         run: |
-          cat > /tmp/v020-acceptance-fixes.patch <<'PATCH'
-          diff --git a/src/interfaces/api/app.py b/src/interfaces/api/app.py
-          index c8f9fd4..0000000 100644
-          --- a/src/interfaces/api/app.py
-          +++ b/src/interfaces/api/app.py
-          @@ -130,6 +130,13 @@ app.add_middleware(
-               allow_credentials=_allow_credentials(_origins),
-           )
-           
-          +
-          +@app.get("/openapi.json", tags=["system"])
-          +def openapi_document() -> Response:
-          +    """Expose the generated OpenAPI contract through the live application."""
-          +
-          +    return Response(status_code=status.HTTP_200_OK, data=app.openapi(), media_type="application/json")
-          +
-           
-           @app.get("/health", response_model=HealthResponse, tags=["system"])
-           def health() -> HealthResponse:
-          diff --git a/tests/test_api.py b/tests/test_api.py
-          index bf2a444..0000000 100644
-          --- a/tests/test_api.py
-          +++ b/tests/test_api.py
-          @@ -25,6 +25,19 @@ def _sample_records(limit: int = 5) -> list[dict[str, object]]:
-               return cast(list[dict[str, object]], json.loads(frame.to_json(orient="records")))
-           
-           
-          +def test_openapi_endpoint_exposes_live_contract() -> None:
-          +    response = client.get("/openapi.json")
-          +    payload = response.json()
-          +
-          +    assert response.status_code == 200
-          +    assert response.media_type == "application/json"
-          +    assert payload["openapi"] == "3.1.0"
-          +    assert payload["info"]["title"] == "Idiot Index API"
-          +    assert payload["info"]["version"] == app.version
-          +    assert "/openapi.json" in payload["paths"]
-          +    assert "/v1/meta/public-data" in payload["paths"]
-          +
-          +
-           def test_health_endpoint_reports_ok() -> None:
-               response = client.get("/health")
-               payload = response.json()
-          diff --git a/src/interfaces/streamlit/components.py b/src/interfaces/streamlit/components.py
-          index 7750505..0000000 100644
-          --- a/src/interfaces/streamlit/components.py
-          +++ b/src/interfaces/streamlit/components.py
-          @@ -73,10 +73,6 @@ def load_custom_styles() -> None:
-                   --surface-strong: #ecf1f5;
-               }
-           
-          -            .stApp {
-          -                background: var(--surface);
-          -            }
-          -
-               .page-hero {
-                   padding: 2.5rem 2rem 1.5rem 2rem;
-                   border-radius: 24px;
-          @@ -143,8 +139,8 @@ def load_custom_styles() -> None:
-               .state-banner {
-                   border-radius: 18px;
-                   padding: 1rem 1.2rem;
-          -                background: var(--accent-soft);
-          -                border: 1px solid rgba(60, 208, 201, 0.4);
-          +                background: #d9f7f4;
-          +                border: 1px solid #3aa8a2;
-                   color: var(--ink-900);
-                   margin-bottom: 1.25rem;
-               }
-          @@ -180,7 +176,7 @@ def load_custom_styles() -> None:
-           
-               .sidebar-guidance {
-                   font-size: 0.85rem;
-          -                color: var(--ink-300);
-          +                color: inherit;
-                   margin-top: 0.75rem;
-               }
-           </style>
-          diff --git a/tests/test_streamlit_components.py b/tests/test_streamlit_components.py
-          index f599245..0000000 100644
-          --- a/tests/test_streamlit_components.py
-          +++ b/tests/test_streamlit_components.py
-          @@ -11,6 +11,7 @@ from src.interfaces.streamlit.components import (
-               ONBOARDING_DISMISSED_SESSION_KEY,
-               SOURCE_SESSION_KEY,
-               build_data_story,
-          +    load_custom_styles,
-               render_data_provenance,
-               render_download_panel,
-               render_first_run_onboarding,
-          @@ -92,6 +93,19 @@ def test_render_page_header_toggle(monkeypatch) -> None:
-               assert focus is True
-           
-           
-          +def test_custom_styles_preserve_native_theme_contrast(monkeypatch) -> None:
-          +    rendered: list[str] = []
-          +    monkeypatch.setattr(
-          +        st,
-          +        "markdown",
-          +        lambda body, **_kwargs: rendered.append(body),
-          +    )
-          +
-          +    load_custom_styles()
-          +
-          +    css = rendered[0]
-          +    assert ".stApp {" not in css
-          +    assert "background: #d9f7f4;" in css
-          +    assert ".sidebar-guidance" in css and "color: inherit;" in css
-          +
-          +
-           def test_render_data_provenance_uses_typed_lineage_only(monkeypatch) -> None:
-               captured: list[pd.DataFrame] = []
-               captions: list[str] = []
-          PATCH
-          git apply --check /tmp/v020-acceptance-fixes.patch
-          git apply /tmp/v020-acceptance-fixes.patch
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one source match, found {count}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          health_route = '\n\n@app.get("/health", response_model=HealthResponse, tags=["system"])\n'
+          openapi_route = '''
+
+@app.get("/openapi.json", tags=["system"])
+def openapi_document() -> Response:
+    """Expose the generated OpenAPI contract through the live application."""
+
+    return Response(
+        status_code=status.HTTP_200_OK,
+        data=app.openapi(),
+        media_type="application/json",
+    )
+
+
+@app.get("/health", response_model=HealthResponse, tags=["system"])
+'''
+          replace_once("src/interfaces/api/app.py", health_route, openapi_route)
+
+          api_test_marker = "\n\ndef test_health_endpoint_reports_ok() -> None:\n"
+          api_test = '''
+
+def test_openapi_endpoint_exposes_live_contract() -> None:
+    response = client.get("/openapi.json")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert response.media_type == "application/json"
+    assert payload["openapi"] == "3.1.0"
+    assert payload["info"]["title"] == "Idiot Index API"
+    assert payload["info"]["version"] == app.version
+    assert "/openapi.json" in payload["paths"]
+    assert "/v1/meta/public-data" in payload["paths"]
+
+
+def test_health_endpoint_reports_ok() -> None:
+'''
+          replace_once("tests/test_api.py", api_test_marker, api_test)
+
+          replace_once(
+              "src/interfaces/streamlit/components.py",
+              '''
+            .stApp {
+                background: var(--surface);
+            }
+
+''',
+              "",
+          )
+          replace_once(
+              "src/interfaces/streamlit/components.py",
+              '''                background: var(--accent-soft);
+                border: 1px solid rgba(60, 208, 201, 0.4);''',
+              '''                background: #d9f7f4;
+                border: 1px solid #3aa8a2;''',
+          )
+          replace_once(
+              "src/interfaces/streamlit/components.py",
+              "                color: var(--ink-300);\n                margin-top: 0.75rem;",
+              "                color: inherit;\n                margin-top: 0.75rem;",
+          )
+
+          replace_once(
+              "tests/test_streamlit_components.py",
+              "    build_data_story,\n    render_data_provenance,\n",
+              "    build_data_story,\n    load_custom_styles,\n    render_data_provenance,\n",
+          )
+          provenance_test_marker = (
+              "\n\ndef test_render_data_provenance_uses_typed_lineage_only(monkeypatch) -> None:\n"
+          )
+          style_test = '''
+
+def test_custom_styles_preserve_native_theme_contrast(monkeypatch) -> None:
+    rendered: list[str] = []
+    monkeypatch.setattr(
+        st,
+        "markdown",
+        lambda body, **_kwargs: rendered.append(body),
+    )
+
+    load_custom_styles()
+
+    css = rendered[0]
+    assert ".stApp {" not in css
+    assert "background: #d9f7f4;" in css
+    assert ".sidebar-guidance" in css and "color: inherit;" in css
+
+
+def test_render_data_provenance_uses_typed_lineage_only(monkeypatch) -> None:
+'''
+          replace_once(
+              "tests/test_streamlit_components.py",
+              provenance_test_marker,
+              style_test,
+          )
+          PY
 
       - name: Format and validate focused fixes
         run: |
