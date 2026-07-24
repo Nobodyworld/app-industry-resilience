@@ -4,6 +4,11 @@
 **Candidate branch:** `release/v0.2.0-rc1`  
 **Starting main SHA:** `f98962ddd8e6490115cf2ac6b332a9ae86bbea76`  
 **Final pre-merge validation base:** `441f9b0f76f28358ee1c51bbbcf054ecd0d10897`<br>
+**Merged `main` SHA:** `5e600a301e36287449742738260f4f66f218f416`<br>
+**Final protected CI:** Quality Gate #239 — passed<br>
+**Final Docker Smoke:** #119 — passed<br>
+**GitHub release:** https://github.com/Nobodyworld/app-industry-resilience/releases/tag/v0.2.0<br>
+**Tag/release SHA parity:** verified true<br>
 **Package version:** `0.2.0`<br>
 **Release version/tag:** `0.2.0` / `v0.2.0`<br>
 **Release issue:** [#107](https://github.com/Nobodyworld/app-industry-resilience/issues/107)
@@ -76,4 +81,4 @@ Exact automated and manual results are recorded in:
 - [issue #107](https://github.com/Nobodyworld/app-industry-resilience/issues/107)
 - release pull request #110 and its protected workflow runs
 
-Post-merge bookkeeping will record the exact merged `main` SHA, final CI and Docker runs, annotated tag, GitHub release URL, and tag/release SHA parity.
+Publication is complete: annotated tag `v0.2.0` and the GitHub Public Beta prerelease both resolve to merged `main` SHA `5e600a301e36287449742738260f4f66f218f416`.
