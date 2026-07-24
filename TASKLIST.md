@@ -49,4 +49,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-- None.
+- [ ] Prepare and validate the v0.2.0 public-beta release candidate — issue: [#107](https://github.com/Nobodyworld/app-industry-resilience/issues/107)

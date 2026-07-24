@@ -23,6 +23,19 @@ def _sample_records(limit: int = 5) -> list[dict[str, object]]:
     return cast(list[dict[str, object]], json.loads(frame.to_json(orient="records")))
 
 
+def test_openapi_endpoint_exposes_live_contract() -> None:
+    response = client.get("/openapi.json")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert response.media_type == "application/json"
+    assert payload["openapi"] == "3.1.0"
+    assert payload["info"]["title"] == "Idiot Index API"
+    assert payload["info"]["version"] == app.version
+    assert "/openapi.json" in payload["paths"]
+    assert "/v1/meta/public-data" in payload["paths"]
+
+
 def test_health_endpoint_reports_ok() -> None:
     response = client.get("/health")
     payload = response.json()
