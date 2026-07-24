@@ -9,6 +9,7 @@ from src.interfaces.streamlit.components import (
     ONBOARDING_DISMISSED_SESSION_KEY,
     SOURCE_SESSION_KEY,
     build_data_story,
+    load_custom_styles,
     render_data_provenance,
     render_download_panel,
     render_first_run_onboarding,
@@ -88,6 +89,22 @@ def test_render_page_header_toggle(monkeypatch) -> None:
     monkeypatch.setattr(st, "toggle", lambda label, value, help=None: True)
     focus = render_page_header("Title", "Subtitle", {"Environment": "dev"}, focus_mode=False)
     assert focus is True
+
+
+def test_custom_styles_preserve_native_theme_contrast(monkeypatch) -> None:
+    rendered: list[str] = []
+    monkeypatch.setattr(
+        st,
+        "markdown",
+        lambda body, **_kwargs: rendered.append(body),
+    )
+
+    load_custom_styles()
+
+    css = rendered[0]
+    assert ".stApp {" not in css
+    assert "background: #d9f7f4;" in css
+    assert ".sidebar-guidance" in css and "color: inherit;" in css
 
 
 def test_render_data_provenance_uses_typed_lineage_only(monkeypatch) -> None:

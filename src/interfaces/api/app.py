@@ -138,6 +138,17 @@ app.add_middleware(
 )
 
 
+@app.get("/openapi.json", tags=["system"])
+def openapi_document() -> Response:
+    """Expose the generated OpenAPI contract through the live application."""
+
+    return Response(
+        status_code=status.HTTP_200_OK,
+        data=app.openapi(),
+        media_type="application/json",
+    )
+
+
 @app.get("/health", response_model=HealthResponse, tags=["system"])
 def health() -> HealthResponse:
     """Return a simple health payload."""

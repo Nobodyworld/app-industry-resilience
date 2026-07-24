@@ -70,11 +70,6 @@ def load_custom_styles() -> None:
                 --surface: #f7f9fb;
                 --surface-strong: #ecf1f5;
             }
-
-            .stApp {
-                background: var(--surface);
-            }
-
             .page-hero {
                 padding: 2.5rem 2rem 1.5rem 2rem;
                 border-radius: 24px;
@@ -141,8 +136,8 @@ def load_custom_styles() -> None:
             .state-banner {
                 border-radius: 18px;
                 padding: 1rem 1.2rem;
-                background: var(--accent-soft);
-                border: 1px solid rgba(60, 208, 201, 0.4);
+                background: #d9f7f4;
+                border: 1px solid #3aa8a2;
                 color: var(--ink-900);
                 margin-bottom: 1.25rem;
             }
@@ -178,7 +173,7 @@ def load_custom_styles() -> None:
 
             .sidebar-guidance {
                 font-size: 0.85rem;
-                color: var(--ink-300);
+                color: inherit;
                 margin-top: 0.75rem;
             }
         </style>
