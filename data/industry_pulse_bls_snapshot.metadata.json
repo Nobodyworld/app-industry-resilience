@@ -1,0 +1,39 @@
+{
+  "csv_sha256": "19545342f247ec893d9db55f3707fe4c2b815eb16be3bb5b170c58429a16b5e1",
+  "endpoint": "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+  "generator": "industry-pulse-generator-v1",
+  "generator_command": "python src/scripts/generate_industry_pulse_snapshot.py --start-year 2024 --end-year 2026",
+  "interpretation_note": "Producer Price Index observations show price movement for a verified mapped BLS industry series. They are contextual signals, not the dashboard's annual output-to-cost ratio, and they do not establish profitability, resilience, insolvency risk, or causation.",
+  "latest_release_period": "2026-06",
+  "manifest_identity": "industry-pulse-bls-2024-2026-19545342f247ec89",
+  "observation_range": {
+    "end": "2026-06-01",
+    "start": "2024-01-01"
+  },
+  "registry_version": "industry-pulse-registry-v1",
+  "requested_years": {
+    "end": 2026,
+    "start": 2024
+  },
+  "retrieved_at": "2026-07-27T22:19:13.133044Z",
+  "row_count": 240,
+  "schema_version": "industry-pulse-snapshot-v1",
+  "series_count": 8,
+  "series_ids": [
+    "PCU311111311111",
+    "PCU312120312120",
+    "PCU322120322120",
+    "PCU325211325211",
+    "PCU326111326111",
+    "PCU331110331110",
+    "PCU334111334111",
+    "PCU336110336110"
+  ],
+  "source_label": "BLS PPI public API v2 (offline reviewed snapshot)",
+  "transformations": [
+    "one batched no-key request for the reviewed eight-series registry",
+    "excluded BLS annual-average M13 rows",
+    "validated monthly periods and finite numeric values",
+    "sorted by series ID and observation date"
+  ]
+}

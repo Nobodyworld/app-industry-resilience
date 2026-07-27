@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import json
+import math
+import re
 import zipfile
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -20,6 +22,7 @@ from src.adapters.aies import (
     AIES_SURVEY_YEAR,
     build_aies_snapshot,
 )
+from src.core.industry_pulse import INDUSTRY_PULSE_ENDPOINT, INDUSTRY_PULSE_REGISTRY
 from src.core.public_data import (
     DEFAULT_CLEANING_VERSION,
     DEFAULT_SCHEMA_VERSION,
@@ -37,17 +40,9 @@ Head = Callable[[str], Mapping[str, str]]
 BLSPost = Callable[[str, Mapping[str, Any]], Mapping[str, Any]]
 
 PUBLIC_DATA_ROOT = Path("data/public")
-BLS_PPI_ENDPOINT = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
-BLS_PPI_SERIES: tuple[dict[str, str], ...] = (
-    {
-        "series_id": "PCU311111311111",
-        "industry_code": "311111",
-        "industry_name": "Dog and Cat Food Manufacturing",
-        "signal_name": "PPI industry index for NAICS 311111",
-        "units": "Index value, base period varies by BLS series",
-        "seasonal_adjustment": "not seasonally adjusted",
-        "mapping_notes": "BLS PCU series identifier embeds industry code 311111 and product code 311111.",
-    },
+BLS_PPI_ENDPOINT = INDUSTRY_PULSE_ENDPOINT
+BLS_PPI_SERIES: tuple[dict[str, str], ...] = tuple(
+    entry.pipeline_mapping() for entry in INDUSTRY_PULSE_REGISTRY.entries
 )
 
 
@@ -493,14 +488,28 @@ def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
     for series in series_payload:
         series_id = str(series.get("seriesID", ""))
         if series_id not in mapping:
-            continue
+            raise PublicDataPipelineError(f"BLS response contained unknown series: {series_id!r}.")
         series_meta = mapping[series_id]
         for item in series.get("data", []):
             period = str(item.get("period", ""))
-            if not period.startswith("M") or period == "M13":
+            if period == "M13":
                 continue
-            month = int(period[1:])
-            year = int(item["year"])
+            if not re.fullmatch(r"M(0[1-9]|1[0-2])", period):
+                raise PublicDataPipelineError(
+                    f"BLS response contained malformed period: {period!r}."
+                )
+            try:
+                month = int(period[1:])
+                year = int(item["year"])
+                value = float(item["value"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise PublicDataPipelineError(
+                    f"BLS response contained a malformed observation for {series_id}."
+                ) from exc
+            if not math.isfinite(value):
+                raise PublicDataPipelineError(
+                    f"BLS response contained a non-finite value for {series_id}."
+                )
             records.append(
                 {
                     "observation_date": f"{year:04d}-{month:02d}-01",
@@ -509,7 +518,7 @@ def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
                     "industry_code": series_meta["industry_code"],
                     "industry_name": series_meta["industry_name"],
                     "signal_name": series_meta["signal_name"],
-                    "signal_value": float(item["value"]),
+                    "signal_value": value,
                     "units": series_meta["units"],
                     "seasonal_adjustment": series_meta["seasonal_adjustment"],
                     "release_period": f"{year:04d}-{month:02d}",
@@ -519,7 +528,7 @@ def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
     frame = pd.DataFrame.from_records(records)
     if frame.empty:
         return pd.DataFrame(columns=[*SIGNAL_SCHEMA, "industry_name"])
-    frame.sort_values(["observation_date", "series_id"], inplace=True)
+    frame.sort_values(["series_id", "observation_date"], inplace=True)
     frame.reset_index(drop=True, inplace=True)
     _validate_columns(frame, SIGNAL_SCHEMA, "bls_ppi_monthly")
     return frame

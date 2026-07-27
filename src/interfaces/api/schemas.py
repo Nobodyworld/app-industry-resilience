@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -22,6 +22,7 @@ from src.application import (
 from src.core import (
     DatasetDefinition,
     HealthSummary,
+    IndustryPulseSeriesHistory,
     lineage_from_dataframe,
     lineage_to_dict,
 )
@@ -185,6 +186,94 @@ class MetaPublicDataResponse(BaseModel):
             by_phase=dict(sorted(by_phase.items())),
             by_frequency=dict(sorted(by_frequency.items())),
         )
+
+
+class IndustryPulseMappingModel(BaseModel):
+    """Public reviewed mapping metadata for one Industry Pulse series."""
+
+    series_id: str
+    industry_code: str
+    registry_label: str
+    source_title: str
+    units: str
+    seasonal_adjustment: str
+    base_date: str
+    source_url: str
+    mapping_basis: str
+    steward_notes: list[str] = Field(default_factory=list)
+
+
+class IndustryPulseObservationModel(BaseModel):
+    series_id: str
+    industry_code: str
+    industry_name: str
+    observation_date: date
+    value: float
+    units: str
+    seasonal_adjustment: str
+    base_date: str
+    release_period: str
+    source: str
+
+
+class IndustryPulseChangeModel(BaseModel):
+    value_pct: float | None
+    latest_period: str | None
+    comparison_period: str | None
+    reason: str | None
+
+
+class IndustryPulseFreshnessModel(BaseModel):
+    state: Literal["current", "stale", "unknown"]
+    as_of: date
+    latest_observation_date: date | None
+    age_days: int | None
+    threshold_days: int
+
+
+class IndustryPulseObservationRangeModel(BaseModel):
+    start: date | None
+    end: date | None
+
+
+class IndustryPulseProvenanceModel(BaseModel):
+    dataset_id: str
+    provider: str
+    source_url: str
+    retrieval_mode: Literal["offline_reviewed_snapshot"]
+    retrieved_at: datetime
+    snapshot_sha256: str
+    manifest_identity: str
+    registry_version: str
+    schema_version: str
+    transformations: list[str] = Field(default_factory=list)
+
+
+class IndustryPulseResponse(BaseModel):
+    """Typed canonical v1 signal envelope."""
+
+    availability: Literal["available", "unmapped", "empty_range"]
+    mapping: IndustryPulseMappingModel | None
+    latest_observation: IndustryPulseObservationModel | None
+    month_over_month: IndustryPulseChangeModel
+    year_over_year: IndustryPulseChangeModel
+    freshness: IndustryPulseFreshnessModel
+    observation_range: IndustryPulseObservationRangeModel
+    observations: list[IndustryPulseObservationModel] = Field(default_factory=list)
+    release_period: str | None
+    provenance: IndustryPulseProvenanceModel
+    limitations: list[str] = Field(default_factory=list)
+
+    @classmethod
+    def from_history(cls, history: IndustryPulseSeriesHistory) -> IndustryPulseResponse:
+        return cls(**history.to_dict())
+
+
+class IndustryPulseListResponse(BaseModel):
+    """Verified mappings plus bounded per-series summaries."""
+
+    count: int
+    signals: list[IndustryPulseResponse] = Field(default_factory=list)
 
 
 class ConnectorHealthModel(BaseModel):

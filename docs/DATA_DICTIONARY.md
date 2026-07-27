@@ -90,6 +90,30 @@ Release manifests for public readiness data track `dataset_id`, `release_period`
 optional Last-Modified, observation range, and notes. These manifests are the duplicate-fetch
 guardrail for daily, weekly, monthly, quarterly, annual, bi-annual, and multi-annual refresh jobs.
 
+### Industry Pulse BLS PPI snapshot
+
+The committed `data/industry_pulse_bls_snapshot.csv` specializes the monthly public-signal
+contract for eight reviewed whole-industry series.
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `series_id` | uppercase string | Reviewed `PCU` ID with matching six-digit industry and product segments. |
+| `industry_code` | six-digit string | Exact registered NAICS mapping; broader codes are never inferred. |
+| `industry_name` | string | Readable registry label. |
+| `observation_date` | date | First day of the source calendar month. |
+| `value` | finite float | Source PPI index value; never compared as a raw level across unlike base dates. |
+| `units` | string | Producer Price Index units with per-series base-period caveat. |
+| `seasonal_adjustment` | string | Explicit BLS adjustment status. |
+| `base_date` | `YYYY-MM` | Per-series BLS base date. |
+| `release_period` | `YYYY-MM` | Monthly release/observation key; `M13` is excluded. |
+| `source` | string | Reviewed offline BLS PPI snapshot label. |
+
+Month-over-month is `(latest / exact prior calendar month - 1) * 100`; year-over-year uses the
+exact same month one year earlier. Missing exact periods are not replaced with nearest values,
+and zero denominators remain unavailable. Freshness is `current` through 90 days after the
+latest monthly observation, `stale` after 90 days, and `unknown` without an observation. Tests
+inject the `as_of` date.
+
 ## Interpretation Limitations
 
 - Metrics are heuristic diagnostics, not causal inference or forecasting guarantees.
@@ -97,8 +121,13 @@ guardrail for daily, weekly, monthly, quarterly, annual, bi-annual, and multi-an
 - Monetary fields are source-native values and may not be inflation-adjusted unless explicitly transformed upstream.
 - Proxy-derived fields should be treated as approximate substitutes when direct source fields are unavailable.
 - Scenario outputs are deterministic recalculations from stated shocks and do not model second-order macroeconomic dynamics.
+- Industry Pulse PPI is contextual producer-price movement, not the annual output-to-cost
+  ratio, a profitability measure, a resilience input, an insolvency indicator, or causal
+  evidence. Different series may use different base dates.
 
 ## Provenance and Validation
 
 - Input validation and normalization occur before metric computation in application/core layers.
 - Official snapshot assumptions and refresh workflow are documented in `data/README.md` and `docs/WORKFLOWS_DATA_REFRESH.md`.
+- Industry Pulse signal provenance is a separate typed envelope and is never copied into annual
+  dataframe lineage.

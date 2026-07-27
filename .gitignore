@@ -696,7 +696,9 @@ Cargo.lock
 # Data files
 *.csv
 !data/official_industry_snapshot.csv
+!data/industry_pulse_bls_snapshot.csv
 *.json
+!data/industry_pulse_bls_snapshot.metadata.json
 *.parquet
 
 # Jupyter Notebook checkpoints
@@ -717,4 +719,3 @@ runs/
 #########################################
 
 # Add project-specific patterns below this line
-

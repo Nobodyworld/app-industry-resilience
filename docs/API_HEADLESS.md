@@ -19,7 +19,10 @@ Inside Docker, set `APP_MODE=api` to boot the same service from the container en
 
 ## Endpoints
 
-Consumer-facing analytical and metadata routes use the canonical `/v1` prefix. Deprecated unversioned aliases remain only for routes that existed before versioning; the new `/v1/meta/public-data` endpoint intentionally has no `/meta/public-data` alias.
+Consumer-facing analytical, metadata, and context routes use the canonical `/v1` prefix.
+Deprecated unversioned aliases remain only for routes that existed before versioning. The new
+`/v1/meta/public-data` and `/v1/context/signals*` endpoints intentionally have no unversioned
+aliases.
 
 ### `GET /health`
 
@@ -74,6 +77,44 @@ Returns the validated no-auth public-data readiness catalog. Each entry identifi
 ```bash
 curl http://localhost:9000/v1/meta/public-data
 ```
+
+### `GET /v1/context/signals`
+
+Lists the eight verified Industry Pulse mappings with bounded per-series summaries from the
+committed reviewed BLS PPI snapshot. Query parameters:
+
+- `series_id`: optional exact reviewed series ID;
+- `start` / `end`: optional `YYYY-MM` or first-of-month `YYYY-MM-DD`;
+- `limit`: observations returned per series, from 1 through 120 (default 1).
+
+```bash
+curl "http://localhost:9000/v1/context/signals?series_id=PCU311111311111&limit=2"
+```
+
+This route makes no live BLS request and has no unversioned alias.
+
+### `GET /v1/context/signals/{industry_code}`
+
+Returns one exact six-digit NAICS mapping and its filtered monthly observations. `start`, `end`,
+and `limit` use the same contract as the list route; optional `series_id` must match the path
+mapping. Expected availability states are:
+
+- `available`: exact mapping plus one or more observations;
+- `unmapped`: valid six-digit NAICS with no reviewed mapping;
+- `empty_range`: reviewed mapping whose requested range contains no observations.
+
+The envelope includes mapping/source titles, units, seasonal status, base date, latest
+observation, exact-calendar MoM/YoY summaries, explicit unavailable reasons, freshness,
+observation range, release period, path-free signal provenance, transformations, and
+interpretation limitations.
+
+```bash
+curl "http://localhost:9000/v1/context/signals/311111?start=2025-01&end=2026-06"
+```
+
+Malformed codes, dates, non-month dates, or result limits return `422`. Reversed dates and a
+mismatched `series_id` return `400`. Valid unmapped and empty-range requests return `200`.
+There is no `/context/signals` alias and no `/v2` route.
 
 ### `POST /v1/evaluate`
 

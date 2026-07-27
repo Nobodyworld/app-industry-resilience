@@ -1,6 +1,6 @@
 # Industry Resilience Specification
 
-_Last updated: 2026-07-22_
+_Last updated: 2026-07-27_
 
 The Industry Resilience project delivers a Streamlit dashboard and headless API for analysing industry cost structure and comparative resilience signals. This specification captures the canonical requirements for maintaining and extending the repository.
 
@@ -10,6 +10,9 @@ The Industry Resilience project delivers a Streamlit dashboard and headless API 
 - **Domain Services**: `src/application/idiot_index_service.py` orchestrates data retrieval, normalisation, analytics, and leaderboard generation.
 - **Data Access**: Adapters in `src/adapters/` provide BEA, Census ASM, Census AIES, bundled sample, and public-data readiness paths with caching via `src/core/cache.py`.
 - **Analytics and Provenance**: `src/core/analytics` provides heuristic scoring and cohort aggregation; `src/core/lineage.py` provides the typed, redacted provenance contract used by adapters, caches, scenarios, API responses, Streamlit, and exports.
+- **Industry Pulse**: `src/core/industry_pulse.py` owns the reviewed mapping/domain contract;
+  `src/application/industry_pulse_service.py` loads the verified offline snapshot and calculates
+  exact-calendar changes/freshness; signal provenance remains distinct from annual lineage.
 - **Observability**: Extensions under `src/extensions/` plus infrastructure modules handle metrics, tracing, and snapshot replication.
 - **Agent Surface**: `src/agents/` exposes curated tooling for automation clients, delegating to the application layer while enforcing schema metadata.
 
@@ -19,8 +22,8 @@ Refer to [`ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md) for diagrams and
 
 | Workflow | Entry Point | Notes |
 | --- | --- | --- |
-| Streamlit dashboard | `streamlit run app.py` | Uses bundled sample data by default, supports an official AIES snapshot and validated uploads, and exposes typed Data provenance. |
-| Headless API | `make api` or `python src/scripts/run_api.py` | Serves canonical `/v1` analytical routes, deprecated compatibility aliases, typed lineage, health, and observability endpoints on port 9000. |
+| Streamlit dashboard | `streamlit run app.py` | Uses bundled sample data by default, supports an official AIES snapshot and validated uploads, exposes typed Data provenance, and provides a fifth snapshot-backed Industry Pulse tab. |
+| Headless API | `make api` or `python src/scripts/run_api.py` | Serves canonical `/v1` analytical/context routes, deprecated compatibility aliases only for older contracts, typed lineage/provenance, health, and observability endpoints on port 9000. |
 | Scenario planning CLI | `python src/scripts/run_scenario.py` | Applies shocks to current datasets and emits summary tables. |
 | Observability snapshotting | `python src/scripts/observability_snapshot.py` | Persists local and remote snapshots with optional replication extensions. |
 | Agent integrations | `src/agents/` | Provides dataclass schemas and tool metadata for conversational agents. |
@@ -35,6 +38,10 @@ Refer to [`ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md) for diagrams and
 - Cache hits preserve original source identity, timestamps, and transformations while changing only retrieval/cache state.
 - JSON exports use top-level `lineage` and `records`; XLSX exports include a `Lineage` sheet; CSV remains tabular and is accompanied by lineage JSON.
 - The Streamlit Data provenance panel renders only the typed envelope and ordered transformation history.
+- Industry Pulse routes are canonical-only at `/v1/context/signals*`, perform no provider calls,
+  and return typed available/unmapped/empty-range envelopes.
+- Industry Pulse CSV/JSON/XLSX exports carry separate allowlisted signal provenance and cannot
+  mutate annual dataframe lineage.
 
 ## 4. Quality Gates
 

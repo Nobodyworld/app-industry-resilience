@@ -8,5 +8,15 @@ Scripts in this directory provide developer automation and operational helpers. 
 - `extensions_catalog.py`, `connectors_catalog.py`, and `scaffold_extension.py` – manage the extension ecosystem and scaffolding.
 - `run_api.py`, `run_scenario.py`, and `analytics_health.py` – CLI facades mirroring Streamlit features for automation contexts.
 - `benchmark_metrics.py` – deterministic, no-cache metric-computation benchmark; use `--check` in regression gates or `--json` for automation.
+- `generate_industry_pulse_snapshot.py` – makes one no-key batch request for exactly the eight
+  reviewed BLS PPI series, validates/omits `M13`, sorts observations deterministically, and
+  writes the bounded CSV plus SHA-256 metadata:
+
+  ```bash
+  python src/scripts/generate_industry_pulse_snapshot.py --start-year 2024 --end-year 2026
+  ```
+
+  The committed snapshot is the UI/API/test path. Running this operator command is the only
+  live refresh path for the product slice.
 
 All scripts self-bootstrap the repository root onto `PYTHONPATH` so they can be executed directly via `python src/scripts/<name>.py`.

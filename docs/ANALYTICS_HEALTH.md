@@ -4,6 +4,11 @@ This guide explains the experimental composite score introduced in Stage 1 along
 
 ## Overview
 
+Industry Pulse BLS PPI observations are contextual monthly signals only. They do not enter any
+composite score, band, ranking, annual output-to-cost ratio, or Scenario Lab calculation.
+Producer-price movement does not establish profitability, resilience, distress, insolvency
+risk, or causation, and raw levels from series with unlike BLS base dates are not comparable.
+
 The composite score combines four signals derived from the same source cost-structure inputs used by Idiot Index metrics:
 
 1. **Value-added percentage** – derived from value added and gross output.

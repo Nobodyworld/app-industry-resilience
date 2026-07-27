@@ -1,5 +1,18 @@
 # Changelog
 
+# 2026-07-27 – Industry Pulse implementation for v0.3.0
+- Added a strictly validated eight-series whole-industry BLS PPI registry and replaced the
+  public-data pipeline's single inline mapping with registry-derived compatibility output.
+- Added the deterministic 2024–2026 reviewed offline snapshot, metadata/hash verification,
+  exact-calendar MoM/YoY service, 90-day freshness rule, separate signal provenance, and
+  deterministic CSV/JSON/XLSX exports.
+- Added canonical-only `/v1/context/signals` routes and a fifth Streamlit Industry Pulse tab
+  with exact/unmapped/manual-browse/stale/empty/error states, chart plus table, comparison
+  mapping availability, and prominent interpretation limits.
+- Added hermetic registry, generator, snapshot, service, API/OpenAPI, Streamlit, export,
+  provenance, privacy, compatibility, and annual-lineage regression coverage. Package version
+  remains `0.2.0`; release acceptance and `v0.3.0` publication remain open.
+
 # 2026-07-24 – v0.2.0 Public Beta finalization
 - Accepted the completed Windows/Edge GO recommendation and promoted package, Commitizen, and fallback versions from `0.2.0rc1` to `0.2.0`.
 - Finalized Public Beta status and release notes while preserving all experimental-methodology limitations and explicit screen-reader NOT RUN disclosure.

@@ -21,6 +21,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from src.adapters.aies import attach_aies_snapshot_lineage
 from src.application import (
     DataSource,
+    IndustryPulseService,
     NormalizationOptions,
     ScenarioAdjustment,
     ScenarioPlanner,
@@ -61,6 +62,7 @@ from src.interfaces.streamlit.helpers import (
     prepare_trend_data,
     summarise_scenario_deltas,
 )
+from src.interfaces.streamlit.industry_pulse import render_industry_pulse
 from src.interfaces.streamlit.provenance import attach_uploaded_file_lineage
 
 
@@ -177,6 +179,12 @@ st.set_page_config(
 load_custom_styles()
 
 SCENARIO_PLANNER = ScenarioPlanner()
+try:
+    INDUSTRY_PULSE_SERVICE: IndustryPulseService | None = IndustryPulseService()
+    INDUSTRY_PULSE_LOAD_ERROR: str | None = None
+except Exception as exc:  # pragma: no cover - runtime snapshot safeguard
+    INDUSTRY_PULSE_SERVICE = None
+    INDUSTRY_PULSE_LOAD_ERROR = exc.__class__.__name__
 
 try:
     bootstrap_state = get_bootstrap_state()
@@ -497,8 +505,8 @@ def _format_overview_table(frame: pd.DataFrame) -> pd.DataFrame:
     return table
 
 
-tabs = ["Overview", "Explore", "Compare", "Scenario Lab"]
-overview_tab, explore_tab, compare_tab, scenario_tab = render_insight_tabs(tabs)
+tabs = ["Overview", "Explore", "Compare", "Scenario Lab", "Industry Pulse"]
+overview_tab, explore_tab, compare_tab, scenario_tab, industry_pulse_tab = render_insight_tabs(tabs)
 
 code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"], strict=False))
 choices: Sequence[str] = list(dict.fromkeys(df_filtered["industry_code"]))
@@ -862,6 +870,14 @@ with scenario_tab:
         st.info(
             "Idle scenario state. Select an industry target if useful, set at least one non-zero adjustment, and click Run scenario."
         )
+
+with industry_pulse_tab:
+    render_industry_pulse(
+        selected_industry_code=selected_code,
+        comparison_codes=comparison_selection,
+        service=INDUSTRY_PULSE_SERVICE,
+        load_error=INDUSTRY_PULSE_LOAD_ERROR,
+    )
 
 with st.expander("Technical diagnostics", expanded=False):
     render_observability_snapshots(

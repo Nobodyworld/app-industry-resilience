@@ -14,6 +14,25 @@ This reference captures the primary Python entrypoints intended for reuse across
 
 Convenience wrapper delegating to the shared `IdiotIndexService` singleton. Accepts the same parameters as `.evaluate` for easy reuse in CLI tools and automation.
 
+### `src.application.industry_pulse_service.IndustryPulseService`
+
+| Member | Description |
+| --- | --- |
+| `list_mappings(series_id=None)` | Lists the eight validated whole-industry BLS PPI mappings, optionally restricted to one exact series ID. |
+| `for_industry_code(industry_code, start=None, end=None, limit=120)` | Returns a typed available, unmapped, or empty-range history using exact six-digit NAICS matching and the committed offline snapshot. |
+| `for_series_id(series_id, start=None, end=None, limit=120)` | Resolves the registry entry first, then returns the same bounded history contract. |
+
+The service calculates month-over-month and year-over-year movement only against the exact
+calendar comparison month, applies an injected 90-day monthly freshness rule, verifies the
+committed CSV SHA-256 against its metadata, and performs no provider request.
+
+### `src.application.industry_pulse_exports`
+
+`build_industry_pulse_exports(history)` returns deterministic signal-only CSV, JSON, and XLSX
+artifacts. JSON carries mapping, summaries, observations, limitations, and typed signal
+provenance. XLSX uses `Industry Pulse` and `Signal Metadata` sheets. These helpers do not read
+or mutate annual dataset lineage.
+
 ## Adapters
 
 ### `src.adapters.bea`
@@ -58,6 +77,13 @@ Contains `load_sample_csv` for offline demo data and `load_csv` for arbitrary CS
 
 Collection of static methods for validating API keys, CSV uploads, and general string sanitisation. All UI entrypoints call these utilities before processing user-supplied data. Rate limiting delegates to a pluggable backend registered by infrastructure (`src.infrastructure.rate_limiter`).
 
+### `src.core.industry_pulse`
+
+Defines the reviewed eight-entry `INDUSTRY_PULSE_REGISTRY`, strict whole-industry PCU and
+six-digit NAICS validation, observation/change/freshness/provenance/history dataclasses,
+registry/schema versions, and mandatory interpretation text. The public-data pipeline derives
+its `BLS_PPI_SERIES` compatibility structure from this registry.
+
 ## Streamlit helpers
 
 ### `src.interfaces.streamlit.helpers`
@@ -72,6 +98,12 @@ Collection of static methods for validating API keys, CSV uploads, and general s
 
 Reusable rendering helpers used by `app.py`. Components include `render_page_header`, `render_signal_bar`, `render_insight_tabs`, and `render_download_panel`.
 
+### `src.interfaces.streamlit.industry_pulse`
+
+`render_industry_pulse(...)` renders exact mapping, unmapped/manual browse, stale, empty, and
+snapshot-error states; a monthly chart with adjacent accessible table; comparison mapping
+availability; interpretation limits; provenance; and separate signal downloads.
+
 ## Agents toolkit
 
 The `agents` package exposes dataclasses and helper functions that map 1:1 with the application service. Import `agents.compute_idiot_index_summary` to trigger evaluations from CLI tools or other Python code. JSON schemas live alongside the dataclasses for validation in typed clients.
@@ -83,12 +115,12 @@ Licensed under the Apache License 2.0. See [LICENSE](../LICENSE).
 
 ### `src.interfaces.api.app`
 
-- `app` – FastAPI-compatible application exposing canonical `/v1` consumer routes for metadata, evaluation, scenarios, and analytics alongside unversioned operational endpoints. `GET /v1/meta/public-data` returns the validated no-auth readiness catalog with typed implementation stages and ground-truth flags; credentialed BEA and Census ASM adapters remain available through source/connector surfaces rather than this public catalog. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
+- `app` – FastAPI-compatible application exposing canonical `/v1` consumer routes for metadata, evaluation, scenarios, analytics, and snapshot-backed Industry Pulse context alongside unversioned operational endpoints. `GET /v1/context/signals` and `GET /v1/context/signals/{industry_code}` are canonical-only and never perform provider calls. `GET /v1/meta/public-data` returns the validated no-auth readiness catalog with typed implementation stages and ground-truth flags; credentialed BEA and Census ASM adapters remain available through source/connector surfaces rather than this public catalog. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
 - `ObservabilityRegistry` – Singleton registry (see `src/infrastructure/observability/instrumentation.py`) aggregating metrics, traces, and health checks. Extensions register instrumentation hooks through it instead of modifying services directly.
 
 ### `src.interfaces.api.schemas`
 
-- Lightweight Pydantic-style models (`EvaluateRequest`, `EvaluateResponse`, `ScenarioRequest`, `MetaPublicDataResponse`, etc.) plus helpers to convert pandas dataframes, catalog definitions, and service summaries into JSON-safe payloads.
+- Lightweight Pydantic-style models (`EvaluateRequest`, `EvaluateResponse`, `ScenarioRequest`, `MetaPublicDataResponse`, `IndustryPulseResponse`, etc.) plus helpers to convert pandas dataframes, catalog definitions, and service summaries into JSON-safe payloads.
 
 ### `src/scripts/run_api.py`
 
