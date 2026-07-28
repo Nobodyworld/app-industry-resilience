@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import copy
 import io
 import zipfile
 from collections.abc import Mapping
 from typing import Any
 
 import pandas as pd
+import pytest
 import requests
 
 from src.adapters.aies import AIES_BASIC_URL, AIES_EXPENSE_URL
 from src.application.public_data_pipeline import (
+    BLS_PPI_SERIES,
+    PublicDataPipelineError,
+    _bls_latest_fingerprint,
+    _normalise_bls_ppi,
     backfill_public_dataset,
     listen_for_public_release,
 )
@@ -115,6 +121,84 @@ def test_bls_listener_reports_new_then_no_change(tmp_path) -> None:
     assert second.status == "no_release_changed"
 
 
+def test_bls_normalization_requires_and_orders_all_reviewed_series() -> None:
+    cleaned = _normalise_bls_ppi(_bls_payload(value="102.0", reverse_series=True))
+
+    expected_series = [series["series_id"] for series in BLS_PPI_SERIES]
+    assert sorted(cleaned["series_id"].unique()) == expected_series
+    assert len(cleaned) == len(expected_series) * 3
+    assert not cleaned["release_period"].str.endswith("-13").any()
+    assert list(zip(cleaned["series_id"], cleaned["observation_date"], strict=True)) == sorted(
+        zip(cleaned["series_id"], cleaned["observation_date"], strict=True)
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda payload: payload["Results"]["series"].pop(), "omitted reviewed series"),
+        (
+            lambda payload: payload["Results"]["series"].append(
+                copy.deepcopy(payload["Results"]["series"][0])
+            ),
+            "duplicate series object",
+        ),
+        (
+            lambda payload: payload["Results"]["series"][0]["data"].append(
+                copy.deepcopy(payload["Results"]["series"][0]["data"][0])
+            ),
+            "duplicate series-month observation",
+        ),
+        (
+            lambda payload: payload["Results"]["series"][0].update({"seriesID": "PCU999999999999"}),
+            "unknown series",
+        ),
+        (
+            lambda payload: payload["Results"].update({"series": {}}),
+            "Results.series must be a list",
+        ),
+    ],
+)
+def test_bls_normalization_rejects_incomplete_or_ambiguous_registry_payloads(
+    mutate: Any, message: str
+) -> None:
+    payload = _bls_payload(value="102.0")
+    mutate(payload)
+
+    with pytest.raises(PublicDataPipelineError, match=message):
+        _normalise_bls_ppi(payload)
+
+
+def test_bls_fingerprint_is_deterministic_across_provider_series_ordering() -> None:
+    ordered = _normalise_bls_ppi(_bls_payload(value="102.0"))
+    reversed_order = _normalise_bls_ppi(_bls_payload(value="102.0", reverse_series=True))
+
+    assert _bls_latest_fingerprint(ordered) == _bls_latest_fingerprint(reversed_order)
+
+
+def test_bls_listener_detects_revision_in_non_final_series(tmp_path) -> None:
+    backfill_public_dataset(
+        "bls_ppi_monthly",
+        storage_root=tmp_path,
+        start_year=2023,
+        end_year=2024,
+        bls_post=lambda *_: _bls_payload(value="102.0"),
+    )
+    changed_series = BLS_PPI_SERIES[0]["series_id"]
+
+    revised = listen_for_public_release(
+        "bls_ppi_monthly",
+        storage_root=tmp_path,
+        bls_post=lambda *_: _bls_payload(
+            value="102.0",
+            latest_values={changed_series: "103.5"},
+        ),
+    )
+
+    assert changed_series != sorted(series["series_id"] for series in BLS_PPI_SERIES)[-1]
+    assert revised.status == "existing_release_revised"
+
+
 def test_aies_listener_reports_revision_from_changed_headers(tmp_path) -> None:
     backfill_public_dataset(
         "census_aies_annual",
@@ -186,38 +270,53 @@ def _zip_payload(member: str, text: str) -> bytes:
     return buffer.getvalue()
 
 
-def _bls_payload(*, value: str) -> dict[str, Any]:
+def _bls_payload(
+    *,
+    value: str,
+    latest_values: Mapping[str, str] | None = None,
+    reverse_series: bool = False,
+) -> dict[str, Any]:
+    values = latest_values or {}
+    series_payload = [
+        {
+            "seriesID": series["series_id"],
+            "data": [
+                {
+                    "year": "2024",
+                    "period": "M02",
+                    "periodName": "February",
+                    "value": values.get(series["series_id"], value),
+                    "footnotes": [{}],
+                },
+                {
+                    "year": "2024",
+                    "period": "M01",
+                    "periodName": "January",
+                    "value": "101.0",
+                    "footnotes": [{}],
+                },
+                {
+                    "year": "2023",
+                    "period": "M12",
+                    "periodName": "December",
+                    "value": "100.0",
+                    "footnotes": [{}],
+                },
+                {
+                    "year": "2024",
+                    "period": "M13",
+                    "periodName": "Annual",
+                    "value": "999.0",
+                    "footnotes": [{}],
+                },
+            ],
+        }
+        for series in BLS_PPI_SERIES
+    ]
+    if reverse_series:
+        series_payload.reverse()
     return {
         "status": "REQUEST_SUCCEEDED",
         "message": [],
-        "Results": {
-            "series": [
-                {
-                    "seriesID": "PCU311111311111",
-                    "data": [
-                        {
-                            "year": "2024",
-                            "period": "M02",
-                            "periodName": "February",
-                            "value": value,
-                            "footnotes": [{}],
-                        },
-                        {
-                            "year": "2024",
-                            "period": "M01",
-                            "periodName": "January",
-                            "value": "101.0",
-                            "footnotes": [{}],
-                        },
-                        {
-                            "year": "2023",
-                            "period": "M12",
-                            "periodName": "December",
-                            "value": "100.0",
-                            "footnotes": [{}],
-                        },
-                    ],
-                }
-            ]
-        },
+        "Results": {"series": series_payload},
     }

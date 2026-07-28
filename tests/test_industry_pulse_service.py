@@ -16,7 +16,9 @@ from src.application.industry_pulse_exports import build_industry_pulse_exports
 from src.application.industry_pulse_service import IndustryPulseService, _calculate_change
 from src.core import LineageStep, attach_lineage, build_lineage, lineage_from_dataframe
 from src.core.industry_pulse import (
+    INDUSTRY_PULSE_ENDPOINT,
     INDUSTRY_PULSE_REGISTRY,
+    INDUSTRY_PULSE_SOURCE,
     IndustryPulseObservation,
     IndustryPulseSnapshotError,
 )
@@ -174,16 +176,53 @@ def test_exports_parse_repeat_deterministically_and_do_not_mutate_annual_lineage
         workbook_xml = workbook.read("xl/workbook.xml").decode("utf-8")
 
     assert len(csv_rows) == len(history.observations)
+    required_csv_fields = {
+        "provider",
+        "source_url",
+        "retrieved_at",
+        "retrieval_mode",
+        "manifest_identity",
+        "snapshot_sha256",
+        "registry_version",
+        "schema_version",
+        "observation_start",
+        "observation_end",
+        "transformations",
+        "interpretation_warning",
+        "level_comparison_warning",
+    }
+    assert required_csv_fields.issubset(csv_rows[0])
+    assert all(row["manifest_identity"] == history.provenance.manifest_identity for row in csv_rows)
+    assert all(row["provider"] == INDUSTRY_PULSE_SOURCE for row in csv_rows)
+    assert all(row["source_url"] == INDUSTRY_PULSE_ENDPOINT for row in csv_rows)
+    assert all(
+        row["source"] == "BLS PPI public API v2 (offline reviewed snapshot)" for row in csv_rows
+    )
+    assert {row["observation_start"] for row in csv_rows} == {history.observation_start.isoformat()}
+    assert {row["observation_end"] for row in csv_rows} == {history.observation_end.isoformat()}
+    assert {row["retrieval_mode"] for row in csv_rows} == {"offline_reviewed_snapshot"}
+    assert {row["snapshot_sha256"] for row in csv_rows} == {history.provenance.snapshot_sha256}
+    assert {row["registry_version"] for row in csv_rows} == {history.provenance.registry_version}
+    assert {row["schema_version"] for row in csv_rows} == {history.provenance.schema_version}
+    assert all(row["transformations"] for row in csv_rows)
+    assert all(row["interpretation_warning"] for row in csv_rows)
+    assert all(row["level_comparison_warning"] for row in csv_rows)
     assert document["availability"] == "available"
     assert document["provenance"]["retrieval_mode"] == "offline_reviewed_snapshot"
+    assert document == history.to_dict()
     assert 'name="Industry Pulse"' in workbook_xml
     assert 'name="Signal Metadata"' in workbook_xml
     assert [item.data for item in first] == [item.data for item in second]
     assert lineage_from_dataframe(annual) == before
-    serialized = by_extension["json"].data.decode("utf-8").casefold()
-    assert "c:\\\\" not in serialized
-    assert "redis" not in serialized
-    assert "api_key" not in serialized
+    for serialized in (
+        by_extension["csv"].data.decode("utf-8").casefold(),
+        by_extension["json"].data.decode("utf-8").casefold(),
+    ):
+        assert "c:\\\\" not in serialized
+        assert "redis" not in serialized
+        assert "api_key" not in serialized
+        assert "password" not in serialized
+        assert "credential" not in serialized
 
 
 def test_snapshot_hash_tampering_is_rejected(tmp_path) -> None:

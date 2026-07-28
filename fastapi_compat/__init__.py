@@ -286,6 +286,7 @@ class FastAPI:
             400: "Bad Request",
             404: "Not Found",
             422: "Unprocessable Entity",
+            503: "Service Unavailable",
         }
         status_line = f"{response.status_code} {reason_map.get(response.status_code, 'OK')}"
         data = response.data
@@ -523,6 +524,7 @@ status = SimpleNamespace(
     HTTP_400_BAD_REQUEST=400,
     HTTP_404_NOT_FOUND=404,
     HTTP_422_UNPROCESSABLE_ENTITY=422,
+    HTTP_503_SERVICE_UNAVAILABLE=503,
 )
 
 

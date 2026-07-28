@@ -22,6 +22,7 @@ from src.core import (
     public_dataset_catalog,
     summarise_health,
 )
+from src.core.industry_pulse import IndustryPulseSnapshotError
 from src.extensions.manager import get_extension_manager
 from src.infrastructure.observability import (
     bootstrap_observability,
@@ -130,8 +131,37 @@ def _allow_credentials(origins: list[str]) -> bool:
     return flag
 
 
+_industry_pulse_initialization_error: str | None = None
+
+
+def _initialize_industry_pulse_service() -> IndustryPulseService | None:
+    """Load the optional offline snapshot without preventing API startup."""
+
+    global _industry_pulse_initialization_error
+    try:
+        service = IndustryPulseService()
+    except IndustryPulseSnapshotError:
+        _industry_pulse_initialization_error = "snapshot_validation_failure"
+        logger.warning(
+            "Industry Pulse snapshot is unavailable.",
+            extra={"error_classification": _industry_pulse_initialization_error},
+        )
+        return None
+    _industry_pulse_initialization_error = None
+    return service
+
+
+def _require_industry_pulse_service() -> IndustryPulseService:
+    if _industry_pulse_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Industry Pulse snapshot is unavailable.",
+        )
+    return _industry_pulse_service
+
+
 _origins = _allowed_origins()
-_industry_pulse_service = IndustryPulseService()
+_industry_pulse_service = _initialize_industry_pulse_service()
 
 app.add_middleware(
     CORSMiddleware,
@@ -442,17 +472,18 @@ def list_industry_pulse_signals_v1(
 ) -> IndustryPulseListResponse:
     """List verified mappings with bounded snapshot-backed summaries."""
 
+    service = _require_industry_pulse_service()
     start_date, end_date, bounded_limit = _validated_signal_filters(
         start=start, end=end, limit=limit
     )
     histories = [
-        _industry_pulse_service.for_industry_code(
+        service.for_industry_code(
             mapping.industry_code,
             start=start_date,
             end=end_date,
             limit=bounded_limit,
         )
-        for mapping in _industry_pulse_service.list_mappings(series_id=series_id)
+        for mapping in service.list_mappings(series_id=series_id)
     ]
     signals = [IndustryPulseResponse.from_history(history) for history in histories]
     return IndustryPulseListResponse(count=len(signals), signals=signals)
@@ -472,6 +503,7 @@ def get_industry_pulse_signal_v1(
 ) -> IndustryPulseResponse:
     """Return one exact six-digit Industry Pulse mapping and filtered history."""
 
+    service = _require_industry_pulse_service()
     if re.fullmatch(r"[0-9]{6}", industry_code) is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -480,13 +512,13 @@ def get_industry_pulse_signal_v1(
     start_date, end_date, bounded_limit = _validated_signal_filters(
         start=start, end=end, limit=limit
     )
-    mapping = _industry_pulse_service.registry.by_industry_code(industry_code)
+    mapping = service.registry.by_industry_code(industry_code)
     if series_id is not None and (mapping is None or mapping.series_id != series_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="series_id does not match the requested verified industry mapping.",
         )
-    history = _industry_pulse_service.for_industry_code(
+    history = service.for_industry_code(
         industry_code,
         start=start_date,
         end=end_date,

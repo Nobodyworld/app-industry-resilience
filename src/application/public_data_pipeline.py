@@ -409,7 +409,7 @@ def _listen_bls_ppi(root: Path, bls_post: BLSPost | None) -> ReleaseListenerResu
         )
     try:
         cleaned = _normalise_bls_ppi(payload)
-    except (KeyError, ValueError, TypeError) as exc:
+    except (PublicDataPipelineError, KeyError, ValueError, TypeError) as exc:
         return ReleaseListenerResult(
             dataset_id="bls_ppi_monthly",
             release_period=None,
@@ -482,15 +482,39 @@ def _classify_listener_result(
 def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
     if payload.get("status") != "REQUEST_SUCCEEDED":
         raise PublicDataPipelineError(f"BLS API request did not succeed: {payload.get('message')}")
-    series_payload = payload.get("Results", {}).get("series", [])
+    results = payload.get("Results")
+    if not isinstance(results, Mapping):
+        raise PublicDataPipelineError("BLS response Results must be an object.")
+    series_payload = results.get("series")
+    if not isinstance(series_payload, list):
+        raise PublicDataPipelineError("BLS response Results.series must be a list.")
     mapping = {series["series_id"]: series for series in BLS_PPI_SERIES}
+    expected_series = set(mapping)
+    seen_series: set[str] = set()
+    seen_observations: set[tuple[str, str]] = set()
     records: list[dict[str, Any]] = []
     for series in series_payload:
+        if not isinstance(series, Mapping):
+            raise PublicDataPipelineError("BLS response contained a malformed series object.")
         series_id = str(series.get("seriesID", ""))
         if series_id not in mapping:
             raise PublicDataPipelineError(f"BLS response contained unknown series: {series_id!r}.")
+        if series_id in seen_series:
+            raise PublicDataPipelineError(
+                f"BLS response contained duplicate series object: {series_id!r}."
+            )
+        seen_series.add(series_id)
         series_meta = mapping[series_id]
-        for item in series.get("data", []):
+        observations = series.get("data", [])
+        if not isinstance(observations, list):
+            raise PublicDataPipelineError(
+                f"BLS response contained malformed observations for {series_id}."
+            )
+        for item in observations:
+            if not isinstance(item, Mapping):
+                raise PublicDataPipelineError(
+                    f"BLS response contained a malformed observation for {series_id}."
+                )
             period = str(item.get("period", ""))
             if period == "M13":
                 continue
@@ -510,9 +534,17 @@ def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
                 raise PublicDataPipelineError(
                     f"BLS response contained a non-finite value for {series_id}."
                 )
+            observation_date = f"{year:04d}-{month:02d}-01"
+            identity = (series_id, observation_date)
+            if identity in seen_observations:
+                raise PublicDataPipelineError(
+                    f"BLS response contained duplicate series-month observation: "
+                    f"{series_id} {observation_date}."
+                )
+            seen_observations.add(identity)
             records.append(
                 {
-                    "observation_date": f"{year:04d}-{month:02d}-01",
+                    "observation_date": observation_date,
                     "frequency": "monthly",
                     "series_id": series_id,
                     "industry_code": series_meta["industry_code"],
@@ -525,6 +557,11 @@ def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
                     "source": "BLS PPI public API",
                 }
             )
+    missing_series = sorted(expected_series.difference(seen_series))
+    if missing_series:
+        raise PublicDataPipelineError(
+            "BLS response omitted reviewed series: " + ", ".join(missing_series) + "."
+        )
     frame = pd.DataFrame.from_records(records)
     if frame.empty:
         return pd.DataFrame(columns=[*SIGNAL_SCHEMA, "industry_name"])
@@ -598,14 +635,36 @@ def _aies_listener_headers(head: Head | None) -> tuple[str | None, str | None]:
 
 
 def _bls_latest_fingerprint(cleaned: pd.DataFrame) -> str:
-    latest = cleaned.sort_values("observation_date").iloc[-1]
+    expected_series = sorted(series["series_id"] for series in BLS_PPI_SERIES)
+    present_series = sorted(str(value) for value in cleaned["series_id"].unique())
+    if present_series != expected_series:
+        raise PublicDataPipelineError(
+            "BLS cleaned observations must contain every reviewed series."
+        )
+    latest_rows = (
+        cleaned.sort_values(["series_id", "observation_date"])
+        .groupby("series_id", sort=True, as_index=False)
+        .tail(1)
+        .sort_values("series_id")
+    )
+    if len(latest_rows) != len(expected_series):
+        raise PublicDataPipelineError(
+            "BLS cleaned observations must contain one latest row per reviewed series."
+        )
+    series_payload = [
+        {
+            "series_id": str(row.series_id),
+            "release_period": str(row.release_period),
+            "observation_date": str(row.observation_date),
+            "value": float(row.signal_value),
+        }
+        for row in latest_rows.itertuples(index=False)
+    ]
     return hash_payload(
         json.dumps(
-            {
-                "release_period": str(latest["release_period"]),
-                "series_id": str(latest["series_id"]),
-                "value": float(latest["signal_value"]),
-            },
+            {"series": series_payload},
+            allow_nan=False,
+            separators=(",", ":"),
             sort_keys=True,
         ).encode("utf-8")
     )

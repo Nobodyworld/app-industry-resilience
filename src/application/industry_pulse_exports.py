@@ -64,22 +64,43 @@ def _csv_bytes(history: IndustryPulseSeriesHistory) -> bytes:
         "base_date",
         "release_period",
         "source",
+        "provider",
+        "source_url",
+        "retrieved_at",
         "retrieval_mode",
+        "manifest_identity",
         "snapshot_sha256",
+        "registry_version",
+        "schema_version",
+        "observation_start",
+        "observation_end",
         "transformations",
         "interpretation_warning",
+        "level_comparison_warning",
     ]
     buffer = io.StringIO(newline="")
     writer = csv.DictWriter(buffer, fieldnames=fields, lineterminator="\n")
     writer.writeheader()
+    provenance = history.provenance.to_dict()
+    observation_start = history.observation_start.isoformat() if history.observation_start else ""
+    observation_end = history.observation_end.isoformat() if history.observation_end else ""
     for observation in history.observations:
         writer.writerow(
             {
                 **observation.to_dict(),
-                "retrieval_mode": history.provenance.retrieval_mode,
-                "snapshot_sha256": history.provenance.snapshot_sha256,
+                "provider": provenance["provider"],
+                "source_url": provenance["source_url"],
+                "retrieved_at": provenance["retrieved_at"],
+                "retrieval_mode": provenance["retrieval_mode"],
+                "manifest_identity": provenance["manifest_identity"],
+                "snapshot_sha256": provenance["snapshot_sha256"],
+                "registry_version": provenance["registry_version"],
+                "schema_version": provenance["schema_version"],
+                "observation_start": observation_start,
+                "observation_end": observation_end,
                 "transformations": " | ".join(history.provenance.transformations),
                 "interpretation_warning": history.limitations[0],
+                "level_comparison_warning": history.limitations[1],
             }
         )
     return buffer.getvalue().encode("utf-8")

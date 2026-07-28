@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import importlib
+import io
+
 from fastapi_compat.testclient import TestClient
+from src.application import public_data_pipeline
+from src.core.industry_pulse import IndustryPulseSnapshotError
 from src.interfaces.api.app import app
 
 client = TestClient(app)
+api_module = importlib.import_module("src.interfaces.api.app")
 
 
 def test_signal_list_route_exposes_all_verified_mappings_and_bounded_summaries() -> None:
@@ -96,3 +102,75 @@ def test_live_openapi_contains_only_canonical_context_routes() -> None:
     schemas = document["components"]["schemas"]
     assert "IndustryPulseResponse" in schemas
     assert "IndustryPulseProvenanceModel" in schemas
+
+
+def test_unavailable_snapshot_isolated_to_context_routes_and_uses_503(
+    monkeypatch,
+) -> None:
+    provider_calls: list[object] = []
+
+    def unavailable_service():
+        raise IndustryPulseSnapshotError(r"Unable to read C:\private\industry-pulse-snapshot.csv")
+
+    def unexpected_provider_request(*args, **kwargs):
+        provider_calls.append((args, kwargs))
+        raise AssertionError("Provider request must not occur during API handling.")
+
+    monkeypatch.setattr(api_module, "IndustryPulseService", unavailable_service)
+    monkeypatch.setattr(api_module, "_industry_pulse_initialization_error", None)
+    unavailable = api_module._initialize_industry_pulse_service()
+    assert unavailable is None
+    assert api_module._industry_pulse_initialization_error == ("snapshot_validation_failure")
+
+    monkeypatch.setattr(api_module, "_industry_pulse_service", unavailable)
+    monkeypatch.setattr(
+        public_data_pipeline.requests,
+        "post",
+        unexpected_provider_request,
+    )
+
+    health = client.get("/health")
+    openapi = client.get("/openapi.json")
+    analytics = client.post(
+        "/v1/analytics/health",
+        json={
+            "source": "sample",
+            "year": 2023,
+            "records": [],
+            "group_by": "sector",
+            "top_risks": 2,
+        },
+    )
+    list_response = client.get("/v1/context/signals")
+    industry_response = client.get("/v1/context/signals/311111")
+
+    assert health.status_code == 200
+    assert openapi.status_code == 200
+    assert analytics.status_code == 200
+    for response in (list_response, industry_response):
+        assert response.status_code == 503
+        assert response.json() == {"detail": "Industry Pulse snapshot is unavailable."}
+        serialized = str(response.json())
+        assert "private" not in serialized.casefold()
+        assert ":\\" not in serialized
+
+    wsgi_status: list[str] = []
+
+    def start_response(status_line, _headers):
+        wsgi_status.append(status_line)
+
+    body = b"".join(
+        app(
+            {
+                "REQUEST_METHOD": "GET",
+                "PATH_INFO": "/v1/context/signals",
+                "QUERY_STRING": "",
+                "CONTENT_LENGTH": "0",
+                "wsgi.input": io.BytesIO(),
+            },
+            start_response,
+        )
+    )
+    assert wsgi_status == ["503 Service Unavailable"]
+    assert b"Industry Pulse snapshot is unavailable." in body
+    assert provider_calls == []
