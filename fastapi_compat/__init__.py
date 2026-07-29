@@ -265,6 +265,9 @@ class FastAPI:
     ):  # pragma: no cover - exercised via CLI
         method = environ.get("REQUEST_METHOD", "GET")
         path = environ.get("PATH_INFO", "/")
+        query_string = environ.get("QUERY_STRING", "")
+        if query_string:
+            path = f"{path}?{query_string}"
         try:
             length = int(environ.get("CONTENT_LENGTH", "0"))
         except ValueError:
