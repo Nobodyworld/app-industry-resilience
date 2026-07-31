@@ -56,4 +56,5 @@ tests/
 .pytest_cache/
 
 # Streamlit
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
