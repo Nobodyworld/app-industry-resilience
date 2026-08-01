@@ -4,7 +4,7 @@
 **Candidate branch:** `feature/industry-pulse-context`<br>
 **Starting main SHA:** `185c61379430bd641435681249933d29c90ea469`<br>
 **Accepted implementation/evidence SHA:** `a1c270e27752c15eee7445ca85c34375ecfd9f50`<br>
-**Candidate code SHA:** pending the `release: prepare v0.3.0 candidate` commit<br>
+**Candidate code SHA:** `95a47ec8b99df01cf666e15d78942f99e6c7edda`<br>
 **Pre-version protected CI:** Quality Gate #262 — passed<br>
 **Pre-version Docker Smoke:** #131 — passed<br>
 **Final-version protected checks:** pending after the candidate commits are pushed<br>
@@ -79,6 +79,24 @@ They do not claim a merged-main SHA, tag, GitHub release, publication smoke, or 
 Quality Gate #262 and Docker Deployment Smoke #131 support the accepted pre-version evidence head
 `a1c270e27752c15eee7445ca85c34375ecfd9f50`. Fresh protected CI and Docker Smoke are still required
 on the exact final-version evidence head after it is pushed.
+
+Local validation of candidate code SHA `95a47ec8b99df01cf666e15d78942f99e6c7edda` passed:
+
+- focused release-version, telemetry-config, Industry Pulse API, and WSGI regressions: 12 passed;
+- complete suite: 408 passed;
+- CI-equivalent runtime coverage: 87.45% against the 85% threshold;
+- full-source informational coverage: 82%;
+- Black, Ruff, mypy, metric benchmark, detect-secrets baseline, pip check, pip-audit, and
+  `git diff --check`: passed. Pip-audit reported no known vulnerabilities and skipped only the
+  unpublished local `industry-resilience-dashboard==0.3.0` distribution because it is not on PyPI;
+- force-reinstalled package metadata and `src.version` both reported `0.3.0`;
+- live API `/health` and `/openapi.json` both reported version `0.3.0`;
+- Streamlit returned HTTP 200, rendered the five-tab dashboard and selected Industry Pulse without
+  a rendered exception, external resource entry, console warning, or console error; effective
+  `browser.gatherUsageStats = false` remained in force.
+
+The local Docker CLI was unavailable, so local Docker smoke was not run. The fresh hosted Docker
+Smoke on the final pushed evidence head remains authoritative and is pending alongside protected CI.
 
 Publication remains pending: exact-head review and authorization, merge of draft PR #114, creation
 of annotated tag `v0.3.0`, GitHub Public Beta prerelease publication, published-state smoke testing,
