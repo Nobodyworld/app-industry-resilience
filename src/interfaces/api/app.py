@@ -6,14 +6,15 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime
+import re
+from datetime import UTC, date, datetime
 from typing import Any, cast
 
 import pandas as pd
 
 from fastapi_compat import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi_compat.middleware.cors import CORSMiddleware
-from src.application import DataSource, IdiotIndexService, ScenarioPlanner
+from src.application import DataSource, IdiotIndexService, IndustryPulseService, ScenarioPlanner
 from src.core import (
     LineageStep,
     attach_lineage,
@@ -21,6 +22,7 @@ from src.core import (
     public_dataset_catalog,
     summarise_health,
 )
+from src.core.industry_pulse import IndustryPulseSnapshotError
 from src.extensions.manager import get_extension_manager
 from src.infrastructure.observability import (
     bootstrap_observability,
@@ -40,6 +42,8 @@ from src.interfaces.api.schemas import (
     HealthAnalyticsRequest,
     HealthAnalyticsResponse,
     HealthResponse,
+    IndustryPulseListResponse,
+    IndustryPulseResponse,
     MetaConnectorsResponse,
     MetaPublicDataResponse,
     MetaSourcesResponse,
@@ -127,7 +131,37 @@ def _allow_credentials(origins: list[str]) -> bool:
     return flag
 
 
+_industry_pulse_initialization_error: str | None = None
+
+
+def _initialize_industry_pulse_service() -> IndustryPulseService | None:
+    """Load the optional offline snapshot without preventing API startup."""
+
+    global _industry_pulse_initialization_error
+    try:
+        service = IndustryPulseService()
+    except IndustryPulseSnapshotError:
+        _industry_pulse_initialization_error = "snapshot_validation_failure"
+        logger.warning(
+            "Industry Pulse snapshot is unavailable.",
+            extra={"error_classification": _industry_pulse_initialization_error},
+        )
+        return None
+    _industry_pulse_initialization_error = None
+    return service
+
+
+def _require_industry_pulse_service() -> IndustryPulseService:
+    if _industry_pulse_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Industry Pulse snapshot is unavailable.",
+        )
+    return _industry_pulse_service
+
+
 _origins = _allowed_origins()
+_industry_pulse_service = _initialize_industry_pulse_service()
 
 app.add_middleware(
     CORSMiddleware,
@@ -382,6 +416,115 @@ def list_public_data_v1() -> MetaPublicDataResponse:
     """List the validated no-auth public-data readiness catalog."""
 
     return _list_public_data_response()
+
+
+def _parse_signal_date(value: str | None, field_name: str) -> date | None:
+    if value is None:
+        return None
+    if re.fullmatch(r"[0-9]{4}-(0[1-9]|1[0-2])", value):
+        value = f"{value}-01"
+    try:
+        parsed = date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{field_name} must use YYYY-MM or YYYY-MM-DD.",
+        ) from exc
+    if parsed.day != 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{field_name} must identify a calendar month.",
+        )
+    return parsed
+
+
+def _validated_signal_filters(
+    *,
+    start: str | None,
+    end: str | None,
+    limit: int,
+) -> tuple[date | None, date | None, int]:
+    start_date = _parse_signal_date(start, "start")
+    end_date = _parse_signal_date(end, "end")
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start date cannot be after end date.",
+        )
+    if limit < 1 or limit > 120:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="limit must be between 1 and 120.",
+        )
+    return start_date, end_date, limit
+
+
+@app.get(
+    "/v1/context/signals",
+    response_model=IndustryPulseListResponse,
+    tags=["context"],
+)
+def list_industry_pulse_signals_v1(
+    series_id: str | None = Query(None),
+    start: str | None = Query(None),
+    end: str | None = Query(None),
+    limit: int = Query(1, ge=1, le=120),
+) -> IndustryPulseListResponse:
+    """List verified mappings with bounded snapshot-backed summaries."""
+
+    service = _require_industry_pulse_service()
+    start_date, end_date, bounded_limit = _validated_signal_filters(
+        start=start, end=end, limit=limit
+    )
+    histories = [
+        service.for_industry_code(
+            mapping.industry_code,
+            start=start_date,
+            end=end_date,
+            limit=bounded_limit,
+        )
+        for mapping in service.list_mappings(series_id=series_id)
+    ]
+    signals = [IndustryPulseResponse.from_history(history) for history in histories]
+    return IndustryPulseListResponse(count=len(signals), signals=signals)
+
+
+@app.get(
+    "/v1/context/signals/{industry_code}",
+    response_model=IndustryPulseResponse,
+    tags=["context"],
+)
+def get_industry_pulse_signal_v1(
+    industry_code: str,
+    series_id: str | None = Query(None),
+    start: str | None = Query(None),
+    end: str | None = Query(None),
+    limit: int = Query(120, ge=1, le=120),
+) -> IndustryPulseResponse:
+    """Return one exact six-digit Industry Pulse mapping and filtered history."""
+
+    service = _require_industry_pulse_service()
+    if re.fullmatch(r"[0-9]{6}", industry_code) is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="industry_code must be an exact six-digit NAICS code.",
+        )
+    start_date, end_date, bounded_limit = _validated_signal_filters(
+        start=start, end=end, limit=limit
+    )
+    mapping = service.registry.by_industry_code(industry_code)
+    if series_id is not None and (mapping is None or mapping.series_id != series_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="series_id does not match the requested verified industry mapping.",
+        )
+    history = service.for_industry_code(
+        industry_code,
+        start=start_date,
+        end=end_date,
+        limit=bounded_limit,
+    )
+    return IndustryPulseResponse.from_history(history)
 
 
 def _attach_api_inline_lineage(frame: pd.DataFrame, *, year: int) -> None:

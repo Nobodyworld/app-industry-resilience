@@ -265,6 +265,9 @@ class FastAPI:
     ):  # pragma: no cover - exercised via CLI
         method = environ.get("REQUEST_METHOD", "GET")
         path = environ.get("PATH_INFO", "/")
+        query_string = environ.get("QUERY_STRING", "")
+        if query_string:
+            path = f"{path}?{query_string}"
         try:
             length = int(environ.get("CONTENT_LENGTH", "0"))
         except ValueError:
@@ -286,6 +289,7 @@ class FastAPI:
             400: "Bad Request",
             404: "Not Found",
             422: "Unprocessable Entity",
+            503: "Service Unavailable",
         }
         status_line = f"{response.status_code} {reason_map.get(response.status_code, 'OK')}"
         data = response.data
@@ -523,6 +527,7 @@ status = SimpleNamespace(
     HTTP_400_BAD_REQUEST=400,
     HTTP_404_NOT_FOUND=404,
     HTTP_422_UNPROCESSABLE_ENTITY=422,
+    HTTP_503_SERVICE_UNAVAILABLE=503,
 )
 
 

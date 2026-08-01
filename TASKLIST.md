@@ -50,4 +50,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-- None.
+- [ ] Add Industry Pulse contextual signals for v0.3.0 — issue: [#113](https://github.com/Nobodyworld/app-industry-resilience/issues/113)

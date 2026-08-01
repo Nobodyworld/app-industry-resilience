@@ -23,6 +23,11 @@ Derived metrics may include the informal `idiot_index`, `value_added`, `value_ad
 
 Analytical dataframes carry a typed, redacted lineage envelope identifying source, dataset, provider, observation period, acquisition or snapshot time, retrieval/cache state, official/sample truth, calculation version, and ordered transformations. Uploaded files use the generic identity `user-upload`; uploaded filenames and arbitrary dataframe attributes are never lineage fields.
 
+Industry Pulse uses a separate typed contract for eight exact six-digit whole-industry BLS PPI
+mappings, monthly observations, exact-calendar changes, freshness, availability, and
+snapshot provenance. It is contextual only and never changes annual metrics, rankings,
+scenarios, composite scores, bands, or annual dataframe lineage.
+
 ## Supported Entry Points
 
 - Streamlit dashboard: `streamlit run app.py`
@@ -30,6 +35,7 @@ Analytical dataframes carry a typed, redacted lineage envelope identifying sourc
 - Deprecated unversioned API aliases: compatibility-only during the documented migration window
 - Scenario CLI: `python src/scripts/run_scenario.py`
 - Public-data readiness: `python src/scripts/public_data_readiness.py catalog --pretty`
+- Industry Pulse snapshot refresh: `python src/scripts/generate_industry_pulse_snapshot.py --start-year 2024 --end-year 2026`
 - Full validation: `make quality-gate`
 - Docker validation: `.github/workflows/docker-smoke.yml`
 
@@ -47,6 +53,8 @@ Analytical dataframes carry a typed, redacted lineage envelope identifying sourc
 
 - Preserve calculation behavior unless a change is explicitly scoped and tested.
 - Preserve canonical `/v1` and deprecated alias compatibility where applicable.
+- Keep new Industry Pulse routes canonical-only under `/v1/context/signals`; UI/API/tests must
+  use the committed snapshot and must not initiate provider calls.
 - Never copy credentials, filenames, private paths, cache identifiers, raw provider payloads, or arbitrary dataframe attributes into typed lineage.
 - Run `make quality-gate` before merge.
 - Require hosted `CI / Quality Gate` for pull requests.

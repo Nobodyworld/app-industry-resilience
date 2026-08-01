@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import json
+import math
+import re
 import zipfile
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
@@ -20,6 +22,7 @@ from src.adapters.aies import (
     AIES_SURVEY_YEAR,
     build_aies_snapshot,
 )
+from src.core.industry_pulse import INDUSTRY_PULSE_ENDPOINT, INDUSTRY_PULSE_REGISTRY
 from src.core.public_data import (
     DEFAULT_CLEANING_VERSION,
     DEFAULT_SCHEMA_VERSION,
@@ -37,17 +40,9 @@ Head = Callable[[str], Mapping[str, str]]
 BLSPost = Callable[[str, Mapping[str, Any]], Mapping[str, Any]]
 
 PUBLIC_DATA_ROOT = Path("data/public")
-BLS_PPI_ENDPOINT = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
-BLS_PPI_SERIES: tuple[dict[str, str], ...] = (
-    {
-        "series_id": "PCU311111311111",
-        "industry_code": "311111",
-        "industry_name": "Dog and Cat Food Manufacturing",
-        "signal_name": "PPI industry index for NAICS 311111",
-        "units": "Index value, base period varies by BLS series",
-        "seasonal_adjustment": "not seasonally adjusted",
-        "mapping_notes": "BLS PCU series identifier embeds industry code 311111 and product code 311111.",
-    },
+BLS_PPI_ENDPOINT = INDUSTRY_PULSE_ENDPOINT
+BLS_PPI_SERIES: tuple[dict[str, str], ...] = tuple(
+    entry.pipeline_mapping() for entry in INDUSTRY_PULSE_REGISTRY.entries
 )
 
 
@@ -414,7 +409,7 @@ def _listen_bls_ppi(root: Path, bls_post: BLSPost | None) -> ReleaseListenerResu
         )
     try:
         cleaned = _normalise_bls_ppi(payload)
-    except (KeyError, ValueError, TypeError) as exc:
+    except (PublicDataPipelineError, KeyError, ValueError, TypeError) as exc:
         return ReleaseListenerResult(
             dataset_id="bls_ppi_monthly",
             release_period=None,
@@ -487,39 +482,90 @@ def _classify_listener_result(
 def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
     if payload.get("status") != "REQUEST_SUCCEEDED":
         raise PublicDataPipelineError(f"BLS API request did not succeed: {payload.get('message')}")
-    series_payload = payload.get("Results", {}).get("series", [])
+    results = payload.get("Results")
+    if not isinstance(results, Mapping):
+        raise PublicDataPipelineError("BLS response Results must be an object.")
+    series_payload = results.get("series")
+    if not isinstance(series_payload, list):
+        raise PublicDataPipelineError("BLS response Results.series must be a list.")
     mapping = {series["series_id"]: series for series in BLS_PPI_SERIES}
+    expected_series = set(mapping)
+    seen_series: set[str] = set()
+    seen_observations: set[tuple[str, str]] = set()
     records: list[dict[str, Any]] = []
     for series in series_payload:
+        if not isinstance(series, Mapping):
+            raise PublicDataPipelineError("BLS response contained a malformed series object.")
         series_id = str(series.get("seriesID", ""))
         if series_id not in mapping:
-            continue
+            raise PublicDataPipelineError(f"BLS response contained unknown series: {series_id!r}.")
+        if series_id in seen_series:
+            raise PublicDataPipelineError(
+                f"BLS response contained duplicate series object: {series_id!r}."
+            )
+        seen_series.add(series_id)
         series_meta = mapping[series_id]
-        for item in series.get("data", []):
+        observations = series.get("data", [])
+        if not isinstance(observations, list):
+            raise PublicDataPipelineError(
+                f"BLS response contained malformed observations for {series_id}."
+            )
+        for item in observations:
+            if not isinstance(item, Mapping):
+                raise PublicDataPipelineError(
+                    f"BLS response contained a malformed observation for {series_id}."
+                )
             period = str(item.get("period", ""))
-            if not period.startswith("M") or period == "M13":
+            if period == "M13":
                 continue
-            month = int(period[1:])
-            year = int(item["year"])
+            if not re.fullmatch(r"M(0[1-9]|1[0-2])", period):
+                raise PublicDataPipelineError(
+                    f"BLS response contained malformed period: {period!r}."
+                )
+            try:
+                month = int(period[1:])
+                year = int(item["year"])
+                value = float(item["value"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise PublicDataPipelineError(
+                    f"BLS response contained a malformed observation for {series_id}."
+                ) from exc
+            if not math.isfinite(value):
+                raise PublicDataPipelineError(
+                    f"BLS response contained a non-finite value for {series_id}."
+                )
+            observation_date = f"{year:04d}-{month:02d}-01"
+            identity = (series_id, observation_date)
+            if identity in seen_observations:
+                raise PublicDataPipelineError(
+                    f"BLS response contained duplicate series-month observation: "
+                    f"{series_id} {observation_date}."
+                )
+            seen_observations.add(identity)
             records.append(
                 {
-                    "observation_date": f"{year:04d}-{month:02d}-01",
+                    "observation_date": observation_date,
                     "frequency": "monthly",
                     "series_id": series_id,
                     "industry_code": series_meta["industry_code"],
                     "industry_name": series_meta["industry_name"],
                     "signal_name": series_meta["signal_name"],
-                    "signal_value": float(item["value"]),
+                    "signal_value": value,
                     "units": series_meta["units"],
                     "seasonal_adjustment": series_meta["seasonal_adjustment"],
                     "release_period": f"{year:04d}-{month:02d}",
                     "source": "BLS PPI public API",
                 }
             )
+    missing_series = sorted(expected_series.difference(seen_series))
+    if missing_series:
+        raise PublicDataPipelineError(
+            "BLS response omitted reviewed series: " + ", ".join(missing_series) + "."
+        )
     frame = pd.DataFrame.from_records(records)
     if frame.empty:
         return pd.DataFrame(columns=[*SIGNAL_SCHEMA, "industry_name"])
-    frame.sort_values(["observation_date", "series_id"], inplace=True)
+    frame.sort_values(["series_id", "observation_date"], inplace=True)
     frame.reset_index(drop=True, inplace=True)
     _validate_columns(frame, SIGNAL_SCHEMA, "bls_ppi_monthly")
     return frame
@@ -589,14 +635,36 @@ def _aies_listener_headers(head: Head | None) -> tuple[str | None, str | None]:
 
 
 def _bls_latest_fingerprint(cleaned: pd.DataFrame) -> str:
-    latest = cleaned.sort_values("observation_date").iloc[-1]
+    expected_series = sorted(series["series_id"] for series in BLS_PPI_SERIES)
+    present_series = sorted(str(value) for value in cleaned["series_id"].unique())
+    if present_series != expected_series:
+        raise PublicDataPipelineError(
+            "BLS cleaned observations must contain every reviewed series."
+        )
+    latest_rows = (
+        cleaned.sort_values(["series_id", "observation_date"])
+        .groupby("series_id", sort=True, as_index=False)
+        .tail(1)
+        .sort_values("series_id")
+    )
+    if len(latest_rows) != len(expected_series):
+        raise PublicDataPipelineError(
+            "BLS cleaned observations must contain one latest row per reviewed series."
+        )
+    series_payload = [
+        {
+            "series_id": str(row.series_id),
+            "release_period": str(row.release_period),
+            "observation_date": str(row.observation_date),
+            "value": float(row.signal_value),
+        }
+        for row in latest_rows.itertuples(index=False)
+    ]
     return hash_payload(
         json.dumps(
-            {
-                "release_period": str(latest["release_period"]),
-                "series_id": str(latest["series_id"]),
-                "value": float(latest["signal_value"]),
-            },
+            {"series": series_payload},
+            allow_nan=False,
+            separators=(",", ":"),
             sort_keys=True,
         ).encode("utf-8")
     )

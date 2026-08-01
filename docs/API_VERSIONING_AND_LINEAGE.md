@@ -113,6 +113,8 @@ Breaking consumer changes require a new major path such as `/v2`. A new major pa
 | GET | `/meta/sources` | `/v1/meta/sources` | none | `MetaSourcesResponse` | Source identifiers are client-visible enum values. |
 | GET | `/meta/connectors` | `/v1/meta/connectors` | none | `MetaConnectorsResponse` | Connector identifiers, kinds, versions, capabilities, metadata, and health shape are client-visible. |
 | GET | `/v1/meta/public-data` | unchanged | none | `MetaPublicDataResponse` | No-auth public dataset identity, implementation stages, canonical schemas, access notes, and ground-truth flags are client-visible; no legacy alias exists. |
+| GET | `/v1/context/signals` | unchanged | optional `series_id`, `start`, `end`, `limit` | `IndustryPulseListResponse` | Canonical-only reviewed mapping list and bounded snapshot summaries; no provider calls or legacy alias. |
+| GET | `/v1/context/signals/{industry_code}` | unchanged | exact six-digit path code plus optional `series_id`, `start`, `end`, `limit` | `IndustryPulseResponse` | Canonical-only available/unmapped/empty-range contract with exact-calendar changes, freshness, and separate signal provenance. |
 | POST | `/evaluate` | `/v1/evaluate` | `EvaluateRequest` | `EvaluateResponse` | Dataset record fields, filters, leaderboard, notes, dataset rows, metadata, health envelope, status codes, and metric units are contract-sensitive. |
 | POST | `/scenario` | `/v1/scenario` | `ScenarioRequest` | `ScenarioResponse` | Adjustment semantics, baseline/scenario/delta rows, summaries, metadata, and health envelopes are contract-sensitive. |
 | POST | `/analytics/health` | `/v1/analytics/health` | `HealthAnalyticsRequest` | `HealthAnalyticsResponse` | Grouping choices, risk limits, aggregate fields, metadata, and status codes are contract-sensitive. |
@@ -270,6 +272,24 @@ An exact JSON export shape is:
 ```
 
 The abbreviated lineage above illustrates placement; produced exports contain the complete typed envelope.
+
+### Industry Pulse signal provenance
+
+Industry Pulse is intentionally not attached to the annual `LineageEnvelope`. Its typed
+`IndustryPulseProvenance` identifies the public provider and endpoint, the
+`offline_reviewed_snapshot` retrieval mode, retrieval timestamp, deterministic CSV SHA-256,
+manifest identity, registry/schema versions, and bounded transformations. It never includes
+local paths, credentials, cache identifiers, raw provider responses, environment variables, or
+arbitrary dataframe attributes.
+
+Signal exports remain companion artifacts:
+
+- CSV is tabular and repeats the allowlisted signal identity/provenance fields per observation;
+- JSON contains mapping, change summaries, observations, signal provenance, and limitations;
+- XLSX contains `Industry Pulse` and `Signal Metadata` sheets.
+
+Repeated serialization is deterministic and does not read or mutate annual dataframes or their
+lineage. UI/API requests load only the committed snapshot and cannot trigger a live refresh.
 
 ## Privacy and security constraints
 
