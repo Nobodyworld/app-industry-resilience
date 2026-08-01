@@ -30,6 +30,7 @@ from src.core.industry_pulse import (  # noqa: E402
     INDUSTRY_PULSE_REGISTRY_VERSION,
     INDUSTRY_PULSE_SCHEMA_VERSION,
 )
+from src.version import __version__  # noqa: E402
 
 GENERATOR_VERSION = "industry-pulse-generator-v1"
 DEFAULT_START_YEAR = 2024
@@ -249,7 +250,7 @@ def _request_bls(start_year: int, end_year: int) -> Mapping[str, Any]:
             "endyear": str(end_year),
         },
         timeout=60,
-        headers={"User-Agent": "industry-resilience-dashboard/0.2.0 (+offline-snapshot)"},
+        headers={"User-Agent": f"industry-resilience-dashboard/{__version__} (+offline-snapshot)"},
     )
     response.raise_for_status()
     payload = response.json()

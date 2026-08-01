@@ -1,8 +1,8 @@
 # U.S. Industry Cost Structure & Resilience Dashboard
 
-> **Status: v0.2.0 PUBLIC BETA** — Released after protected CI, production Docker validation, and Windows/Microsoft Edge acceptance. The analytical metrics remain experimental and should not be treated as financial, investment, credit, or policy advice.
+> **Status: v0.3.0 PUBLIC BETA CANDIDATE** — Industry Pulse has accepted release-owner GO evidence, and the package version is `0.3.0` on the candidate branch. PR [#114](https://github.com/Nobodyworld/app-industry-resilience/pull/114) remains draft and unmerged; the `v0.3.0` tag and release publication are pending. The analytical metrics remain experimental and should not be treated as financial, investment, credit, or policy advice.
 
-The `v0.2.0` Public Beta release evidence, Windows/Edge acceptance matrix, and remaining publication bookkeeping are tracked in [issue #107](https://github.com/Nobodyworld/app-industry-resilience/issues/107), [`docs/execplans/v0.2.0-public-beta-release-candidate.md`](docs/execplans/v0.2.0-public-beta-release-candidate.md), and [`docs/RELEASE_NOTES_V0.2.0.md`](docs/RELEASE_NOTES_V0.2.0.md).
+Active `v0.3.0` candidate evidence is tracked in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113), the [`v0.3.0` execution plan](docs/execplans/v0.3.0-industry-pulse.md), and the [`v0.3.0` candidate release notes](docs/RELEASE_NOTES_V0.3.0.md). The currently published prior release is [`v0.2.0`](docs/RELEASE_NOTES_V0.2.0.md).
 
 This repository demonstrates practical economic and financial analysis engineering using U.S. government industry datasets. It provides an interactive Streamlit dashboard and a headless API for reproducible metric calculation, scenario comparison, and release-grade validation.
 
@@ -206,6 +206,8 @@ GitHub Actions policy: hosted CI is required for current pull requests and relea
 
 ## Documentation
 
+- [v0.3.0 Industry Pulse candidate validation and acceptance](docs/execplans/v0.3.0-industry-pulse.md)
+- [v0.3.0 Public Beta candidate release notes](docs/RELEASE_NOTES_V0.3.0.md)
 - [v0.2.0 release validation and acceptance](docs/execplans/v0.2.0-public-beta-release-candidate.md)
 - [v0.2.0 Public Beta release notes](docs/RELEASE_NOTES_V0.2.0.md)
 - [Data dictionary](docs/DATA_DICTIONARY.md)

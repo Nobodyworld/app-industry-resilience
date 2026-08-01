@@ -1,5 +1,14 @@
 # Changelog
 
+# 2026-08-01 – v0.3.0 Public Beta final candidate
+- Accepted the release-owner GO for final candidate preparation and aligned the package,
+  Commitizen, fallback, and outbound snapshot-generator identities at `0.3.0`.
+- Finalized the Industry Pulse candidate documentation after telemetry-free headed Edge acceptance
+  of its offline snapshot, mapped/unmapped/manual-browse states, API/WSGI filters, exports, and
+  accessibility smoke.
+- Publication remains pending fresh exact-head protected validation, merge authorization, merge,
+  annotated tag, GitHub Public Beta release, publication smoke, and tag/release SHA parity.
+
 # 2026-07-27 – Industry Pulse implementation for v0.3.0
 - Added a strictly validated eight-series whole-industry BLS PPI registry and replaced the
   public-data pipeline's single inline mapping with registry-derived compatibility output.
