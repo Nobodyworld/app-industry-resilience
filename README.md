@@ -1,8 +1,8 @@
 # U.S. Industry Cost Structure & Resilience Dashboard
 
-> **Status: v0.3.0 PUBLIC BETA CANDIDATE** — Industry Pulse has accepted release-owner GO evidence, and the package version is `0.3.0` on the candidate branch. PR [#114](https://github.com/Nobodyworld/app-industry-resilience/pull/114) remains draft and unmerged; the `v0.3.0` tag and release publication are pending. The analytical metrics remain experimental and should not be treated as financial, investment, credit, or policy advice.
+> **Status: v0.3.0 PUBLIC BETA** — Industry Pulse is published as the `v0.3.0` GitHub prerelease after exact-head CI, Docker validation, and Windows/Microsoft Edge acceptance. The analytical metrics remain experimental and should not be treated as financial, investment, credit, or policy advice.
 
-Active `v0.3.0` candidate evidence is tracked in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113), the [`v0.3.0` execution plan](docs/execplans/v0.3.0-industry-pulse.md), and the [`v0.3.0` candidate release notes](docs/RELEASE_NOTES_V0.3.0.md). The currently published prior release is [`v0.2.0`](docs/RELEASE_NOTES_V0.2.0.md).
+Published `v0.3.0` evidence is tracked in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113), the [`v0.3.0` execution plan](docs/execplans/v0.3.0-industry-pulse.md), the [`v0.3.0` release notes](docs/RELEASE_NOTES_V0.3.0.md), and the [publication parity record](docs/execplans/v0.3.0-publication-record.md). The GitHub release is available at [`v0.3.0 Public Beta — Industry Pulse`](https://github.com/Nobodyworld/app-industry-resilience/releases/tag/v0.3.0).
 
 This repository demonstrates practical economic and financial analysis engineering using U.S. government industry datasets. It provides an interactive Streamlit dashboard and a headless API for reproducible metric calculation, scenario comparison, and release-grade validation.
 
@@ -198,21 +198,21 @@ python src/scripts/run_quality_checks.py --fast
 git diff --check
 ```
 
-Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md) and should be run where `pip-audit`, `detect-secrets`, and `pytest-cov` are installed. Current pull requests must pass the hosted `CI / Quality Gate`; the completed public-beta publication evidence is recorded in [issue #72](https://github.com/Nobodyworld/app-industry-resilience/issues/72).
+Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md) and should be run where `pip-audit`, `detect-secrets`, and `pytest-cov` are installed. The `v0.3.0` protected and publication evidence is recorded in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113) and the [publication record](docs/execplans/v0.3.0-publication-record.md).
 
 Most recent clean-clone totals are recorded in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md). Current hosted evidence should be taken from the relevant pull request or Actions run rather than inferred from historical totals.
 
-GitHub Actions policy: hosted CI is required for current pull requests and release candidates. Local clean-clone validation remains supporting evidence, but it does not replace a successful Actions run. All external action references must use approved repositories and be pinned to full-length commit SHAs. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for contributor requirements and [issue #72](https://github.com/Nobodyworld/app-industry-resilience/issues/72) for the completed public-beta validation record.
+GitHub Actions policy: hosted CI is required for current pull requests and release candidates. Local clean-clone validation remains supporting evidence, but it does not replace a successful Actions run. All external action references must use approved repositories and be pinned to full-length commit SHAs. See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for contributor requirements.
 
 ## Documentation
 
-- [v0.3.0 Industry Pulse candidate validation and acceptance](docs/execplans/v0.3.0-industry-pulse.md)
-- [v0.3.0 Public Beta candidate release notes](docs/RELEASE_NOTES_V0.3.0.md)
+- [v0.3.0 Industry Pulse validation and acceptance](docs/execplans/v0.3.0-industry-pulse.md)
+- [v0.3.0 Public Beta release notes](docs/RELEASE_NOTES_V0.3.0.md)
+- [v0.3.0 publication parity record](docs/execplans/v0.3.0-publication-record.md)
 - [v0.2.0 release validation and acceptance](docs/execplans/v0.2.0-public-beta-release-candidate.md)
 - [v0.2.0 Public Beta release notes](docs/RELEASE_NOTES_V0.2.0.md)
 - [Data dictionary](docs/DATA_DICTIONARY.md)
 - [Industry Pulse verified BLS registry](docs/INDUSTRY_PULSE_BLS_SERIES.md)
-- [Industry Pulse execution plan](docs/execplans/v0.3.0-industry-pulse.md)
 - [Public data refresh workflow](docs/WORKFLOWS_DATA_REFRESH.md)
 - [Analytics methodology](docs/ANALYTICS_HEALTH.md)
 - [API reference](docs/API_REFERENCE.md)
@@ -240,7 +240,7 @@ docker run -p 8501:8501 industry-resilience-dashboard
 docker run -e APP_MODE=api -p 9000:9000 industry-resilience-dashboard
 ```
 
-The image uses Python 3.13 and runtime dependencies only. The pinned, least-privilege [Docker Smoke workflow](.github/workflows/docker-smoke.yml) validates the production image, non-root runtime user, Streamlit health, API `/health`, and API `/metrics` on deployment-relevant changes. Completed public-beta Docker evidence is recorded in [issue #72](https://github.com/Nobodyworld/app-industry-resilience/issues/72).
+The image uses Python 3.13 and runtime dependencies only. The pinned, least-privilege [Docker Smoke workflow](.github/workflows/docker-smoke.yml) validates the production image, non-root runtime user, Streamlit health, API `/health`, and API `/metrics` on deployment-relevant changes. Published `v0.3.0` Docker evidence is recorded in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113).
 
 ## License
 
