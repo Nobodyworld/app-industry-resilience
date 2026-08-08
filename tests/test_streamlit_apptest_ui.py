@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
+
+_APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
 
 def _load_app() -> AppTest:
-    app = AppTest.from_file("app.py")
+    app = AppTest.from_file(_APP_PATH)
     app.run(timeout=30)
     assert not app.exception
     return app
@@ -53,7 +57,7 @@ def test_first_run_guide_can_be_dismissed_and_reopened() -> None:
 
 
 def test_explicit_source_query_and_session_selection_are_preserved() -> None:
-    app = AppTest.from_file("app.py")
+    app = AppTest.from_file(_APP_PATH)
     app.query_params["mode"] = "official-snapshot-(aies-2023)"
     app.run(timeout=30)
     assert not app.exception
@@ -65,7 +69,7 @@ def test_explicit_source_query_and_session_selection_are_preserved() -> None:
 
 
 def test_unresolved_source_query_defaults_to_sample() -> None:
-    app = AppTest.from_file("app.py")
+    app = AppTest.from_file(_APP_PATH)
     app.query_params["mode"] = "retired-source"
     app.run(timeout=30)
     assert not app.exception

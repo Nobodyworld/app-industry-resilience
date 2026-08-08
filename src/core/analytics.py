@@ -6,6 +6,8 @@ from typing import Literal
 
 import pandas as pd
 
+from .lineage import append_lineage_step, attach_lineage, lineage_from_dataframe
+
 _HEALTH_REQUIRED_COLUMNS: tuple[str, ...] = (
     "value_added_pct",
     "resilience_score",
@@ -135,10 +137,12 @@ def compute_health_scores(
 
     config = config or HealthScoreConfig()
     _ensure_required_columns(df)
+    input_lineage = lineage_from_dataframe(df)
     weights = config.normalised_weights()
     sorted_bands = _sort_bands(config.bands)
 
     work = df.copy()
+    work.attrs.clear()
     work["value_added_pct"] = pd.to_numeric(work["value_added_pct"], errors="coerce").astype(
         "float64"
     )
@@ -174,6 +178,11 @@ def compute_health_scores(
     score = (raw_score.clip(lower=0.0) * 100.0).round(2)
     work["health_score"] = score
     work["health_band"] = _classify_series(score, sorted_bands)
+    if input_lineage is not None:
+        attach_lineage(
+            work,
+            append_lineage_step(input_lineage, "compute_health_scores"),
+        )
     return work
 
 

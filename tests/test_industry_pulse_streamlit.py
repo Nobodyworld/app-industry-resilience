@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from streamlit.testing.v1 import AppTest
+
+_APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
 
 
 def _component_app(body: str) -> AppTest:
@@ -13,7 +17,7 @@ def _component_app(body: str) -> AppTest:
 
 
 def test_default_dashboard_has_fifth_pulse_tab_and_manual_browse_state() -> None:
-    app = AppTest.from_file("app.py")
+    app = AppTest.from_file(_APP_PATH)
     app.run(timeout=30)
     assert not app.exception
 
