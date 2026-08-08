@@ -60,7 +60,8 @@ def test_evaluate_sample_uses_loader() -> None:
     assert summary.dataframe_full.shape[0] == 2
     assert summary.average_idiot_index is not None
     assert len(summary.leaderboard) == 2
-    assert "demo note" in summary.notes
+    assert "demo note" not in summary.notes
+    assert "bea_metadata" not in summary.dataframe_full.attrs
     assert any("manufacturing_cost_driver" in note for note in summary.notes)
     assert "health_score" in summary.dataframe_full.columns
     assert summary.health_summary_full is not None

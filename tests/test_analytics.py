@@ -4,11 +4,16 @@ import pandas as pd
 import pytest
 
 from src.core import (
+    LINEAGE_ATTR_KEY,
     HealthBand,
     HealthScoreConfig,
+    LineageStep,
     MetricConfig,
+    attach_lineage,
+    build_lineage,
     compute_health_scores,
     compute_metrics,
+    lineage_from_dataframe,
     summarise_health,
 )
 
@@ -65,6 +70,53 @@ def test_compute_health_scores_handles_missing_values() -> None:
 
     assert pd.isna(scored.loc[0, "health_score"])
     assert scored.loc[0, "health_band"] is None
+
+
+def test_compute_health_scores_preserves_only_ordered_typed_lineage() -> None:
+    frame = _analytics_frame()
+    source_lineage = build_lineage(
+        source="sample",
+        source_kind="bundled_sample",
+        dataset_id="sample_industries",
+        observation_period=2023,
+        retrieval_mode="bundled",
+        is_sample=True,
+        is_official=False,
+        transformations=(LineageStep(name="source_load", details={"record_count": len(frame)}),),
+    )
+    frame.attrs["private_debug"] = "should-not-propagate"
+    attach_lineage(frame, source_lineage)
+
+    scored = compute_health_scores(frame)
+    lineage = lineage_from_dataframe(scored)
+
+    assert lineage is not None
+    assert lineage.transformations[:-1] == source_lineage.transformations
+    assert [step.name for step in lineage.transformations] == [
+        "source_load",
+        "compute_health_scores",
+    ]
+    assert sum(step.name == "compute_health_scores" for step in lineage.transformations) == 1
+    assert lineage.transformations[-1].details == {}
+    assert set(scored.attrs) == {LINEAGE_ATTR_KEY}
+    assert "private_debug" not in scored.attrs
+    assert scored["health_score"].tolist() == [68.0, 82.45, 34.75]
+    assert scored["health_band"].tolist() == [
+        "moderate_input_intensity",
+        "lower_input_intensity",
+        "review_required",
+    ]
+
+
+def test_compute_health_scores_without_lineage_drops_arbitrary_attrs() -> None:
+    frame = _analytics_frame()
+    frame.attrs["private_debug"] = "should-not-propagate"
+
+    scored = compute_health_scores(frame)
+
+    assert lineage_from_dataframe(scored) is None
+    assert scored.attrs == {}
+    assert scored["health_score"].tolist() == [68.0, 82.45, 34.75]
 
 
 def test_summarise_health_returns_expected_structure() -> None:

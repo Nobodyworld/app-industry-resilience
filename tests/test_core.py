@@ -12,13 +12,17 @@ import requests
 
 from src.adapters import fetch_asm_manufacturing
 from src.core import (
+    LINEAGE_ATTR_KEY,
     Cache,
     HTTPRequestError,
     LineageStep,
     MetricConfig,
     RetryPolicy,
+    attach_lineage,
+    build_lineage,
     compute_metrics,
     format_for_display,
+    lineage_from_dataframe,
     normalize_columns,
     register_retry_observer,
     safe_get_json,
@@ -65,6 +69,64 @@ def test_normalize_columns_respects_dtype_overrides() -> None:
 
     assert str(normalized.dtypes["materials_cost"]) == "Int64"
     assert str(normalized.dtypes["industry_code"]).startswith("string")
+
+
+def test_normalize_columns_preserves_only_ordered_typed_lineage() -> None:
+    frame = pd.DataFrame(
+        {
+            "NAICS2017": ["311"],
+            "NAICS2017_LABEL": ["Food"],
+            "Year": ["2021"],
+            "RCPTOT": ["1,000"],
+            "CSTMTOT": ["600"],
+        }
+    )
+    source_lineage = build_lineage(
+        source="sample",
+        source_kind="bundled_sample",
+        dataset_id="sample_industries",
+        observation_period=2021,
+        retrieval_mode="bundled",
+        is_sample=True,
+        is_official=False,
+        transformations=(LineageStep(name="source_load", details={"record_count": len(frame)}),),
+    )
+    frame.attrs["private_debug"] = "should-not-propagate"
+    attach_lineage(frame, source_lineage)
+
+    normalized = normalize_columns(frame)
+    lineage = lineage_from_dataframe(normalized)
+
+    assert lineage is not None
+    assert lineage.transformations[:-1] == source_lineage.transformations
+    assert [step.name for step in lineage.transformations] == [
+        "source_load",
+        "normalize_columns",
+    ]
+    assert sum(step.name == "normalize_columns" for step in lineage.transformations) == 1
+    assert lineage.transformations[-1].details == {"column_count": len(normalized.columns)}
+    assert set(normalized.attrs) == {LINEAGE_ATTR_KEY}
+    assert "private_debug" not in normalized.attrs
+    assert normalized.loc[0, "gross_output"] == 1000.0
+    assert normalized.loc[0, "materials_cost"] == 600.0
+
+
+def test_normalize_columns_without_lineage_drops_arbitrary_attrs() -> None:
+    frame = pd.DataFrame(
+        {
+            "industry_code": ["311"],
+            "industry_name": ["Food"],
+            "year": [2021],
+            "gross_output": [1000],
+        }
+    )
+    frame.attrs["private_debug"] = "should-not-propagate"
+
+    normalized = normalize_columns(frame)
+
+    assert lineage_from_dataframe(normalized) is None
+    assert normalized.attrs == {}
+    assert normalized.loc[0, "gross_output"] == 1000.0
 
 
 def test_normalize_columns_rejects_fractional_years() -> None:
