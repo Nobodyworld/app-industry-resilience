@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
-_APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+_APP_PATH = str(_REPOSITORY_ROOT / "app.py")
+
+
+@pytest.fixture
+def _run_from_repository_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(_REPOSITORY_ROOT)
 
 
 def _component_app(body: str) -> AppTest:
@@ -16,7 +23,9 @@ def _component_app(body: str) -> AppTest:
     return app
 
 
-def test_default_dashboard_has_fifth_pulse_tab_and_manual_browse_state() -> None:
+def test_default_dashboard_has_fifth_pulse_tab_and_manual_browse_state(
+    _run_from_repository_root: None,
+) -> None:
     app = AppTest.from_file(_APP_PATH)
     app.run(timeout=30)
     assert not app.exception
