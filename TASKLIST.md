@@ -51,4 +51,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-None.
+- [ ] Make Streamlit AppTest entrypoint paths repository-root stable — issue: [#125](https://github.com/Nobodyworld/app-industry-resilience/issues/125)
