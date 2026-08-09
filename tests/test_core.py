@@ -71,7 +71,7 @@ def test_normalize_columns_respects_dtype_overrides() -> None:
     assert str(normalized.dtypes["industry_code"]).startswith("string")
 
 
-def test_normalize_columns_preserves_only_ordered_typed_lineage() -> None:
+def test_normalize_columns_preserves_approved_metadata_and_ordered_lineage() -> None:
     frame = pd.DataFrame(
         {
             "NAICS2017": ["311"],
@@ -91,7 +91,41 @@ def test_normalize_columns_preserves_only_ordered_typed_lineage() -> None:
         is_official=False,
         transformations=(LineageStep(name="source_load", details={"record_count": len(frame)}),),
     )
-    frame.attrs["private_debug"] = "should-not-propagate"
+    frame.attrs.update(
+        {
+            "source": "api-inline",
+            "source_origin": "api",
+            "bea_metadata": {
+                "years": (2021,),
+                "endpoint": "https://apps.bea.gov/api/data",
+                "tables": ["Gross Output", "Intermediate Inputs"],
+                "notes": ["Public provider note"],
+                "contract_validated": True,
+                "unmapped_naics_codes": ["999"],
+                "request_params": {"UserID": "should-not-propagate"},
+            },
+            "census_asm_metadata": {
+                "year": 2021,
+                "row_count": 1,
+                "contract_validated": True,
+                "required_fields": ["NAICS2017", "RCPTOT"],
+                "raw_payload": ["should-not-propagate"],
+            },
+            "source_metadata": {
+                "agency": "U.S. Census Bureau",
+                "survey": "Annual Integrated Economic Survey",
+                "survey_year": 2023,
+                "release_date": "2026-02-26",
+                "basic_url": "https://www2.census.gov/programs-surveys/aies/data/2023/AIES00BASIC.zip",
+                "expense_url": "https://www2.census.gov/programs-surveys/aies/data/2023/AIES00EXP01.zip",
+                "denominator": "Total operating expenses",
+                "notes": ["Public AIES note"],
+                "provider_payload": {"rows": ["should-not-propagate"]},
+            },
+            "private_debug": "should-not-propagate",
+            "uploaded_filename": "should-not-propagate.csv",
+        }
+    )
     attach_lineage(frame, source_lineage)
 
     normalized = normalize_columns(frame)
@@ -105,8 +139,46 @@ def test_normalize_columns_preserves_only_ordered_typed_lineage() -> None:
     ]
     assert sum(step.name == "normalize_columns" for step in lineage.transformations) == 1
     assert lineage.transformations[-1].details == {"column_count": len(normalized.columns)}
-    assert set(normalized.attrs) == {LINEAGE_ATTR_KEY}
+    assert set(normalized.attrs) == {
+        "source",
+        "source_origin",
+        "bea_metadata",
+        "census_asm_metadata",
+        "source_metadata",
+        LINEAGE_ATTR_KEY,
+    }
+    assert normalized.attrs["source"] == "api-inline"
+    assert normalized.attrs["source_origin"] == "api"
+    assert set(normalized.attrs["bea_metadata"]) == {
+        "years",
+        "endpoint",
+        "tables",
+        "notes",
+        "contract_validated",
+        "unmapped_naics_codes",
+    }
+    assert set(normalized.attrs["census_asm_metadata"]) == {
+        "year",
+        "row_count",
+        "contract_validated",
+        "required_fields",
+    }
+    assert set(normalized.attrs["source_metadata"]) == {
+        "agency",
+        "survey",
+        "survey_year",
+        "release_date",
+        "basic_url",
+        "expense_url",
+        "denominator",
+        "notes",
+    }
     assert "private_debug" not in normalized.attrs
+    assert "uploaded_filename" not in normalized.attrs
+    normalized.attrs["bea_metadata"]["notes"].append("output-only note")
+    assert frame.attrs["bea_metadata"]["notes"] == ["Public provider note"]
+    normalized.attrs["source_metadata"]["notes"].append("output-only AIES note")
+    assert frame.attrs["source_metadata"]["notes"] == ["Public AIES note"]
     assert normalized.loc[0, "gross_output"] == 1000.0
     assert normalized.loc[0, "materials_cost"] == 600.0
 
@@ -120,7 +192,26 @@ def test_normalize_columns_without_lineage_drops_arbitrary_attrs() -> None:
             "gross_output": [1000],
         }
     )
-    frame.attrs["private_debug"] = "should-not-propagate"
+    frame.attrs.update(
+        {
+            "private_debug": "should-not-propagate",
+            "uploaded_filename": "should-not-propagate.csv",
+            "local_path": "should-not-propagate",
+            "source_path": "should-not-propagate",
+            "api_key": "should-not-propagate",
+            "password": "should-not-propagate",
+            "token": "should-not-propagate",
+            "cache_key": "should-not-propagate",
+            "redis_url": "should-not-propagate",
+            "arbitrary_mapping": {"value": "should-not-propagate"},
+            "source": r"C:\private\dataset.csv",
+            "source_origin": "api?token=should-not-propagate",
+            "bea_metadata": {
+                "endpoint": "https://apps.bea.gov/api/data?api_key=should-not-propagate",
+                "raw_payload": ["should-not-propagate"],
+            },
+        }
+    )
 
     normalized = normalize_columns(frame)
 

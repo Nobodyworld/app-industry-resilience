@@ -6,6 +6,10 @@ from typing import Literal
 
 import pandas as pd
 
+from .compatibility_metadata import (
+    apply_compatibility_metadata,
+    sanitize_compatibility_metadata,
+)
 from .lineage import append_lineage_step, attach_lineage, lineage_from_dataframe
 
 _HEALTH_REQUIRED_COLUMNS: tuple[str, ...] = (
@@ -138,11 +142,12 @@ def compute_health_scores(
     config = config or HealthScoreConfig()
     _ensure_required_columns(df)
     input_lineage = lineage_from_dataframe(df)
+    compatibility_metadata = sanitize_compatibility_metadata(df)
     weights = config.normalised_weights()
     sorted_bands = _sort_bands(config.bands)
 
     work = df.copy()
-    work.attrs.clear()
+    apply_compatibility_metadata(work, compatibility_metadata)
     work["value_added_pct"] = pd.to_numeric(work["value_added_pct"], errors="coerce").astype(
         "float64"
     )

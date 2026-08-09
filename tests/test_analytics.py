@@ -72,7 +72,7 @@ def test_compute_health_scores_handles_missing_values() -> None:
     assert scored.loc[0, "health_band"] is None
 
 
-def test_compute_health_scores_preserves_only_ordered_typed_lineage() -> None:
+def test_compute_health_scores_preserves_approved_metadata_and_ordered_lineage() -> None:
     frame = _analytics_frame()
     source_lineage = build_lineage(
         source="sample",
@@ -84,7 +84,18 @@ def test_compute_health_scores_preserves_only_ordered_typed_lineage() -> None:
         is_official=False,
         transformations=(LineageStep(name="source_load", details={"record_count": len(frame)}),),
     )
-    frame.attrs["private_debug"] = "should-not-propagate"
+    frame.attrs.update(
+        {
+            "source": "api-inline",
+            "bea_metadata": {
+                "years": [2023],
+                "notes": ["Public provider note"],
+                "contract_validated": True,
+                "raw_payload": ["should-not-propagate"],
+            },
+            "private_debug": "should-not-propagate",
+        }
+    )
     attach_lineage(frame, source_lineage)
 
     scored = compute_health_scores(frame)
@@ -98,8 +109,16 @@ def test_compute_health_scores_preserves_only_ordered_typed_lineage() -> None:
     ]
     assert sum(step.name == "compute_health_scores" for step in lineage.transformations) == 1
     assert lineage.transformations[-1].details == {}
-    assert set(scored.attrs) == {LINEAGE_ATTR_KEY}
+    assert set(scored.attrs) == {"source", "bea_metadata", LINEAGE_ATTR_KEY}
+    assert scored.attrs["source"] == "api-inline"
+    assert scored.attrs["bea_metadata"] == {
+        "years": [2023],
+        "notes": ["Public provider note"],
+        "contract_validated": True,
+    }
     assert "private_debug" not in scored.attrs
+    scored.attrs["bea_metadata"]["notes"].append("output-only note")
+    assert frame.attrs["bea_metadata"]["notes"] == ["Public provider note"]
     assert scored["health_score"].tolist() == [68.0, 82.45, 34.75]
     assert scored["health_band"].tolist() == [
         "moderate_input_intensity",

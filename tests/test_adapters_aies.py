@@ -10,7 +10,7 @@ from src.adapters.aies import (
     attach_aies_snapshot_lineage,
     build_aies_snapshot,
 )
-from src.core import lineage_from_dataframe
+from src.core import lineage_from_dataframe, normalize_columns
 
 
 def _frame(value_column: str, values: list[str]) -> pd.DataFrame:
@@ -50,6 +50,22 @@ def test_build_aies_snapshot_merges_national_industries() -> None:
     assert lineage.retrieval_mode.value == "snapshot"
     assert lineage.is_official is True
     assert lineage.transformations[0].details == {"record_count": 2}
+
+    result.attrs["source_metadata"]["raw_payload"] = ["should-not-propagate"]
+    result.attrs["private_debug"] = "should-not-propagate"
+    normalized = normalize_columns(result)
+    assert set(normalized.attrs["source_metadata"]) == {
+        "agency",
+        "survey",
+        "survey_year",
+        "release_date",
+        "basic_url",
+        "expense_url",
+        "denominator",
+        "notes",
+    }
+    assert "raw_payload" not in normalized.attrs["source_metadata"]
+    assert "private_debug" not in normalized.attrs
 
 
 def test_build_aies_snapshot_rejects_schema_drift() -> None:
