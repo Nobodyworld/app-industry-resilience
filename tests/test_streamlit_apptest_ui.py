@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
-_APP_PATH = str(Path(__file__).resolve().parents[1] / "app.py")
+_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+_APP_PATH = str(_REPOSITORY_ROOT / "app.py")
+
+
+@pytest.fixture(autouse=True)
+def _run_from_repository_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(_REPOSITORY_ROOT)
 
 
 def _load_app() -> AppTest:
