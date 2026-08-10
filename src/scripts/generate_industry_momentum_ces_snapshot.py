@@ -11,7 +11,7 @@ import math
 import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -237,7 +237,7 @@ def validate_committed(csv_path: Path, metadata_path: Path) -> dict[str, Any]:
     }
     if {row["series_id"] for row in rows} != expected:
         raise CESSnapshotGenerationError("Committed CES snapshot registry coverage is incomplete.")
-    return metadata
+    return cast(dict[str, Any], metadata)
 
 
 def main() -> int:

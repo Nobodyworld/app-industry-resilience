@@ -97,9 +97,9 @@ def test_v1_meta_public_data_lists_truthful_readiness_catalog() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["count"] == len(payload["datasets"])
-    assert payload["implemented_count"] == 2
-    assert payload["readiness_complete_count"] == 2
-    assert payload["roadmap_count"] == payload["count"] - 2
+    assert payload["implemented_count"] == 4
+    assert payload["readiness_complete_count"] == 4
+    assert payload["roadmap_count"] == payload["count"] - 4
     assert payload["by_phase"]["phase_1"] == payload["count"]
 
     by_id = {item["dataset_id"]: item for item in payload["datasets"]}
@@ -113,6 +113,8 @@ def test_v1_meta_public_data_lists_truthful_readiness_catalog() -> None:
         "listener_validated": True,
     }
     assert by_id["bls_ppi_monthly"]["implementation_status"]["adapter_implemented"]
+    assert by_id["bls_ces_monthly"]["implementation_status"]["listener_validated"]
+    assert by_id["fed_g17_monthly"]["implementation_status"]["listener_validated"]
     assert not by_id["census_m3_monthly"]["implementation_status"]["adapter_implemented"]
     assert by_id["gdelt_events_daily"]["source_type"] == "event_context"
     assert by_id["gdelt_events_daily"]["economic_ground_truth"] is False

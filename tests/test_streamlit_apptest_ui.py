@@ -29,7 +29,7 @@ def test_startup_renders_primary_navigation() -> None:
     assert "Explore" in tabs
     assert "Compare" in tabs
     assert "Scenario Lab" in tabs
-    assert "Industry Pulse" in tabs
+    assert "Industry Momentum" in tabs
     assert "Observability" not in tabs
 
     text_blob = " ".join(markdown.value for markdown in app.markdown)

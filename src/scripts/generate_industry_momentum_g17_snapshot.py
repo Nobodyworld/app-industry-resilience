@@ -12,7 +12,7 @@ import re
 import sys
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import requests
 
@@ -127,8 +127,8 @@ def normalise_files(payloads: dict[str, str]) -> list[dict[str, str]]:
     mapping_by_series = {entry.series_id: entry for entry in entries}
     for series_id, values in values_by_series.items():
         mapping = mapping_by_series[series_id]
-        for month, value in sorted(values.items()):
-            if month > latest_complete:
+        for observation_month, value in sorted(values.items()):
+            if observation_month > latest_complete:
                 continue
             rows.append(
                 {
@@ -138,7 +138,7 @@ def normalise_files(payloads: dict[str, str]) -> list[dict[str, str]]:
                     "published_industry_code": mapping.published_industry_code,
                     "target_industry_code": mapping.target_industry_code,
                     "mapping_relationship": mapping.mapping_relationship,
-                    "observation_date": month.isoformat(),
+                    "observation_date": observation_month.isoformat(),
                     "value": format(value, ".10g"),
                     "units": mapping.units,
                     "seasonal_adjustment": mapping.seasonal_adjustment,
@@ -224,7 +224,7 @@ def validate_committed(csv_path: Path, metadata_path: Path) -> dict[str, Any]:
     }
     if {row["series_id"] for row in rows} != expected:
         raise G17SnapshotGenerationError("Committed G.17 registry coverage is incomplete.")
-    return metadata
+    return cast(dict[str, Any], metadata)
 
 
 def main() -> int:
