@@ -10,6 +10,12 @@ from .idiot_index_service import (
     evaluate_idiot_index,
     sanitize_search,
 )
+from .industry_momentum_exports import (
+    IndustryMomentumExportArtifact,
+    IndustryMomentumExportFormat,
+    build_industry_momentum_exports,
+)
+from .industry_momentum_service import IndustryMomentumService
 from .industry_pulse_exports import (
     IndustryPulseExportArtifact,
     IndustryPulseExportFormat,
@@ -34,10 +40,14 @@ __all__ = [
     "IndustryPulseExportArtifact",
     "IndustryPulseExportFormat",
     "IndustryPulseService",
+    "IndustryMomentumExportArtifact",
+    "IndustryMomentumExportFormat",
+    "IndustryMomentumService",
     "IndustryMetrics",
     "NormalizationOptions",
     "evaluate_idiot_index",
     "build_industry_pulse_exports",
+    "build_industry_momentum_exports",
     "sanitize_search",
     "ScenarioAdjustment",
     "ScenarioPlanner",
