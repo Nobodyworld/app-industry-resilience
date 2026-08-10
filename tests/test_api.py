@@ -135,6 +135,8 @@ def test_evaluate_with_inline_dataset_returns_leaderboard() -> None:
     assert data["filters"]["top_n"] == 3
     assert len(data["leaderboard"]) == 3
     assert data["metadata"].get("source") == "api-inline"
+    assert data["lineage"]["source"] == "api-inline"
+    assert "private_debug" not in data["metadata"]
     assert len(data["dataset"]["full"]) == len(records)
     assert any("manufacturing_cost_driver" in note for note in data["notes"])
     assert "manufacturing_cost_driver" in data["metadata"].get("extensions", {})

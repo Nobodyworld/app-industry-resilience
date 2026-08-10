@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.adapters.census_asm import fetch_asm_manufacturing
+from src.core import normalize_columns
 from src.core.cache import Cache
 from src.core.lineage import lineage_from_dataframe
 
@@ -52,6 +53,17 @@ def test_fetch_asm_manufacturing_caches(tmp_path: Path) -> None:
         assert miss_lineage.retrieval_mode.value == "live"
         assert miss_lineage.cache_status.value == "miss"
         assert miss_lineage.is_official is True
+
+        frame.attrs["census_asm_metadata"]["raw_payload"] = ["should-not-propagate"]
+        frame.attrs["private_debug"] = "should-not-propagate"
+        normalized = normalize_columns(frame)
+        assert normalized.attrs["census_asm_metadata"] == {
+            "year": 2020,
+            "row_count": 1,
+            "contract_validated": True,
+            "required_fields": ["NAICS2017", "NAICS2017_LABEL", "RCPTOT", "CSTMTOT", "VALADD"],
+        }
+        assert "private_debug" not in normalized.attrs
 
         cached_payload = cache.get("census_asm_2020")
         assert isinstance(cached_payload, dict)

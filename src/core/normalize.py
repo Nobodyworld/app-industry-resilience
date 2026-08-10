@@ -10,6 +10,11 @@ from typing import Any, cast
 
 import pandas as pd
 
+from .compatibility_metadata import (
+    apply_compatibility_metadata,
+    sanitize_compatibility_metadata,
+)
+from .lineage import append_lineage_step, attach_lineage, lineage_from_dataframe
 from .security import SecurityUtils
 
 REQUIRED_COLS: tuple[str, ...] = (
@@ -70,6 +75,8 @@ def normalize_columns(
     if df.empty:
         raise ValueError("Input dataframe is empty; cannot normalise columns.")
 
+    input_lineage = lineage_from_dataframe(df)
+    compatibility_metadata = sanitize_compatibility_metadata(df)
     opts = options or NormalizationOptions()
     alias_input = column_aliases if column_aliases is not None else opts.column_aliases
     dtype_input = dtype_overrides if dtype_overrides is not None else opts.dtype_overrides
@@ -80,6 +87,7 @@ def normalize_columns(
     }
 
     normalized = df.copy()
+    apply_compatibility_metadata(normalized, compatibility_metadata)
     normalized.columns = [col.strip().lower() for col in normalized.columns]
     normalized.rename(columns=lambda c: alias_map.get(c, c), inplace=True)
 
@@ -101,6 +109,16 @@ def normalize_columns(
 
     if dtype_input:
         apply_dtype_overrides(normalized, dtype_input)
+
+    if input_lineage is not None:
+        attach_lineage(
+            normalized,
+            append_lineage_step(
+                input_lineage,
+                "normalize_columns",
+                details={"column_count": len(normalized.columns)},
+            ),
+        )
 
     return normalized
 

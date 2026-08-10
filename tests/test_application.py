@@ -17,6 +17,7 @@ from src.application.idiot_index_service import (
     sanitize_search,
 )
 from src.core import AppConfig, lineage_from_dataframe, load_config
+from src.infrastructure.observability import ObservabilityRegistry
 from src.interfaces.streamlit.provenance import attach_uploaded_file_lineage
 
 
@@ -45,7 +46,16 @@ def _sample_frame() -> pd.DataFrame:
             },
         ]
     )
-    frame.attrs["bea_metadata"] = {"notes": ["demo note"]}
+    frame.attrs["bea_metadata"] = {
+        "years": [2021],
+        "endpoint": "https://apps.bea.gov/api/data",
+        "tables": ["Gross Output"],
+        "notes": ["demo note"],
+        "contract_validated": True,
+        "unmapped_naics_codes": [],
+        "raw_payload": ["should-not-propagate"],
+    }
+    frame.attrs["private_debug"] = "should-not-propagate"
     return frame
 
 
@@ -61,6 +71,17 @@ def test_evaluate_sample_uses_loader() -> None:
     assert summary.average_idiot_index is not None
     assert len(summary.leaderboard) == 2
     assert "demo note" in summary.notes
+    assert set(summary.dataframe_full.attrs["bea_metadata"]) == {
+        "years",
+        "endpoint",
+        "tables",
+        "notes",
+        "contract_validated",
+        "unmapped_naics_codes",
+    }
+    assert "raw_payload" not in summary.dataframe_full.attrs["bea_metadata"]
+    assert "private_debug" not in summary.dataframe_full.attrs
+    assert "private_debug" not in summary.dataframe_filtered.attrs
     assert any("manufacturing_cost_driver" in note for note in summary.notes)
     assert "health_score" in summary.dataframe_full.columns
     assert summary.health_summary_full is not None
@@ -124,9 +145,10 @@ def test_evaluate_with_search_filters_results() -> None:
 
 def test_bea_requires_api_key() -> None:
     config = load_config({"BEA_API_KEY": ""})
+    service = IdiotIndexService(observability=ObservabilityRegistry())
 
     with pytest.raises(ValueError):
-        evaluate_idiot_index(
+        service.evaluate(
             year=2021,
             source=DataSource.BEA,
             config=config,
@@ -192,7 +214,7 @@ def test_sanitize_search_handles_blank_and_malicious_input() -> None:
 
 
 def test_evaluate_requires_positive_topn() -> None:
+    service = IdiotIndexService(observability=ObservabilityRegistry())
+
     with pytest.raises(ValueError):
-        evaluate_idiot_index(
-            year=2021, source=DataSource.SAMPLE, top_n=0, sample_loader=_sample_frame
-        )
+        service.evaluate(year=2021, source=DataSource.SAMPLE, top_n=0, sample_loader=_sample_frame)

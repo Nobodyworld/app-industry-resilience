@@ -52,4 +52,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-None.
+- [ ] Recover unique local lineage work from protected checkout — issue: [#123](https://github.com/Nobodyworld/app-industry-resilience/issues/123)
