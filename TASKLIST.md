@@ -53,4 +53,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-None.
+- [ ] Deliver multi-source Industry Momentum for v0.4.0 — issue: #129
