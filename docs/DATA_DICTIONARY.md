@@ -114,6 +114,18 @@ and zero denominators remain unavailable. Freshness is `current` through 90 days
 latest monthly observation, `stale` after 90 days, and `unknown` without an observation. Tests
 inject the `as_of` date.
 
+### Industry Momentum CES and G.17 snapshots
+
+The CES and G.17 CSVs standardize `source_family`, `signal_type`, `series_id`, published and target
+industry codes, `mapping_relationship`, first-of-month `observation_date`, finite `value`, `units`,
+seasonal status, optional `base_period`, `release_period`, and source label. CES employment is in
+thousands of employees. G.17 production and capacity indexes use `2017=100`; utilization is a
+percent. Index/count changes are percent changes; utilization changes are percentage points.
+
+Registry metadata adds mapping level/basis, official title/table/URL, historical coverage, and
+review notes. Provenance is source-family-specific and allowlisted. Broader published mappings are
+not exact six-digit matches, and unlike units or index base periods must not be compared directly.
+
 ## Interpretation Limitations
 
 - Metrics are heuristic diagnostics, not causal inference or forecasting guarantees.
@@ -131,3 +143,5 @@ inject the `as_of` date.
 - Official snapshot assumptions and refresh workflow are documented in `data/README.md` and `docs/WORKFLOWS_DATA_REFRESH.md`.
 - Industry Pulse signal provenance is a separate typed envelope and is never copied into annual
   dataframe lineage.
+- Industry Momentum family provenance is likewise separate; snapshots and manual browsing never
+  mutate annual dataframe attributes, rankings, scenarios, health scores, or bands.

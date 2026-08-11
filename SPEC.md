@@ -28,6 +28,10 @@ mappings, monthly observations, exact-calendar changes, freshness, availability,
 snapshot provenance. It is contextual only and never changes annual metrics, rankings,
 scenarios, composite scores, bands, or annual dataframe lineage.
 
+Industry Momentum composes that released contract with eight reviewed CES employment series and
+22 G.17 production/capacity/utilization series. Provider scopes remain typed as exact or broader;
+there is no composite momentum score and no signal enters annual calculations or lineage.
+
 ## Supported Entry Points
 
 - Streamlit dashboard: `streamlit run app.py`
@@ -55,6 +59,8 @@ scenarios, composite scores, bands, or annual dataframe lineage.
 - Preserve canonical `/v1` and deprecated alias compatibility where applicable.
 - Keep new Industry Pulse routes canonical-only under `/v1/context/signals`; UI/API/tests must
   use the committed snapshot and must not initiate provider calls.
+- Keep Industry Momentum canonical-only under `/v1/context/momentum`; allow bounded family, type,
+  series, date, and limit filters, with independently degrading committed source-family snapshots.
 - Never copy credentials, filenames, private paths, cache identifiers, raw provider payloads, or arbitrary dataframe attributes into typed lineage.
 - Run `make quality-gate` before merge.
 - Require hosted `CI / Quality Gate` for pull requests.
