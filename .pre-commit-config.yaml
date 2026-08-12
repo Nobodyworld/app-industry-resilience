@@ -3,17 +3,6 @@ minimum_pre_commit_version: "4.6.1"
 repos:
   - repo: local
     hooks:
-      - id: check-trailing-whitespace
-        name: Check trailing whitespace
-        entry: python src/scripts/check_trailing_whitespace.py
-        language: system
-        files: '\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$'
-      - id: ensure-eof-newline
-        name: Ensure EOF newline
-        entry: python src/scripts/check_trailing_whitespace.py --check-eof
-        language: system
-        pass_filenames: true
-        files: '\.(py|md|markdown|txt|rst|yml|yaml|json|toml)$'
       - id: black
         name: Black
         entry: python -m black
@@ -46,6 +35,9 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
+      - id: trailing-whitespace
+        args: ["--markdown-linebreak-ext=md"]
+      - id: end-of-file-fixer
       - id: check-added-large-files
         args: ["--maxkb=1024"]
   - repo: https://github.com/Yelp/detect-secrets
