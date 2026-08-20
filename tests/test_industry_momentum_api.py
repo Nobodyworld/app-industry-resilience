@@ -70,9 +70,18 @@ def test_malformed_code_and_mismatched_series_are_stable_errors() -> None:
 def test_partial_and_all_requested_unavailable_behavior(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    missing = tmp_path / "not-present"
+    missing = tmp_path / "not-present-SECRET_MARKER"
     service = IndustryMomentumService(ces_snapshot_path=missing, ces_metadata_path=missing)
     monkeypatch.setattr(api_module, "_industry_momentum_service", service)
+
+    listing = client.get("/v1/context/momentum")
+    assert listing.status_code == 200
+    assert listing.json()["source_family_availability"]["bls_ces"]["error"] == (
+        "Employment snapshot unavailable."
+    )
+    assert str(tmp_path) not in listing.text
+    assert "SECRET_MARKER" not in listing.text
+
     partial = client.get("/v1/context/momentum/325211")
     assert (partial.status_code, partial.json()["availability"]) == (200, "partial")
     unavailable = client.get("/v1/context/momentum/325211?source_family=bls_ces")
@@ -81,6 +90,7 @@ def test_partial_and_all_requested_unavailable_behavior(
         "detail": "Requested Industry Momentum snapshots are unavailable."
     }
     assert str(tmp_path) not in unavailable.text
+    assert "SECRET_MARKER" not in unavailable.text
 
 
 def test_openapi_has_only_canonical_v1_routes_and_legacy_ppi_is_unchanged() -> None:

@@ -31,6 +31,12 @@ over-month and year-over-year changes; indexes, counts, hours, and earnings use 
 Missing exact calendar observations remain unavailable. Unlike units or different base periods are
 never compared as raw levels.
 
+Freshness is source-family specific rather than one global Momentum rule. BLS PPI preserves the
+released Industry Pulse threshold of **90 days**. BLS CES employment uses **120 days**, and Federal
+Reserve G.17 production/capacity/utilization uses **120 days**. Every returned history exposes its
+applied `threshold_days`; these thresholds affect only current/stale context labeling and never
+annual calculations, rankings, scenarios, scores, bands, or lineage.
+
 ## BLS Current Employment Statistics
 
 Official verification inputs:
@@ -142,3 +148,5 @@ units or different base periods must not be compared directly.
   presented as implemented or accepted without evidence.
 - 2026-08-10: Recorded the accepted 8 CES and 22 G.17 series, explicit broader mappings, candidate
   exclusions, snapshot bounds, hashes, and manifest identities.
+- 2026-08-20: Preserved the released PPI 90-day freshness contract and documented explicit 120-day
+  CES and G.17 thresholds; public snapshot degradation remains bounded and path-free.

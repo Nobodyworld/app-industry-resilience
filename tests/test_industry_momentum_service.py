@@ -17,6 +17,7 @@ from src.application.industry_momentum_service import (
     IndustryMomentumService,
     _calculate_change,
 )
+from src.application.industry_pulse_service import IndustryPulseService
 from src.core.industry_momentum import (
     INDUSTRY_MOMENTUM_REGISTRY,
     IndustryMomentumObservation,
@@ -98,8 +99,9 @@ def test_full_service_state_filters_order_and_broader_mapping() -> None:
     assert service.for_series_id("unknown").availability == "unmapped"
 
 
-def test_unmapped_empty_stale_current_and_unknown_states() -> None:
-    service = IndustryMomentumService(as_of=date(2026, 8, 10))
+def test_unmapped_empty_stale_current_unknown_and_family_freshness_states() -> None:
+    as_of = date(2026, 8, 10)
+    service = IndustryMomentumService(as_of=as_of)
     assert service.for_industry_code("999999").availability == "unmapped"
     empty = service.for_industry_code("325211", start=date(2030, 1, 1))
     assert empty.availability == "empty_range"
@@ -108,7 +110,27 @@ def test_unmapped_empty_stale_current_and_unknown_states() -> None:
         for family in empty.families
         for history in family.histories
     )
-    assert service.for_industry_code("325211").families[1].histories[0].freshness.state == "current"
+
+    ppi_freshness = service.for_industry_code(
+        "325211", source_family="bls_ppi"
+    ).families[0].histories[0].freshness
+    released_ppi_freshness = IndustryPulseService(as_of=as_of).for_industry_code(
+        "325211"
+    ).freshness
+    assert ppi_freshness.state == released_ppi_freshness.state
+    assert ppi_freshness.age_days == released_ppi_freshness.age_days
+    assert ppi_freshness.threshold_days == released_ppi_freshness.threshold_days == 90
+
+    ces_freshness = service.for_industry_code(
+        "325211", source_family="bls_ces"
+    ).families[0].histories[0].freshness
+    g17_freshness = service.for_industry_code(
+        "325211", source_family="fed_g17"
+    ).families[0].histories[0].freshness
+    assert ces_freshness.threshold_days == 120
+    assert g17_freshness.threshold_days == 120
+    assert ces_freshness.state == "current"
+
     stale = IndustryMomentumService(as_of=date(2027, 1, 1)).for_industry_code("325211")
     assert all(
         history.freshness.state == "stale"
@@ -117,14 +139,42 @@ def test_unmapped_empty_stale_current_and_unknown_states() -> None:
     )
 
 
-def test_one_family_failure_is_partial_and_requested_failure_is_unavailable(tmp_path: Path) -> None:
-    missing = tmp_path / "missing.csv"
+def test_one_family_failure_is_partial_requested_failure_and_summary_are_sanitized(
+    tmp_path: Path,
+) -> None:
+    missing = tmp_path / "missing-SECRET_MARKER.csv"
     service = IndustryMomentumService(ces_snapshot_path=missing, ces_metadata_path=missing)
     assert service.for_industry_code("325211").availability == "partial"
     requested = service.for_industry_code("325211", source_family="bls_ces")
     assert requested.availability == "unavailable"
     assert requested.families[0].histories[0].provenance is None
-    assert "missing" not in json.dumps(requested.to_dict()).lower()
+
+    public_payload = json.dumps(
+        {
+            "result": requested.to_dict(),
+            "availability": service.availability_summary(),
+            "metadata": service.metadata,
+        }
+    )
+    assert str(tmp_path) not in public_payload
+    assert "SECRET_MARKER" not in public_payload
+    assert service.availability_summary()["bls_ces"]["error"] == "Employment snapshot unavailable."
+
+
+def test_ppi_failure_summary_is_sanitized() -> None:
+    class BrokenPulse:
+        freshness_threshold_days = 90
+
+        def for_industry_code(self, industry_code: str) -> object:
+            raise ValueError(f"private snapshot failure for {industry_code}: SECRET_MARKER")
+
+    service = IndustryMomentumService(pulse_service=BrokenPulse())  # type: ignore[arg-type]
+    public_payload = json.dumps(service.availability_summary())
+    assert "SECRET_MARKER" not in public_payload
+    assert "private snapshot failure" not in public_payload
+    assert service.availability_summary()["bls_ppi"]["error"] == (
+        "Producer price snapshot unavailable."
+    )
 
 
 def test_filter_validation() -> None:
@@ -133,6 +183,12 @@ def test_filter_validation() -> None:
         service.for_industry_code("325211", start=date(2026, 2, 1), end=date(2026, 1, 1))
     with pytest.raises(ValueError, match="limit"):
         service.for_industry_code("325211", limit=121)
+    with pytest.raises(ValueError, match="Freshness thresholds"):
+        IndustryMomentumService(ppi_freshness_threshold_days=0)
+    with pytest.raises(ValueError, match="Freshness thresholds"):
+        IndustryMomentumService(ces_freshness_threshold_days=0)
+    with pytest.raises(ValueError, match="Freshness thresholds"):
+        IndustryMomentumService(g17_freshness_threshold_days=0)
 
 
 def test_exports_parse_and_are_deterministic_and_private() -> None:

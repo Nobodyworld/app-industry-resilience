@@ -11,7 +11,10 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any, cast
 
-from src.application.industry_pulse_service import IndustryPulseService
+from src.application.industry_pulse_service import (
+    DEFAULT_FRESHNESS_THRESHOLD_DAYS as DEFAULT_PPI_FRESHNESS_THRESHOLD_DAYS,
+    IndustryPulseService,
+)
 from src.core.industry_momentum import (
     INDUSTRY_MOMENTUM_COMPARISON_LIMITATION,
     INDUSTRY_MOMENTUM_INTERPRETATION,
@@ -48,8 +51,15 @@ DEFAULT_G17_METADATA_PATH = (
     Path(__file__).parents[2] / "data" / "industry_momentum_fed_g17_snapshot.metadata.json"
 )
 DEFAULT_FRESHNESS_THRESHOLD_DAYS = 120
+DEFAULT_CES_FRESHNESS_THRESHOLD_DAYS = DEFAULT_FRESHNESS_THRESHOLD_DAYS
+DEFAULT_G17_FRESHNESS_THRESHOLD_DAYS = DEFAULT_FRESHNESS_THRESHOLD_DAYS
 MAX_OBSERVATION_LIMIT = 120
 SOURCE_FAMILIES: tuple[SourceFamily, ...] = ("bls_ppi", "bls_ces", "fed_g17")
+DEFAULT_FRESHNESS_THRESHOLDS: Mapping[SourceFamily, int] = {
+    "bls_ppi": DEFAULT_PPI_FRESHNESS_THRESHOLD_DAYS,
+    "bls_ces": DEFAULT_CES_FRESHNESS_THRESHOLD_DAYS,
+    "fed_g17": DEFAULT_G17_FRESHNESS_THRESHOLD_DAYS,
+}
 _SNAPSHOT_COLUMNS = (
     "source_family",
     "signal_type",
@@ -75,6 +85,11 @@ _DATASET_IDS = {
     "bls_ces": "bls_ces_monthly",
     "fed_g17": "fed_g17_monthly",
 }
+_PUBLIC_SNAPSHOT_ERRORS: Mapping[SourceFamily, str] = {
+    "bls_ppi": "Producer price snapshot unavailable.",
+    "bls_ces": "Employment snapshot unavailable.",
+    "fed_g17": "Production and capacity snapshot unavailable.",
+}
 
 
 class IndustryMomentumService:
@@ -90,13 +105,20 @@ class IndustryMomentumService:
         registry: IndustryMomentumRegistry = INDUSTRY_MOMENTUM_REGISTRY,
         pulse_service: IndustryPulseService | None = None,
         as_of: date | None = None,
-        freshness_threshold_days: int = DEFAULT_FRESHNESS_THRESHOLD_DAYS,
+        ppi_freshness_threshold_days: int = DEFAULT_PPI_FRESHNESS_THRESHOLD_DAYS,
+        ces_freshness_threshold_days: int = DEFAULT_CES_FRESHNESS_THRESHOLD_DAYS,
+        g17_freshness_threshold_days: int = DEFAULT_G17_FRESHNESS_THRESHOLD_DAYS,
     ) -> None:
-        if freshness_threshold_days <= 0:
-            raise ValueError("Freshness threshold must be positive.")
+        freshness_thresholds: dict[SourceFamily, int] = {
+            "bls_ppi": ppi_freshness_threshold_days,
+            "bls_ces": ces_freshness_threshold_days,
+            "fed_g17": g17_freshness_threshold_days,
+        }
+        if any(value <= 0 for value in freshness_thresholds.values()):
+            raise ValueError("Freshness thresholds must be positive.")
         self.registry = registry
         self.as_of = as_of or date.today()
-        self.freshness_threshold_days = freshness_threshold_days
+        self.freshness_threshold_days_by_family = freshness_thresholds
         self._by_family_series: dict[
             SourceFamily, dict[str, tuple[IndustryMomentumObservation, ...]]
         ] = {family: {} for family in SOURCE_FAMILIES}
@@ -107,11 +129,12 @@ class IndustryMomentumService:
         try:
             pulse = pulse_service or IndustryPulseService(
                 as_of=self.as_of,
-                freshness_threshold_days=freshness_threshold_days,
+                freshness_threshold_days=ppi_freshness_threshold_days,
             )
+            self.freshness_threshold_days_by_family["bls_ppi"] = pulse.freshness_threshold_days
             self._load_pulse(pulse)
-        except (IndustryMomentumSnapshotError, OSError, ValueError) as exc:
-            self._errors["bls_ppi"] = str(exc)
+        except (IndustryMomentumSnapshotError, OSError, ValueError):
+            self._errors["bls_ppi"] = _PUBLIC_SNAPSHOT_ERRORS["bls_ppi"]
 
         self._load_family_safely("bls_ces", Path(ces_snapshot_path), Path(ces_metadata_path))
         self._load_family_safely("fed_g17", Path(g17_snapshot_path), Path(g17_metadata_path))
@@ -319,7 +342,7 @@ class IndustryMomentumService:
             latest_observation=latest,
             month_over_month=_calculate_change(summary, mapping.change_method, 1),
             year_over_year=_calculate_change(summary, mapping.change_method, 12),
-            freshness=self._freshness(latest),
+            freshness=self._freshness(latest, mapping.source_family),
             observation_start=summary[0].observation_date if summary else None,
             observation_end=summary[-1].observation_date if summary else None,
             release_period=latest.release_period if latest else None,
@@ -330,22 +353,27 @@ class IndustryMomentumService:
             ),
         )
 
-    def _freshness(self, latest: IndustryMomentumObservation | None) -> IndustryMomentumFreshness:
+    def _freshness(
+        self,
+        latest: IndustryMomentumObservation | None,
+        family: SourceFamily,
+    ) -> IndustryMomentumFreshness:
+        threshold_days = self.freshness_threshold_days_by_family[family]
         if latest is None:
             return IndustryMomentumFreshness(
                 state="unknown",
                 as_of=self.as_of,
                 latest_observation_date=None,
                 age_days=None,
-                threshold_days=self.freshness_threshold_days,
+                threshold_days=threshold_days,
             )
         age_days = (self.as_of - latest.observation_date).days
         return IndustryMomentumFreshness(
-            state="current" if age_days <= self.freshness_threshold_days else "stale",
+            state="current" if age_days <= threshold_days else "stale",
             as_of=self.as_of,
             latest_observation_date=latest.observation_date,
             age_days=age_days,
-            threshold_days=self.freshness_threshold_days,
+            threshold_days=threshold_days,
         )
 
     def _load_pulse(self, pulse: IndustryPulseService) -> None:
@@ -419,8 +447,8 @@ class IndustryMomentumService:
                 transformations=tuple(str(item) for item in metadata["transformations"]),
             )
             self._metadata[family] = metadata
-        except (IndustryMomentumSnapshotError, OSError, ValueError, KeyError) as exc:
-            self._errors[family] = str(exc)
+        except (IndustryMomentumSnapshotError, OSError, ValueError, KeyError):
+            self._errors[family] = _PUBLIC_SNAPSHOT_ERRORS[family]
 
 
 def _overall_availability(
@@ -647,11 +675,15 @@ def _parse_retrieved_at(value: str) -> datetime:
 
 
 __all__ = [
+    "DEFAULT_CES_FRESHNESS_THRESHOLD_DAYS",
     "DEFAULT_CES_METADATA_PATH",
     "DEFAULT_CES_SNAPSHOT_PATH",
     "DEFAULT_FRESHNESS_THRESHOLD_DAYS",
+    "DEFAULT_FRESHNESS_THRESHOLDS",
+    "DEFAULT_G17_FRESHNESS_THRESHOLD_DAYS",
     "DEFAULT_G17_METADATA_PATH",
     "DEFAULT_G17_SNAPSHOT_PATH",
+    "DEFAULT_PPI_FRESHNESS_THRESHOLD_DAYS",
     "MAX_OBSERVATION_LIMIT",
     "SOURCE_FAMILIES",
     "IndustryMomentumService",
