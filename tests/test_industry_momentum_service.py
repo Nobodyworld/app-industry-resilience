@@ -111,22 +111,29 @@ def test_unmapped_empty_stale_current_unknown_and_family_freshness_states() -> N
         for history in family.histories
     )
 
-    ppi_freshness = service.for_industry_code(
-        "325211", source_family="bls_ppi"
-    ).families[0].histories[0].freshness
-    released_ppi_freshness = IndustryPulseService(as_of=as_of).for_industry_code(
-        "325211"
-    ).freshness
+    ppi_freshness = (
+        service.for_industry_code("325211", source_family="bls_ppi")
+        .families[0]
+        .histories[0]
+        .freshness
+    )
+    released_ppi_freshness = IndustryPulseService(as_of=as_of).for_industry_code("325211").freshness
     assert ppi_freshness.state == released_ppi_freshness.state
     assert ppi_freshness.age_days == released_ppi_freshness.age_days
     assert ppi_freshness.threshold_days == released_ppi_freshness.threshold_days == 90
 
-    ces_freshness = service.for_industry_code(
-        "325211", source_family="bls_ces"
-    ).families[0].histories[0].freshness
-    g17_freshness = service.for_industry_code(
-        "325211", source_family="fed_g17"
-    ).families[0].histories[0].freshness
+    ces_freshness = (
+        service.for_industry_code("325211", source_family="bls_ces")
+        .families[0]
+        .histories[0]
+        .freshness
+    )
+    g17_freshness = (
+        service.for_industry_code("325211", source_family="fed_g17")
+        .families[0]
+        .histories[0]
+        .freshness
+    )
     assert ces_freshness.threshold_days == 120
     assert g17_freshness.threshold_days == 120
     assert ces_freshness.state == "current"
