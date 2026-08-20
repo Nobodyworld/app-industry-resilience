@@ -13,8 +13,8 @@ from typing import Any, cast
 
 from src.application.industry_pulse_service import (
     DEFAULT_FRESHNESS_THRESHOLD_DAYS as DEFAULT_PPI_FRESHNESS_THRESHOLD_DAYS,
-    IndustryPulseService,
 )
+from src.application.industry_pulse_service import IndustryPulseService
 from src.core.industry_momentum import (
     INDUSTRY_MOMENTUM_COMPARISON_LIMITATION,
     INDUSTRY_MOMENTUM_INTERPRETATION,
