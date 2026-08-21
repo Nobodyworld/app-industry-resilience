@@ -1,2 +1,5 @@
 [browser]
 gatherUsageStats = false
+
+[theme.light]
+primaryColor = "#B42318"

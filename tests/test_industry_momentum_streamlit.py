@@ -33,6 +33,15 @@ render_industry_momentum(
     assert any("Verified exact and broader-published" in item.value for item in app.success)
     assert any("Broader published mapping" in item.value for item in app.warning)
     assert any("Comparison mapping availability" in item.value for item in app.markdown)
+    comparison = next(
+        item.value for item in app.dataframe if "Mapping availability" in item.value.columns
+    )
+    assert comparison[["Annual industry code", "Mapping availability"]].to_dict(
+        orient="records"
+    ) == [
+        {"Annual industry code": "325211", "Mapping availability": "Available"},
+        {"Annual industry code": "999999", "Mapping availability": "Unmapped"},
+    ]
     assert len(app.get("plotly_chart")) == 5
     assert len(app.dataframe) >= 7
     assert len(app.download_button) == 3
