@@ -48,7 +48,9 @@ Suggested walkthrough in the UI:
 4. Open **Data provenance** to verify source identity, vintage, cache state, and transformations.
 5. Open **Industry Momentum** to inspect exact/broader mapping availability or clearly labeled
    manual browsing across Prices, Employment, and Production & Capacity, with monthly history,
-   freshness, tables, provenance, and signal-only CSV/JSON/XLSX downloads.
+   freshness, tables, provenance, and signal-only CSV/JSON/XLSX downloads. Enable the optional
+   custom history window to limit only this contextual display and those signal-only downloads;
+   annual analysis, comparisons, Scenario Lab, scores, bands, and lineage remain unchanged.
 6. Use the annual export panel for all-rows vs current-view outputs in CSV, JSON, or XLSX.
 
 Primary offline source for demos: `data/sample_industries.csv`.
@@ -104,7 +106,8 @@ Verified features:
 - Typed, privacy-safe provenance in the dashboard, API, caches, scenarios, and exports.
 - Structured export paths (CSV, JSON, XLSX, plus CSV lineage companions).
 - First-class Industry Momentum tab with exact/broader mapping, explicit partial/unmapped/manual
-  states, separate signal charts and tables, current/stale disclosure, and separate provenance.
+  states, a user-selectable contextual history window, separate signal charts and tables,
+  current/stale disclosure, and separate provenance.
 
 Experimental capabilities:
 

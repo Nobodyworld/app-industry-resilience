@@ -145,7 +145,9 @@ Licensed under the Apache License 2.0. See [LICENSE](../LICENSE).
 Industry Momentum adds canonical-only `GET /v1/context/momentum` and
 `GET /v1/context/momentum/{industry_code}`. These routes expose the verified registry,
 source-family states, and typed `IndustryMomentumResponse` without provider calls; existing
-Industry Pulse routes remain unchanged.
+Industry Pulse routes remain unchanged. When a registered `series_id` contradicts either a supplied
+`source_family` or `signal_type`, the collection route returns a stable `400`; an unknown series ID
+deliberately remains a successful empty registry result.
 
 ### `src.interfaces.api.schemas`
 

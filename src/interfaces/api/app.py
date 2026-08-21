@@ -516,12 +516,14 @@ def list_industry_momentum_v1(
     _validated_signal_filters(start=start, end=end, limit=limit)
     if series_id is not None:
         registered = service.registry.by_series_id(series_id)
-        if registered is not None and source_family is not None:
-            if registered.source_family != source_family:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="series_id does not belong to the requested source_family.",
-                )
+        if registered is not None and (
+            (source_family is not None and registered.source_family != source_family)
+            or (signal_type is not None and registered.signal_type != signal_type)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=("series_id does not match the requested source_family or signal_type."),
+            )
     mappings = service.list_mappings(
         source_family=source_family,
         signal_type=signal_type,

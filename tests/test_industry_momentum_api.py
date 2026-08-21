@@ -58,6 +58,40 @@ def test_filters_are_bounded_and_typed() -> None:
     )
 
 
+def test_collection_series_filters_are_consistent_and_unknown_is_deliberate() -> None:
+    signal_mismatch = client.get(
+        "/v1/context/momentum",
+        params={"series_id": "CES3232521101", "signal_type": "capacity_index"},
+    )
+    assert signal_mismatch.status_code == 400
+    assert signal_mismatch.json() == {
+        "detail": "series_id does not match the requested source_family or signal_type."
+    }
+
+    match = client.get(
+        "/v1/context/momentum",
+        params={
+            "series_id": "CES3232521101",
+            "source_family": "bls_ces",
+            "signal_type": "employment_count",
+        },
+    )
+    assert match.status_code == 200
+    assert match.json()["count"] == 1
+    assert match.json()["registry"][0]["series_id"] == "CES3232521101"
+
+    family_mismatch = client.get(
+        "/v1/context/momentum",
+        params={"series_id": "CES3232521101", "source_family": "fed_g17"},
+    )
+    assert family_mismatch.status_code == 400
+
+    unknown = client.get("/v1/context/momentum", params={"series_id": "UNKNOWN-SERIES"})
+    assert unknown.status_code == 200
+    assert unknown.json()["count"] == 0
+    assert unknown.json()["registry"] == []
+
+
 def test_malformed_code_and_mismatched_series_are_stable_errors() -> None:
     assert client.get("/v1/context/momentum/32521").status_code == 422
     mismatch = client.get(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -117,3 +118,39 @@ def test_scenario_run_and_reset_cycle() -> None:
 
     infos = [info.value for info in app.info]
     assert any("Idle scenario state" in message for message in infos)
+
+
+def test_momentum_manual_browse_and_history_window_do_not_mutate_annual_state() -> None:
+    app = _load_app()
+    annual_before = app.session_state["industry_selection_code"]
+    annual_select = next(item for item in app.selectbox if item.label == "Select an industry")
+    annual_select_value = annual_select.value
+
+    momentum_browse = next(
+        item for item in app.selectbox if item.label == "Browse verified Industry Momentum mappings"
+    )
+    momentum_browse.set_value("325211").run(timeout=60)
+    assert app.session_state["industry_selection_code"] == annual_before
+    assert (
+        next(item for item in app.selectbox if item.label == "Select an industry").value
+        == annual_select_value
+    )
+
+    next(
+        item
+        for item in app.checkbox
+        if item.label == "Use a custom Industry Momentum history window"
+    ).check().run(timeout=60)
+    next(item for item in app.date_input if item.label == "History start month").set_value(
+        date(2025, 1, 17)
+    ).run(timeout=60)
+    next(item for item in app.date_input if item.label == "History end month").set_value(
+        date(2025, 2, 28)
+    ).run(timeout=60)
+
+    assert not app.exception
+    assert app.session_state["industry_selection_code"] == annual_before
+    assert (
+        next(item for item in app.selectbox if item.label == "Select an industry").value
+        == annual_select_value
+    )

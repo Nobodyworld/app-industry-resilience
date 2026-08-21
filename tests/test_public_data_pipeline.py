@@ -423,5 +423,26 @@ def test_g17_normalization_backfill_listener_and_complete_fingerprint(tmp_path) 
 def test_latest_series_fingerprint_requires_full_registry() -> None:
     cleaned = _normalise_bls_ces(_ces_payload())
     incomplete = cleaned.iloc[1:].copy()
-    with pytest.raises(PublicDataPipelineError, match="every reviewed series"):
+    with pytest.raises(PublicDataPipelineError, match="every registered series"):
         _latest_series_fingerprint(incomplete, (entry.series_id for entry in BLS_CES_SERIES))
+
+
+def test_g17_incomplete_registry_diagnostic_is_provider_neutral_and_revisions_register() -> None:
+    baseline = _normalise_fed_g17(_g17_payloads())
+    expected = tuple(entry.series_id for entry in FED_G17_SERIES)
+    missing_series = FED_G17_SERIES[-1].series_id
+    incomplete = baseline[baseline["series_id"] != missing_series].copy()
+
+    with pytest.raises(PublicDataPipelineError) as error:
+        _latest_series_fingerprint(incomplete, expected)
+
+    assert str(error.value) == "Cleaned observations must contain every registered series."
+    assert "bls" not in str(error.value).lower()
+
+    changed_series = next(
+        entry.series_id for entry in FED_G17_SERIES if entry.series_id != missing_series
+    )
+    revised = _normalise_fed_g17(_g17_payloads(changed_series=changed_series))
+    assert _latest_series_fingerprint(revised, expected) != _latest_series_fingerprint(
+        baseline, expected
+    )

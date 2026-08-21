@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import date
 
 import pandas as pd
 import plotly.express as px
@@ -95,7 +96,43 @@ def render_industry_momentum(
             "annual industry and does not change any annual calculation."
         )
 
-    result = service.for_industry_code(active_code)
+    history_start: date | None = None
+    history_end: date | None = None
+    if st.checkbox(
+        "Use a custom Industry Momentum history window",
+        help=(
+            "Optionally limit only the contextual monthly display and signal-only downloads. "
+            "Annual analysis, comparisons, Scenario Lab, scores, bands, and lineage stay unchanged."
+        ),
+        key="industry_momentum_custom_history_window",
+    ):
+        default_start, default_end = _history_window_defaults(service)
+        start_col, end_col = st.columns(2)
+        with start_col:
+            selected_start = st.date_input(
+                "History start month",
+                value=default_start,
+                help="The selected date is normalized to the first day of its month.",
+                key="industry_momentum_history_start",
+            )
+        with end_col:
+            selected_end = st.date_input(
+                "History end month",
+                value=default_end,
+                help="The selected date is normalized to the first day of its month.",
+                key="industry_momentum_history_end",
+            )
+        history_start = selected_start.replace(day=1)
+        history_end = selected_end.replace(day=1)
+        if history_start > history_end:
+            st.error("History start month must be on or before history end month.")
+            return
+        st.caption(
+            f"Custom history window: {history_start:%Y-%m} through {history_end:%Y-%m}. "
+            "Only the contextual display and signal-only downloads use this range."
+        )
+
+    result = service.for_industry_code(active_code, start=history_start, end=history_end)
     _render_overall_state(result)
     prices_tab, employment_tab, production_tab = st.tabs(
         ["Prices", "Employment", "Production & Capacity"]
@@ -295,6 +332,24 @@ def _mapping_label(service: IndustryMomentumService, code: str) -> str:
     mappings = service.registry.for_industry(code)
     labels = sorted({entry.registry_label for entry in mappings})
     return f"{code} — {'; '.join(labels[:2])}"
+
+
+def _history_window_defaults(service: IndustryMomentumService) -> tuple[date, date]:
+    summaries = service.availability_summary().values()
+    starts = [
+        date.fromisoformat(str(summary["observation_start"]))
+        for summary in summaries
+        if summary["observation_start"] is not None
+    ]
+    ends = [
+        date.fromisoformat(str(summary["observation_end"]))
+        for summary in summaries
+        if summary["observation_end"] is not None
+    ]
+    if not starts or not ends:
+        fallback = date(2024, 1, 1)
+        return fallback, fallback
+    return min(starts).replace(day=1), max(ends).replace(day=1)
 
 
 def _change_text(change: IndustryMomentumChange) -> str:

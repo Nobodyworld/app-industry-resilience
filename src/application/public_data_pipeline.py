@@ -963,9 +963,7 @@ def _latest_series_fingerprint(cleaned: pd.DataFrame, expected_series_ids: Itera
     expected_series = sorted(expected_series_ids)
     present_series = sorted(str(value) for value in cleaned["series_id"].unique())
     if present_series != expected_series:
-        raise PublicDataPipelineError(
-            "BLS cleaned observations must contain every reviewed series."
-        )
+        raise PublicDataPipelineError("Cleaned observations must contain every registered series.")
     latest_rows = (
         cleaned.sort_values(["series_id", "observation_date"])
         .groupby("series_id", sort=True, as_index=False)
@@ -974,7 +972,7 @@ def _latest_series_fingerprint(cleaned: pd.DataFrame, expected_series_ids: Itera
     )
     if len(latest_rows) != len(expected_series):
         raise PublicDataPipelineError(
-            "BLS cleaned observations must contain one latest row per reviewed series."
+            "Cleaned observations must contain one latest row per registered series."
         )
     series_payload = [
         {
