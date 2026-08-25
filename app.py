@@ -21,6 +21,7 @@ from streamlit.runtime.uploaded_file_manager import UploadedFile
 from src.adapters.aies import attach_aies_snapshot_lineage
 from src.application import (
     DataSource,
+    IndustryMomentumService,
     IndustryPulseService,
     NormalizationOptions,
     ScenarioAdjustment,
@@ -62,7 +63,7 @@ from src.interfaces.streamlit.helpers import (
     prepare_trend_data,
     summarise_scenario_deltas,
 )
-from src.interfaces.streamlit.industry_pulse import render_industry_pulse
+from src.interfaces.streamlit.industry_momentum import render_industry_momentum
 from src.interfaces.streamlit.provenance import attach_uploaded_file_lineage
 
 
@@ -185,6 +186,13 @@ try:
 except Exception as exc:  # pragma: no cover - runtime snapshot safeguard
     INDUSTRY_PULSE_SERVICE = None
     INDUSTRY_PULSE_LOAD_ERROR = exc.__class__.__name__
+
+try:
+    INDUSTRY_MOMENTUM_SERVICE: IndustryMomentumService | None = IndustryMomentumService()
+    INDUSTRY_MOMENTUM_LOAD_ERROR: str | None = None
+except Exception as exc:  # pragma: no cover - runtime snapshot safeguard
+    INDUSTRY_MOMENTUM_SERVICE = None
+    INDUSTRY_MOMENTUM_LOAD_ERROR = exc.__class__.__name__
 
 try:
     bootstrap_state = get_bootstrap_state()
@@ -505,8 +513,10 @@ def _format_overview_table(frame: pd.DataFrame) -> pd.DataFrame:
     return table
 
 
-tabs = ["Overview", "Explore", "Compare", "Scenario Lab", "Industry Pulse"]
-overview_tab, explore_tab, compare_tab, scenario_tab, industry_pulse_tab = render_insight_tabs(tabs)
+tabs = ["Overview", "Explore", "Compare", "Scenario Lab", "Industry Momentum"]
+overview_tab, explore_tab, compare_tab, scenario_tab, industry_momentum_tab = render_insight_tabs(
+    tabs
+)
 
 code_lookup = dict(zip(df_filtered["industry_code"], df_filtered["industry_name"], strict=False))
 choices: Sequence[str] = list(dict.fromkeys(df_filtered["industry_code"]))
@@ -871,12 +881,12 @@ with scenario_tab:
             "Idle scenario state. Select an industry target if useful, set at least one non-zero adjustment, and click Run scenario."
         )
 
-with industry_pulse_tab:
-    render_industry_pulse(
+with industry_momentum_tab:
+    render_industry_momentum(
         selected_industry_code=selected_code,
         comparison_codes=comparison_selection,
-        service=INDUSTRY_PULSE_SERVICE,
-        load_error=INDUSTRY_PULSE_LOAD_ERROR,
+        service=INDUSTRY_MOMENTUM_SERVICE,
+        load_error=INDUSTRY_MOMENTUM_LOAD_ERROR,
     )
 
 with st.expander("Technical diagnostics", expanded=False):

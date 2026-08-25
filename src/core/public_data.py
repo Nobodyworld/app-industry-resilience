@@ -495,7 +495,18 @@ DEFAULT_PUBLIC_DATASETS: tuple[DatasetDefinition, ...] = (
         historical_coverage="Monthly public BLS time series within no-key API limits",
         canonical_schema=SIGNAL_SCHEMA,
         canonical_field_mappings=SIGNAL_FIELD_MAPPINGS,
+        implementation_status=ImplementationStatus(
+            cataloged=True,
+            endpoint_verified=True,
+            adapter_implemented=True,
+            backfill_validated=True,
+            listener_validated=True,
+        ),
         release_monitor="https://www.bls.gov/ces/",
+        steward_notes=(
+            "Eight reviewed employment series; broader published mappings remain explicit.",
+            "Backfill and listener fingerprints include every registered series.",
+        ),
     ),
     DatasetDefinition(
         dataset_id="fed_g17_monthly",
@@ -510,7 +521,18 @@ DEFAULT_PUBLIC_DATASETS: tuple[DatasetDefinition, ...] = (
         historical_coverage="Monthly G.17 releases and downloadable public tables",
         canonical_schema=SIGNAL_SCHEMA,
         canonical_field_mappings=SIGNAL_FIELD_MAPPINGS,
+        implementation_status=ImplementationStatus(
+            cataloged=True,
+            endpoint_verified=True,
+            adapter_implemented=True,
+            backfill_validated=True,
+            listener_validated=True,
+        ),
         release_monitor="https://www.federalreserve.gov/releases/g17/",
+        steward_notes=(
+            "Uses official seasonally adjusted production, capacity, and utilization files.",
+            "Annual revisions require full registered-series fingerprint review.",
+        ),
     ),
     DatasetDefinition(
         dataset_id="gdelt_events_daily",

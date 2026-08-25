@@ -1,5 +1,17 @@
 # Changelog
 
+# 2026-08-10 – v0.4.0 Industry Momentum implementation candidate
+
+- Expanded the released PPI context into a 38-series typed registry: eight PPI, eight CES
+  employment, and 22 Federal Reserve G.17 production/capacity/utilization mappings.
+- Added deterministic January 2024 snapshots, exact-calendar percent/percentage-point changes,
+  family-specific degradation/provenance, canonical `/v1/context/momentum*` routes, and separate
+  CSV/JSON/five-sheet XLSX exports.
+- Renamed the fifth tab to Industry Momentum with Prices, Employment, and Production & Capacity
+  sections while keeping signals observational and outside annual analytics.
+- Package version remains `0.3.0`; this entry records an unreleased draft workstream, not a tag or
+  publication.
+
 # 2026-08-01 – v0.3.0 Public Beta final candidate
 - Accepted the release-owner GO for final candidate preparation and aligned the package,
   Commitizen, fallback, and outbound snapshot-generator identities at `0.3.0`.

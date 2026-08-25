@@ -116,6 +116,27 @@ Malformed codes, dates, non-month dates, or result limits return `422`. Reversed
 mismatched `series_id` return `400`. Valid unmapped and empty-range requests return `200`.
 There is no `/context/signals` alias and no `/v2` route.
 
+### `GET /v1/context/momentum`
+
+Lists all 38 verified PPI/CES/G.17 mappings, source-family availability, latest committed snapshot
+summaries, and interpretation limits. Optional `source_family`, `signal_type`, and `series_id`
+filters narrow registry rows; `start`, `end`, and `limit` use the same bounded validation contract
+as Industry Pulse. This route has no unversioned or `/v2` alias.
+
+### `GET /v1/context/momentum/{industry_code}`
+
+Returns `available`, `partial`, `unmapped`, or `empty_range` with per-family histories, latest
+observations, exact-calendar MoM/YoY values and methods, freshness, observation/release ranges,
+allowlisted provenance, and limitations. A broader published scope is never called an exact
+six-digit match. One failed family yields `partial`; every requested mapped family failed yields a
+stable path-free `503`.
+
+```bash
+curl "http://localhost:9000/v1/context/momentum/325211?source_family=fed_g17&limit=24"
+```
+
+Requests read committed snapshots only. They do not call BLS or the Federal Reserve.
+
 ### `POST /v1/evaluate`
 
 Compute Idiot Index metrics for a given year. Provide either a `source` (which will use configured API keys) or `records` containing inline data. Inline datasets must include at least `industry_code`, `industry_name`, `year`, and `gross_output` columns.

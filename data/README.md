@@ -27,4 +27,17 @@ python src/scripts/generate_industry_pulse_snapshot.py --start-year 2024 --end-y
 The generator uses no credential or registration key. Dashboard rendering, API requests, and
 tests never call BLS. Do not hand-edit the snapshot or commit the large raw provider response.
 
+`industry_momentum_bls_ces_snapshot.csv` contains 240 observations for eight reviewed employment
+series from January 2024 through June 2026. Its metadata hash is
+`4115607936cf15d80ecbb0f3924dc8611527d150fd7b106733b2c06389904de6`.
+
+`industry_momentum_fed_g17_snapshot.csv` contains 616 observations for 22 reviewed production,
+capacity, and utilization series from January 2024 through the latest complete month common to
+all registered series, April 2026. Its metadata hash is
+`d29a2b31edb86a0353cfc04e77503411aacf523c95cbb653b3cbaed5de9ee954`.
+
+The adjacent metadata files carry official URLs, retrieval time, complete series registries,
+ranges, hashes, generator identity, transformations, and revision notes. Requests and UI rendering
+use these committed files only and never call providers.
+
 Do not commit other production datasets here. Large or sensitive data should remain in external storage.

@@ -23,7 +23,7 @@ def _component_app(body: str) -> AppTest:
     return app
 
 
-def test_default_dashboard_has_fifth_pulse_tab_and_manual_browse_state(
+def test_default_dashboard_has_fifth_momentum_tab_and_manual_browse_state(
     _run_from_repository_root: None,
 ) -> None:
     app = AppTest.from_file(_APP_PATH)
@@ -35,17 +35,19 @@ def test_default_dashboard_has_fifth_pulse_tab_and_manual_browse_state(
         "Explore",
         "Compare",
         "Scenario Lab",
-        "Industry Pulse",
+        "Industry Momentum",
+        "Prices",
+        "Employment",
+        "Production & Capacity",
     ]
-    assert any(select.label == "Browse verified signals" for select in app.selectbox)
-    assert any("No verified exact six-digit" in warning.value for warning in app.warning)
-    assert any("Manual browse state" in info.value for info in app.info)
-    assert any(metric.label == "Latest PPI value" for metric in app.metric)
-    assert len(app.get("plotly_chart")) >= 1
     assert any(
-        "Producer Price Index observations show price movement" in warning.value
-        for warning in app.warning
+        select.label == "Browse verified Industry Momentum mappings" for select in app.selectbox
     )
+    assert any("No verified Industry Momentum mapping" in warning.value for warning in app.warning)
+    assert any("Manual browse state" in info.value for info in app.info)
+    assert any(metric.label == "Latest value" for metric in app.metric)
+    assert len(app.get("plotly_chart")) >= 1
+    assert any("contextual official observations" in warning.value for warning in app.warning)
 
 
 def test_exact_mapping_state_is_synchronized_and_has_chart_table_and_exports() -> None:

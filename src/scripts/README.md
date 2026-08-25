@@ -19,4 +19,15 @@ Scripts in this directory provide developer automation and operational helpers. 
   The committed snapshot is the UI/API/test path. Running this operator command is the only
   live refresh path for the product slice.
 
+- `generate_industry_momentum_ces_snapshot.py` requests only the eight reviewed CES employment
+  series from the official keyless BLS API and writes/validates the deterministic CES snapshot.
+- `generate_industry_momentum_g17_snapshot.py` downloads only official Federal Reserve G.17
+  `ip_sa.txt`, `cap_sa.txt`, and `utl_sa.txt`, keeps the 22 registered series, and writes/validates
+  the deterministic common-complete-month snapshot.
+
+```bash
+python src/scripts/generate_industry_momentum_ces_snapshot.py --validate-only
+python src/scripts/generate_industry_momentum_g17_snapshot.py --validate-only
+```
+
 All scripts self-bootstrap the repository root onto `PYTHONPATH` so they can be executed directly via `python src/scripts/<name>.py`.

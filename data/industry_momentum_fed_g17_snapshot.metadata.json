@@ -1,0 +1,61 @@
+{
+  "csv_sha256": "d29a2b31edb86a0353cfc04e77503411aacf523c95cbb653b3cbaed5de9ee954",
+  "dataset_id": "fed_g17_monthly",
+  "generator_command": "python src/scripts/generate_industry_momentum_g17_snapshot.py",
+  "generator_version": "industry-momentum-g17-generator-v1",
+  "interpretation_notes": [
+    "Producer prices, employment, production, capacity, and utilization are contextual official observations. They do not prove profitability, resilience, distress, insolvency, or causation and do not enter annual dashboard calculations."
+  ],
+  "latest_release_period": "2026-04",
+  "manifest_identity": "industry-momentum-g17-2024-01-2026-04-d29a2b31edb86a03",
+  "observation_range": {
+    "end": "2026-04-01",
+    "start": "2024-01-01"
+  },
+  "official_endpoints": [
+    "https://www.federalreserve.gov/releases/g17/Current/ipdisk/cap_sa.txt",
+    "https://www.federalreserve.gov/releases/g17/Current/ipdisk/ip_sa.txt",
+    "https://www.federalreserve.gov/releases/g17/Current/ipdisk/utl_sa.txt"
+  ],
+  "registry_version": "industry-momentum-registry-v1",
+  "requested_series": [
+    "CAP.G311A2.S",
+    "CAP.G322.S",
+    "CAP.G325.S",
+    "CAP.G326.S",
+    "CAP.G331.S",
+    "CAP.G334.S",
+    "CAP.G3361T3.S",
+    "CAPUTL.G311A2.S",
+    "CAPUTL.G322.S",
+    "CAPUTL.G325.S",
+    "CAPUTL.G326.S",
+    "CAPUTL.G331.S",
+    "CAPUTL.G334.S",
+    "CAPUTL.G3361T3.S",
+    "IP.G3111.S",
+    "IP.G32212.S",
+    "IP.G3261.S",
+    "IP.G3311A2.S",
+    "IP.G3341.S",
+    "IP.G33611.S",
+    "IP.N31212.S",
+    "IP.N325211.S"
+  ],
+  "retrieved_at": "2026-08-10T23:24:57.993185Z",
+  "revision_notes": [
+    "G.17 series are revised and codes may change during annual revisions; validate each refresh.",
+    "The reviewed current files reflect the November 24, 2025 annual revision structure."
+  ],
+  "row_count": 616,
+  "schema_version": "industry-momentum-snapshot-v1",
+  "series_count": 22,
+  "transformations": [
+    "downloaded official seasonally adjusted G.17 production, capacity, and utilization files",
+    "kept only registered source codes",
+    "excluded missing and non-monthly values",
+    "normalized observations to first-of-month dates",
+    "bounded all series to their latest common complete month",
+    "sorted by source family, series ID, and observation date"
+  ]
+}

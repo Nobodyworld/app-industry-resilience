@@ -26,6 +26,7 @@ from src.core import (
     lineage_from_dataframe,
     lineage_to_dict,
 )
+from src.core.industry_momentum import IndustryMomentumResult
 from src.infrastructure.observability.storage import ObservabilitySnapshot
 
 
@@ -274,6 +275,119 @@ class IndustryPulseListResponse(BaseModel):
 
     count: int
     signals: list[IndustryPulseResponse] = Field(default_factory=list)
+
+
+class IndustryMomentumMappingModel(BaseModel):
+    source_family: Literal["bls_ppi", "bls_ces", "fed_g17"]
+    signal_type: str
+    series_id: str
+    published_industry_code: str
+    target_industry_code: str
+    mapping_relationship: Literal["exact", "broader_published", "manual_only"]
+    mapping_level: str
+    registry_label: str
+    official_title: str
+    units: str
+    change_method: Literal["percent_change", "percentage_point_change"]
+    seasonal_adjustment: str
+    base_period: str | None
+    source_url: str
+    source_table: str
+    mapping_basis: str
+    historical_coverage: str
+    steward_notes: list[str] = Field(default_factory=list)
+
+
+class IndustryMomentumObservationModel(BaseModel):
+    source_family: Literal["bls_ppi", "bls_ces", "fed_g17"]
+    signal_type: str
+    series_id: str
+    published_industry_code: str
+    target_industry_code: str
+    mapping_relationship: Literal["exact", "broader_published", "manual_only"]
+    observation_date: date
+    value: float
+    units: str
+    seasonal_adjustment: str
+    base_period: str | None
+    release_period: str
+    source: str
+
+
+class IndustryMomentumChangeModel(BaseModel):
+    value: float | None
+    method: Literal["percent_change", "percentage_point_change"]
+    units: str
+    latest_period: str | None
+    comparison_period: str | None
+    unavailable_reason: str | None
+
+
+class IndustryMomentumFreshnessModel(BaseModel):
+    state: Literal["current", "stale", "unknown"]
+    as_of: date
+    latest_observation_date: date | None
+    age_days: int | None
+    threshold_days: int
+
+
+class IndustryMomentumProvenanceModel(BaseModel):
+    dataset_id: str
+    provider: str
+    source_url: str
+    retrieval_mode: Literal["offline_reviewed_snapshot"]
+    retrieved_at: datetime
+    snapshot_sha256: str
+    manifest_identity: str
+    registry_version: str
+    schema_version: str
+    observation_start: date
+    observation_end: date
+    transformations: list[str] = Field(default_factory=list)
+
+
+class IndustryMomentumSignalHistoryModel(BaseModel):
+    availability: Literal["available", "partial", "unmapped", "empty_range", "unavailable"]
+    mapping: IndustryMomentumMappingModel
+    latest_observation: IndustryMomentumObservationModel | None
+    month_over_month: IndustryMomentumChangeModel
+    year_over_year: IndustryMomentumChangeModel
+    freshness: IndustryMomentumFreshnessModel
+    observation_range: IndustryPulseObservationRangeModel
+    observations: list[IndustryMomentumObservationModel] = Field(default_factory=list)
+    release_period: str | None
+    provenance: IndustryMomentumProvenanceModel | None
+    limitations: list[str] = Field(default_factory=list)
+
+
+class IndustryMomentumFamilyModel(BaseModel):
+    source_family: Literal["bls_ppi", "bls_ces", "fed_g17"]
+    availability: Literal["available", "partial", "unmapped", "empty_range", "unavailable"]
+    histories: list[IndustryMomentumSignalHistoryModel] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+
+class IndustryMomentumResponse(BaseModel):
+    """Typed canonical v1 multi-source context envelope."""
+
+    industry_code: str
+    availability: Literal["available", "partial", "unmapped", "empty_range", "unavailable"]
+    mapping_relationship: Literal["exact", "broader_published", "manual_only"] | None
+    families: list[IndustryMomentumFamilyModel] = Field(default_factory=list)
+    requested_filters: dict[str, Any] = Field(default_factory=dict)
+    limitations: list[str] = Field(default_factory=list)
+
+    @classmethod
+    def from_result(cls, result: IndustryMomentumResult) -> IndustryMomentumResponse:
+        return cls(**result.to_dict())
+
+
+class IndustryMomentumListResponse(BaseModel):
+    count: int
+    registry: list[IndustryMomentumMappingModel] = Field(default_factory=list)
+    source_family_availability: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    latest_snapshot_summaries: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    limitations: list[str] = Field(default_factory=list)
 
 
 class ConnectorHealthModel(BaseModel):
