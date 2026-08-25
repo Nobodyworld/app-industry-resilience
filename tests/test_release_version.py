@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 from src.scripts import (
-    generate_industry_momentum_ces_snapshot,
-    generate_industry_momentum_g17_snapshot,
-    generate_industry_pulse_snapshot,
+    generate_industry_momentum_ces_snapshot as ces_generator,
+    generate_industry_momentum_g17_snapshot as g17_generator,
+    generate_industry_pulse_snapshot as ppi_generator,
 )
 
 EXPECTED_VERSION = "0.4.0"
@@ -44,7 +44,7 @@ def test_authoritative_release_versions_are_aligned() -> None:
     assert len({project_version, commitizen_version, fallback_version}) == 1
 
 
-def test_industry_pulse_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None:
+def test_ppi_generator_user_agent_uses_version(monkeypatch) -> None:
     request: dict[str, Any] = {}
 
     class Response:
@@ -59,17 +59,17 @@ def test_industry_pulse_snapshot_user_agent_uses_the_canonical_version(monkeypat
         request.update(kwargs)
         return Response()
 
-    monkeypatch.setattr(generate_industry_pulse_snapshot, "__version__", EXPECTED_VERSION)
-    monkeypatch.setattr(generate_industry_pulse_snapshot.requests, "post", fake_post)
+    monkeypatch.setattr(ppi_generator, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(ppi_generator.requests, "post", fake_post)
 
-    generate_industry_pulse_snapshot._request_bls(2024, 2026)
+    ppi_generator._request_bls(2024, 2026)
 
     assert request["headers"] == {
         "User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION} (+offline-snapshot)"
     }
 
 
-def test_ces_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None:
+def test_ces_generator_user_agent_uses_version(monkeypatch) -> None:
     request: dict[str, Any] = {}
 
     class Response:
@@ -84,25 +84,16 @@ def test_ces_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None
         request.update(kwargs)
         return Response()
 
-    monkeypatch.setattr(
-        generate_industry_momentum_ces_snapshot,
-        "__version__",
-        EXPECTED_VERSION,
-    )
-    monkeypatch.setattr(
-        generate_industry_momentum_ces_snapshot.requests,
-        "post",
-        fake_post,
-    )
+    monkeypatch.setattr(ces_generator, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(ces_generator.requests, "post", fake_post)
 
-    generate_industry_momentum_ces_snapshot.fetch_payload(start_year=2024, end_year=2026)
+    ces_generator.fetch_payload(start_year=2024, end_year=2026)
 
-    assert request["headers"] == {
-        "User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"
-    }
+    expected = {"User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"}
+    assert request["headers"] == expected
 
 
-def test_g17_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None:
+def test_g17_generator_user_agent_uses_version(monkeypatch) -> None:
     requests_made: list[tuple[str, dict[str, Any]]] = []
 
     class Response:
@@ -115,24 +106,12 @@ def test_g17_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None
         requests_made.append((url, kwargs))
         return Response()
 
-    monkeypatch.setattr(
-        generate_industry_momentum_g17_snapshot,
-        "__version__",
-        EXPECTED_VERSION,
-    )
-    monkeypatch.setattr(
-        generate_industry_momentum_g17_snapshot.requests,
-        "get",
-        fake_get,
-    )
+    monkeypatch.setattr(g17_generator, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(g17_generator.requests, "get", fake_get)
 
-    payloads = generate_industry_momentum_g17_snapshot.fetch_files()
+    payloads = g17_generator.fetch_files()
 
-    expected_files = generate_industry_momentum_g17_snapshot.G17_FILES
-    assert set(payloads) == set(expected_files)
-    assert len(requests_made) == len(expected_files)
-    assert all(
-        request["headers"]
-        == {"User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"}
-        for _, request in requests_made
-    )
+    assert set(payloads) == set(g17_generator.G17_FILES)
+    assert len(requests_made) == len(g17_generator.G17_FILES)
+    expected = {"User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"}
+    assert all(request["headers"] == expected for _, request in requests_made)
