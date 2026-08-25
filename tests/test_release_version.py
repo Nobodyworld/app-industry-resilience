@@ -5,11 +5,9 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from src.scripts import (
-    generate_industry_momentum_ces_snapshot as ces_generator,
-    generate_industry_momentum_g17_snapshot as g17_generator,
-    generate_industry_pulse_snapshot as ppi_generator,
-)
+import src.scripts.generate_industry_momentum_ces_snapshot as ces_generator
+import src.scripts.generate_industry_momentum_g17_snapshot as g17_generator
+import src.scripts.generate_industry_pulse_snapshot as ppi_generator
 
 EXPECTED_VERSION = "0.4.0"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
