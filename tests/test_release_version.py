@@ -5,9 +5,13 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from src.scripts import generate_industry_pulse_snapshot
+from src.scripts import (
+    generate_industry_momentum_ces_snapshot,
+    generate_industry_momentum_g17_snapshot,
+    generate_industry_pulse_snapshot,
+)
 
-EXPECTED_VERSION = "0.3.0"
+EXPECTED_VERSION = "0.4.0"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -40,7 +44,7 @@ def test_authoritative_release_versions_are_aligned() -> None:
     assert len({project_version, commitizen_version, fallback_version}) == 1
 
 
-def test_snapshot_generator_user_agent_uses_the_canonical_version(monkeypatch) -> None:
+def test_industry_pulse_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None:
     request: dict[str, Any] = {}
 
     class Response:
@@ -63,3 +67,55 @@ def test_snapshot_generator_user_agent_uses_the_canonical_version(monkeypatch) -
     assert request["headers"] == {
         "User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION} (+offline-snapshot)"
     }
+
+
+def test_ces_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None:
+    request: dict[str, Any] = {}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return {"status": "REQUEST_SUCCEEDED"}
+
+    def fake_post(url: str, **kwargs: Any) -> Response:
+        request["url"] = url
+        request.update(kwargs)
+        return Response()
+
+    monkeypatch.setattr(generate_industry_momentum_ces_snapshot, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(generate_industry_momentum_ces_snapshot.requests, "post", fake_post)
+
+    generate_industry_momentum_ces_snapshot.fetch_payload(start_year=2024, end_year=2026)
+
+    assert request["headers"] == {
+        "User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"
+    }
+
+
+def test_g17_snapshot_user_agent_uses_the_canonical_version(monkeypatch) -> None:
+    requests_made: list[tuple[str, dict[str, Any]]] = []
+
+    class Response:
+        text = ""
+
+        def raise_for_status(self) -> None:
+            return None
+
+    def fake_get(url: str, **kwargs: Any) -> Response:
+        requests_made.append((url, kwargs))
+        return Response()
+
+    monkeypatch.setattr(generate_industry_momentum_g17_snapshot, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(generate_industry_momentum_g17_snapshot.requests, "get", fake_get)
+
+    payloads = generate_industry_momentum_g17_snapshot.fetch_files()
+
+    assert set(payloads) == set(generate_industry_momentum_g17_snapshot.G17_FILES)
+    assert len(requests_made) == len(generate_industry_momentum_g17_snapshot.G17_FILES)
+    assert all(
+        request["headers"]
+        == {"User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"}
+        for _, request in requests_made
+    )
