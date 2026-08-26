@@ -1,10 +1,12 @@
 # U.S. Industry Cost Structure & Resilience Dashboard
 
-> **Status: v0.3.0 PUBLIC BETA** — Industry Pulse is published as the `v0.3.0` GitHub prerelease after exact-head CI, Docker validation, and Windows/Microsoft Edge acceptance. The analytical metrics remain experimental and should not be treated as financial, investment, credit, or policy advice.
+> **Published release: v0.3.0 PUBLIC BETA — Industry Pulse.** The analytical metrics remain experimental and should not be treated as financial, investment, credit, or policy advice.
 
-The draft `v0.4.0 Industry Momentum` workstream adds reviewed BLS CES employment and Federal
-Reserve G.17 production, capacity, and utilization context. It does not change the published
-package version or Public Beta status and is not yet a release.
+Current `main` includes the Industry Momentum implementation merged through
+[PR #130](https://github.com/Nobodyworld/app-industry-resilience/pull/130). The active
+`release/v0.4.0` candidate reports package version `0.4.0` and is tracked in draft
+[PR #132](https://github.com/Nobodyworld/app-industry-resilience/pull/132), but it is not
+published: no `v0.4.0` tag or GitHub release exists.
 
 Published `v0.3.0` evidence is tracked in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113), the [`v0.3.0` execution plan](docs/execplans/v0.3.0-industry-pulse.md), the [`v0.3.0` release notes](docs/RELEASE_NOTES_V0.3.0.md), and the [publication parity record](docs/execplans/v0.3.0-publication-record.md). The GitHub release is available at [`v0.3.0 Public Beta — Industry Pulse`](https://github.com/Nobodyworld/app-industry-resilience/releases/tag/v0.3.0).
 
@@ -228,6 +230,9 @@ GitHub Actions policy: hosted CI is required for current pull requests and relea
 
 ## Documentation
 
+- [v0.4.0 release notes](docs/RELEASE_NOTES_V0.4.0.md)
+- [v0.4.0 Industry Momentum implementation history](docs/execplans/v0.4.0-industry-momentum.md)
+- [v0.4.0 release-candidate preparation](docs/execplans/v0.4.0-release-preparation.md)
 - [v0.3.0 Industry Pulse validation and acceptance](docs/execplans/v0.3.0-industry-pulse.md)
 - [v0.3.0 Public Beta release notes](docs/RELEASE_NOTES_V0.3.0.md)
 - [v0.3.0 publication parity record](docs/execplans/v0.3.0-publication-record.md)

@@ -32,7 +32,7 @@ Returns service metadata, component-level health status, and a trace identifier 
 {
   "status": "warn",
   "service": "idiot-index-api",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "checked_at": "2025-10-25T03:45:12.456789+00:00",
   "trace_id": "1f3e8b7157c448c1aaeb87b7e0e1d2b6",
   "components": [

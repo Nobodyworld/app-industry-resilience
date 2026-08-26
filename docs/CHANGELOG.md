@@ -1,7 +1,10 @@
 # Changelog
 
-# 2026-08-10 – v0.4.0 Industry Momentum implementation candidate
+# Unreleased — v0.4.0 Public Beta release candidate
 
+- Industry Momentum was completed at feature head
+  `e3fea89db624414fe3cad7980768f0265cf9570a` in PR #130 and squash-merged into `main` as signed
+  commit `f99abbf42c898f0fe4a7494f09b4aae13bed5c40`.
 - Expanded the released PPI context into a 38-series typed registry: eight PPI, eight CES
   employment, and 22 Federal Reserve G.17 production/capacity/utilization mappings.
 - Added deterministic January 2024 snapshots, exact-calendar percent/percentage-point changes,
@@ -9,8 +12,10 @@
   CSV/JSON/five-sheet XLSX exports.
 - Renamed the fifth tab to Industry Momentum with Prices, Employment, and Production & Capacity
   sections while keeping signals observational and outside annual analytics.
-- Package version remains `0.3.0`; this entry records an unreleased draft workstream, not a tag or
-  publication.
+- The `release/v0.4.0` branch aligns the package, Commitizen, fallback, tests, API, OpenAPI, and
+  snapshot-generator identities at `0.4.0` in draft PR #132.
+- The release candidate remains draft and unmerged. No `v0.4.0` tag or GitHub release has been
+  published, and no publication date is assigned.
 
 # 2026-08-01 – v0.3.0 Public Beta final candidate
 - Accepted the release-owner GO for final candidate preparation and aligned the package,

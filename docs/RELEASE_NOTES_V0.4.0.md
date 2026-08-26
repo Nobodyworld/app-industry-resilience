@@ -2,13 +2,15 @@
 
 **Status:** Release candidate preparation — not published<br>
 **Starting main / merged-feature SHA:** `f99abbf42c898f0fe4a7494f09b4aae13bed5c40`<br>
+**Starting release-candidate SHA:** `27d5caeca73ef29382bd9f34c656f69aea66fa6d`<br>
+**Final pushed candidate SHA:** pending exact-head acceptance<br>
 **Release branch:** `release/v0.4.0`<br>
 **Package / Commitizen / fallback version:** `0.4.0` / `0.4.0` / `0.4.0`<br>
 **Planned release tag:** `v0.4.0` — not created<br>
 **GitHub release:** not created<br>
 **Release issue:** [#129](https://github.com/Nobodyworld/app-industry-resilience/issues/129)<br>
 **Implementation pull request:** [#130](https://github.com/Nobodyworld/app-industry-resilience/pull/130)<br>
-**Release pull request:** pending
+**Release pull request:** [#132](https://github.com/Nobodyworld/app-industry-resilience/pull/132) — open, draft, and unmerged at the starting checkpoint
 
 These notes describe the planned `v0.4.0` Public Beta release. The complete Industry Momentum implementation is merged into `main`, but publication remains gated on version-aligned exact-head validation, release-candidate review, explicit merge authorization, an annotated immutable tag, GitHub release publication, and tag/release/fresh-checkout SHA parity.
 
@@ -109,6 +111,11 @@ The merged implementation candidate previously recorded:
 
 Those results are implementation and post-merge baselines. They do not replace final validation of the version-aligned release candidate.
 
+Preliminary release-branch evidence at starting SHA
+`27d5caeca73ef29382bd9f34c656f69aea66fa6d` is also historical after the next commit: CI / Quality
+Gate #328 and Docker Smoke #168 passed, with 460 tests and 87.59% runtime combined coverage. Final
+totals and hosted dispositions will be recorded only for the final pushed candidate.
+
 Before publication, record on the exact final release-candidate head:
 
 - focused release/version tests;
@@ -150,3 +157,4 @@ Publication requires separate explicit owner authorization after the release pul
 - [`docs/execplans/v0.4.0-release-preparation.md`](execplans/v0.4.0-release-preparation.md)
 - [Issue #129](https://github.com/Nobodyworld/app-industry-resilience/issues/129)
 - [Implementation PR #130](https://github.com/Nobodyworld/app-industry-resilience/pull/130)
+- [Release PR #132](https://github.com/Nobodyworld/app-industry-resilience/pull/132)
