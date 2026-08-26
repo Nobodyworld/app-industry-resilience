@@ -3,7 +3,8 @@
 **Status:** Release candidate preparation — not published<br>
 **Starting main / merged-feature SHA:** `f99abbf42c898f0fe4a7494f09b4aae13bed5c40`<br>
 **Starting release-candidate SHA:** `27d5caeca73ef29382bd9f34c656f69aea66fa6d`<br>
-**Final pushed candidate SHA:** pending exact-head acceptance<br>
+**Accepted code-and-doc candidate SHA:** `3afdb891baa681f8b77177434055e257b15e6763`<br>
+**Final pushed evidence-commit SHA:** recorded in PR #132 and the external release report after Git computes the commit identity<br>
 **Release branch:** `release/v0.4.0`<br>
 **Package / Commitizen / fallback version:** `0.4.0` / `0.4.0` / `0.4.0`<br>
 **Planned release tag:** `v0.4.0` — not created<br>
@@ -116,15 +117,26 @@ Preliminary release-branch evidence at starting SHA
 Gate #328 and Docker Smoke #168 passed, with 460 tests and 87.59% runtime combined coverage. Final
 totals and hosted dispositions will be recorded only for the final pushed candidate.
 
-Before publication, record on the exact final release-candidate head:
+Local release-candidate validation on Python 3.13.7 recorded:
 
-- focused release/version tests;
-- complete Python 3.13 quality gate;
-- exact runtime and full-source coverage;
-- Black, Ruff, mypy, benchmark, detect-secrets, pip check, pip-audit, generator validation-only, and `git diff --check` results;
-- API and Streamlit loopback smoke;
-- release-relevant headed Microsoft Edge acceptance, download parsing, console inspection, and network-host inventory;
-- explicit screen-reader disposition;
+- 59 focused release/Momentum tests and 461 complete tests passed;
+- runtime coverage: 91.01% line, 74.49% branch, 87.63% combined (85% gate passed);
+- full-source informational coverage: 86.16% line, 68.51% branch, 83% combined;
+- Black, Ruff, mypy, benchmark, detect-secrets baseline, pip check, pip-audit, CES/G.17
+  validate-only, committed PPI snapshot validation, and `git diff --check` passed;
+- API and Streamlit loopback smoke passed with health/OpenAPI version `0.4.0`, canonical and
+  compatibility routes, stable filter errors, and no observed provider or telemetry log activity;
+- headed Edge passed the five top-level and three Momentum tabs, valid/empty/reversed ranges,
+  keyboard-activated CSV/JSON/five-sheet XLSX exports, partial and total-unavailable states,
+  adjacent accessible tables, visible focus, and selected-tab contrast of 6.57:1 light / 5.72:1
+  dark;
+- native effective 200% zoom and real screen-reader acceptance are NOT RUN on this exact head;
+- GNU Make and local Docker are unavailable, so `make quality-gate` and local Docker Smoke are NOT
+  RUN; the exact Makefile gate constituents were run individually;
+- the only `pip-audit` diagnostic was a non-vulnerability cache-deserialization warning.
+
+Before publication, still record on the exact final release-candidate head:
+
 - hosted CI / Quality Gate and Docker Smoke;
 - exact release-code SHA and GO / CONDITIONAL GO / NO-GO recommendation.
 
