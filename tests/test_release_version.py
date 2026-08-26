@@ -8,6 +8,8 @@ from typing import Any
 import src.scripts.generate_industry_momentum_ces_snapshot as ces_generator
 import src.scripts.generate_industry_momentum_g17_snapshot as g17_generator
 import src.scripts.generate_industry_pulse_snapshot as ppi_generator
+from fastapi_compat.testclient import TestClient
+from src.interfaces.api.app import app
 
 EXPECTED_VERSION = "0.4.0"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +42,18 @@ def test_authoritative_release_versions_are_aligned() -> None:
     assert commitizen_version == EXPECTED_VERSION
     assert fallback_version == EXPECTED_VERSION
     assert len({project_version, commitizen_version, fallback_version}) == 1
+
+
+def test_api_and_openapi_report_release_version() -> None:
+    client = TestClient(app)
+
+    health = client.get("/health")
+    openapi = client.get("/openapi.json")
+
+    assert health.status_code == 200
+    assert health.json()["version"] == EXPECTED_VERSION
+    assert openapi.status_code == 200
+    assert openapi.json()["info"]["version"] == EXPECTED_VERSION
 
 
 def test_ppi_generator_user_agent_uses_version(monkeypatch) -> None:
