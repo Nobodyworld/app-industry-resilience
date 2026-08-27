@@ -1,8 +1,10 @@
 # Industry Momentum Official Source Registry Record
 
 **Status:** Official registry and committed snapshots verified for issue [#129](https://github.com/Nobodyworld/app-industry-resilience/issues/129)
-**Target:** `v0.4.0` Industry Momentum product slice; package version remains `0.3.0` in this pull request  
+**Target:** `v0.4.0` Industry Momentum; implementation merged through PR #130 and the active release candidate reports package version `0.4.0`
 **Starting main:** `4b76841c4a28c8657336de3c2864b8ac070e68fb`
+**Merged implementation:** `f99abbf42c898f0fe4a7494f09b4aae13bed5c40`
+**Publication status:** no `v0.4.0` tag or GitHub release exists
 
 ## Purpose and product boundary
 
@@ -150,3 +152,5 @@ units or different base periods must not be compared directly.
   exclusions, snapshot bounds, hashes, and manifest identities.
 - 2026-08-20: Preserved the released PPI 90-day freshness contract and documented explicit 120-day
   CES and G.17 thresholds; public snapshot degradation remains bounded and path-free.
+- 2026-08-26: Reconciled the source record with the merged PR #130 implementation and the
+  version-aligned, unpublished `release/v0.4.0` candidate.
