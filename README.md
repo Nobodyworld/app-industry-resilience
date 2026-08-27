@@ -1,12 +1,8 @@
 # U.S. Industry Cost Structure & Resilience Dashboard
 
-> **Published release: v0.3.0 PUBLIC BETA — Industry Pulse.** The analytical metrics remain experimental and should not be treated as financial, investment, credit, or policy advice.
+> **Newest published release: [v0.4.0 Public Beta — Industry Momentum](https://github.com/Nobodyworld/app-industry-resilience/releases/tag/v0.4.0).** It is published as a GitHub prerelease / Public Beta at release-code SHA `eec9886c5f0a4ef495b6b31c3c2cc6cdc52e631a`. The analytical metrics and monthly signals remain experimental and contextual; they are not financial, investment, credit, insolvency, causal-forecast, or policy advice.
 
-Current `main` includes the Industry Momentum implementation merged through
-[PR #130](https://github.com/Nobodyworld/app-industry-resilience/pull/130). The active
-`release/v0.4.0` candidate reports package version `0.4.0` and is tracked in draft
-[PR #132](https://github.com/Nobodyworld/app-industry-resilience/pull/132), but it is not
-published: no `v0.4.0` tag or GitHub release exists.
+Industry Momentum was delivered through [PR #130](https://github.com/Nobodyworld/app-industry-resilience/pull/130), prepared for release through [PR #132](https://github.com/Nobodyworld/app-industry-resilience/pull/132), and published from the resulting `main` commit as annotated tag `v0.4.0`. See the [v0.4.0 release notes](docs/RELEASE_NOTES_V0.4.0.md), [Industry Momentum implementation history](docs/execplans/v0.4.0-industry-momentum.md), [release-preparation record](docs/execplans/v0.4.0-release-preparation.md), and [publication record](docs/execplans/v0.4.0-publication-record.md).
 
 Published `v0.3.0` evidence is tracked in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113), the [`v0.3.0` execution plan](docs/execplans/v0.3.0-industry-pulse.md), the [`v0.3.0` release notes](docs/RELEASE_NOTES_V0.3.0.md), and the [publication parity record](docs/execplans/v0.3.0-publication-record.md). The GitHub release is available at [`v0.3.0 Public Beta — Industry Pulse`](https://github.com/Nobodyworld/app-industry-resilience/releases/tag/v0.3.0).
 
@@ -222,7 +218,7 @@ python src/scripts/run_quality_checks.py --fast
 git diff --check
 ```
 
-Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md) and should be run where `pip-audit`, `detect-secrets`, and `pytest-cov` are installed. The `v0.3.0` protected and publication evidence is recorded in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113) and the [publication record](docs/execplans/v0.3.0-publication-record.md).
+Security and coverage gates are documented in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md) and should be run where `pip-audit`, `detect-secrets`, and `pytest-cov` are installed. The newest published evidence is recorded in [issue #129](https://github.com/Nobodyworld/app-industry-resilience/issues/129), the [v0.4.0 release-preparation record](docs/execplans/v0.4.0-release-preparation.md), and the [v0.4.0 publication record](docs/execplans/v0.4.0-publication-record.md). Earlier v0.3.0 evidence remains available in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113) and its [publication record](docs/execplans/v0.3.0-publication-record.md).
 
 Most recent clean-clone totals are recorded in [docs/PUBLIC_RELEASE_VALIDATION.md](docs/PUBLIC_RELEASE_VALIDATION.md). Current hosted evidence should be taken from the relevant pull request or Actions run rather than inferred from historical totals.
 
@@ -232,7 +228,8 @@ GitHub Actions policy: hosted CI is required for current pull requests and relea
 
 - [v0.4.0 release notes](docs/RELEASE_NOTES_V0.4.0.md)
 - [v0.4.0 Industry Momentum implementation history](docs/execplans/v0.4.0-industry-momentum.md)
-- [v0.4.0 release-candidate preparation](docs/execplans/v0.4.0-release-preparation.md)
+- [v0.4.0 release preparation and publication history](docs/execplans/v0.4.0-release-preparation.md)
+- [v0.4.0 publication record](docs/execplans/v0.4.0-publication-record.md)
 - [v0.3.0 Industry Pulse validation and acceptance](docs/execplans/v0.3.0-industry-pulse.md)
 - [v0.3.0 Public Beta release notes](docs/RELEASE_NOTES_V0.3.0.md)
 - [v0.3.0 publication parity record](docs/execplans/v0.3.0-publication-record.md)
@@ -267,7 +264,7 @@ docker run -p 8501:8501 industry-resilience-dashboard
 docker run -e APP_MODE=api -p 9000:9000 industry-resilience-dashboard
 ```
 
-The image uses Python 3.13 and runtime dependencies only. The pinned, least-privilege [Docker Smoke workflow](.github/workflows/docker-smoke.yml) validates the production image, non-root runtime user, Streamlit health, API `/health`, and API `/metrics` on deployment-relevant changes. Published `v0.3.0` Docker evidence is recorded in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113).
+The image uses Python 3.13 and runtime dependencies only. The pinned, least-privilege [Docker Smoke workflow](.github/workflows/docker-smoke.yml) validates the production image, non-root runtime user, Streamlit health, API `/health`, and API `/metrics` on deployment-relevant changes. Published `v0.4.0` Docker evidence is recorded in [issue #129](https://github.com/Nobodyworld/app-industry-resilience/issues/129) and the [publication record](docs/execplans/v0.4.0-publication-record.md); historical v0.3.0 evidence remains in [issue #113](https://github.com/Nobodyworld/app-industry-resilience/issues/113).
 
 ## License
 
