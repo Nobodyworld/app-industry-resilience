@@ -4,48 +4,53 @@ This ExecPlan is a living document. Maintain it in accordance with `.agent/PLANS
 
 ## Purpose / Big Picture
 
-The repository currently has a strong quality gate, but its proposed all-files pre-commit gate is not yet idempotent: hosted CI correctly detects historical whitespace and end-of-file drift and reviewed synthetic privacy/security fixtures. After this work, a contributor can run the literal command `pre-commit run --all-files` from the repository root and receive a clean result twice in succession, while hosted CI enforces the same contract before the existing quality gate. Secret detection must remain strict; only reviewed synthetic fixtures and the deterministic snapshot digest field may receive narrow, auditable treatment.
+This work makes the repository's all-files pre-commit contract real, cross-platform, idempotent, and enforced before the existing hosted quality gate. A contributor can run the literal command `pre-commit run --all-files` from the repository root and receive a clean result twice in succession, while hosted CI runs the same contract before `make quality-gate`.
 
-Success is visible when PR #121 remains limited to CI, hook configuration, deliberate formatting corrections, narrow fixture annotations, and this plan; exact-head hosted CI then passes the all-files hook stage, the complete quality gate, and coverage upload.
+The security boundary remains strict. The reviewed detect-secrets baseline is not regenerated during remediation; synthetic privacy/security fixtures receive exact-line official allowlist comments, and deterministic snapshot digest metadata receives one narrow line exclusion. No broad test, data, detector, or entropy-class exclusion is permitted.
+
+The implementation and local remediation completed at branch commit `360cf769f7065800efe7fddd0c1081219a678321`. Exact-head CI #341 and Docker Smoke #171 passed on that commit. A later documentation-only connector correction reconciles this living record; the PR checks and conversation are canonical for the exact final branch head produced by that correction.
 
 ## Progress
 
-- [x] (2026-08-28) Merged workspace-governance PR #131 and verified post-merge CI #338 on signed `main` commit `d3c4df63ab0e473642f75a9060705f074eddefeb`.
+- [x] (2026-08-28) Squash-merged workspace-governance PR #131 and verified post-merge CI #338 on signed `main` commit `d3c4df63ab0e473642f75a9060705f074eddefeb`.
 - [x] (2026-08-28) Incorporated exact current `main` into draft PR #121 without force and preserved the published v0.4.0 records.
-- [x] (2026-08-28) Kept root and compatibility pre-commit configurations byte-identical, disabled checkout credential persistence, and added only the narrow deterministic `csv_sha256` line exclusion.
-- [x] (2026-08-28) Observed CI #339 at connector checkpoint `e1fef1d087c8ebc7276d4b9164acc13e6632fa31`; configuration parity, Black, Ruff, Codespell, and mypy passed, while the expected whitespace/EOF modifications and reviewed synthetic-fixture findings blocked the all-files gate.
-- [x] (2026-08-28 15:02Z) Created task-owned temporary clone `app-industry-resilience-pr121-all-files-20260828-100156` at exact PR head `455ebf9caa33ec0f0e3693d7a72a267c2b4a0398`; verified exact `origin/main` `d3c4df63ab0e473642f75a9060705f074eddefeb`, clean tracking state, and canonical origin.
-- [x] (2026-08-28 15:08Z) Applied only the 14 reported hook-generated whitespace/EOF corrections.
-- [x] (2026-08-28 15:25Z) Added official inline `pragma: allowlist secret` comments to 14 exact synthetic fixture lines: the 11 CI-reported findings plus three duplicate-value occurrences exposed serially by detect-secrets.
-- [x] (2026-08-28 15:25Z) Preserved the reviewed baseline at blob `66b02a83380b2742fe31ee2d8902cc1973ec7e67`, retained every detector and entropy threshold, and kept root/config parity.
-- [x] (2026-08-28 15:27Z) Ran pre-commit 4.6.1 twice successfully; the second run returned 0, status was identical, and the binary diff hash remained `0f6440aec7a4bf5d390fcc50eb03f51a63503531`.
-- [x] (2026-08-28 15:36Z) Passed 107 focused fixture tests and every available direct quality/security constituent; GNU Make and Docker were unavailable and are recorded as not run rather than inferred passes.
-- [ ] Update this plan with exact local evidence, commit coherently, rerun the final exact-head gate, and push normally without force (completed: preliminary evidence recorded and remediation commit `52d9fe279d3f0cffdebbece0a97055dcb0b29330` created; remaining: evidence commit, final exact-head rerun, and normal push).
-- [ ] Observe fresh hosted CI on the final pushed head and leave PR #121 draft for a separate owner-controlled merge decision.
-- [ ] Reconcile every task-created workspace and artifact under the root `AGENTS.md` gate.
+- [x] (2026-08-28) Added the canonical root pre-commit configuration, kept the compatibility copy byte-identical, disabled checkout credential persistence, and added only the narrow deterministic `csv_sha256` line exclusion.
+- [x] (2026-08-28) Used hosted failures #339 and #340 to identify the finite all-files remediation: fourteen mechanical whitespace/end-of-file corrections and reviewed synthetic fixture findings.
+- [x] (2026-08-28) Applied only the fourteen reported mechanical corrections.
+- [x] (2026-08-28) Added official inline `pragma: allowlist secret` comments to fourteen exact synthetic fixture lines: the eleven initially reported findings plus three duplicate-value occurrences exposed sequentially by detect-secrets.
+- [x] (2026-08-28) Preserved baseline blob `66b02a83380b2742fe31ee2d8902cc1973ec7e67` throughout final local remediation and retained every detector, filter, entropy threshold, secret hash, verification flag, and line number.
+- [x] (2026-08-28) Added `src/scripts/detect_secrets_check.py`, which scans through detect-secrets 1.5.0 using a disposable baseline copy, propagates genuine finding failures, and accepts only exit code 3 after a clean comparison so reviewed baseline metadata is not rewritten.
+- [x] (2026-08-28) Added the typing-only `cast(Any, row.signal_value)` at the existing float conversion to satisfy mypy 2.3.1 without changing runtime output or control flow.
+- [x] (2026-08-28) Proved pre-commit 4.6.1 idempotence with two successful final-head runs and unchanged status/diff state.
+- [x] (2026-08-28) Passed 107 focused fixture tests, 461 complete tests, all direct quality/security constituents, the runtime coverage gate, full-source coverage, benchmark, pip check, pip-audit, detect-secrets, and `git diff --check`.
+- [x] (2026-08-28) Pushed final local implementation/evidence commit `360cf769f7065800efe7fddd0c1081219a678321` normally without force and retained PR #121 as draft.
+- [x] (2026-08-28) Verified exact-head CI #341 and Docker Smoke #171 passed on `360cf769f7065800efe7fddd0c1081219a678321`.
+- [x] (2026-08-28) Reconciled the final diff, baseline delta, wrapper semantics, fixture annotations, review state, release parity, and this living record through the GitHub connector.
+- [ ] Observe fresh hosted checks on the documentation-only connector head and keep PR #121 draft until a separate owner-controlled ready/merge authorization.
+- [ ] After an authorized merge, verify resulting `main`, push-triggered checks, preserved v0.4.0 tag/release identity, issue #134 progress, and task-owned workspace disposition.
 
 ## Surprises & Discoveries
 
-- Observation: The dependency version itself is not the blocker. Historical validation passed installation, Black, Ruff, mypy, tests, benchmark, security checks, and runtime coverage; the failure is the newly enforced all-files contract.
-  Evidence: CI #339 reached the all-files stage after successful dependency installation and configuration parity, then passed Black, Ruff, Codespell, and mypy.
+- Observation: The dependency version itself was not the blocker.
+  Evidence: Hosted failures reached the all-files stage after successful installation, configuration parity, Black, Ruff, Codespell, and mypy; the finite failures were repository hygiene and synthetic fixtures.
 
 - Observation: The narrow `csv_sha256` exclusion works as intended.
-  Evidence: CI #339 no longer reported `data/industry_pulse_bls_snapshot.metadata.json`; only synthetic test fixtures remained.
+  Evidence: After the exact line pattern was added, committed snapshot digests were no longer reported while synthetic fixture findings continued to fail the hook.
 
-- Observation: Standard hooks identify finite repository hygiene corrections rather than runtime changes.
-  Evidence: CI #339 reported two trailing-whitespace files and twelve end-of-file files, all documentation/configuration/governance paths.
+- Observation: Standard hooks identified finite repository hygiene corrections rather than runtime changes.
+  Evidence: Two trailing-whitespace files and twelve end-of-file files were confined to documentation, configuration, governance, and historical planning paths.
 
-- Observation: The reviewed baseline must not be regenerated on Windows.
-  Evidence: An earlier rejected attempt produced platform-specific paths, self-findings, and an unexplained stale-entry removal. The branch retains the valid reviewed baseline.
+- Observation: The baseline delta against `main` is path normalization, not policy or finding drift.
+  Evidence: Keys and `filename` values change only from Windows `\` separators to repository-standard `/`; plugins, filters, thresholds, hashes, verification flags, and line numbers remain identical.
 
-- Observation: Detect-secrets 1.5.0 reports only the first unallowlisted occurrence of an identical secret value in a file, so three additional exact synthetic lines appeared after the original eleven were annotated.
-  Evidence: Follow-up scans reported `tests/test_lineage.py:81`, then `tests/test_core.py:202`, then `tests/test_lineage.py:106`; each containing test proves non-propagation or bounded serialization.
+- Observation: Detect-secrets 1.5.0 reports only the first unallowlisted occurrence of an identical secret value in a file.
+  Evidence: Three additional exact synthetic lines appeared sequentially after the original findings were annotated; each containing test proves redaction, rejection, bounded serialization, or non-propagation.
 
-- Observation: Once no new secret remained, the stock baseline-backed hook returned exit code 3 and rewrote baseline metadata, including Windows path separators, even though the reviewed baseline must remain byte-identical.
-  Evidence: The hook attempted to change blob `66b02a8...`; restoring only `config/.secrets.baseline` recovered the required blob, and the non-mutating wrapper then passed against the same scan inputs.
+- Observation: The stock baseline-backed hook returns exit code 3 after a clean comparison when it wants to refresh baseline metadata.
+  Evidence: The official 1.5.0 hook returns 1 for new secrets, 3 for a baseline update, and 0 for a clean unchanged baseline. The wrapper uses a disposable copy, maps only 3 to success, and propagates all other exit codes.
 
-- Observation: The current allowed mypy 2.3.1 is stricter than the tool resolution used by CI #340.
-  Evidence: It rejected `float(row.signal_value)` because pandas `itertuples()` exposes a broad scalar union; `float(cast(Any, row.signal_value))` preserves runtime behavior and restored a clean 113-file mypy result.
+- Observation: The current allowed mypy 2.3.1 is stricter about pandas tuple scalar typing.
+  Evidence: It rejected `float(row.signal_value)` because `itertuples()` exposes a broad scalar union; an `Any` cast at the existing conversion restored a clean 114-source-file result without runtime change.
 
 ## Decision Log
 
@@ -53,151 +58,133 @@ Success is visible when PR #121 remains limited to CI, hook configuration, delib
   Rationale: The literal all-files command exposed repository configuration and hygiene defects that hosted CI previously did not exercise.
   Date/Author: 2026-08-12 / project owner and connector.
 
-- Decision: Preserve `config/.secrets.baseline` exactly and use inline official allowlist comments for reviewed synthetic fixtures.
-  Rationale: Regenerating the baseline would obscure review history and risks platform-specific drift; inline comments keep each false positive local and auditable.
+- Decision: Preserve the reviewed baseline during final remediation and use inline official allowlist comments for reviewed synthetic fixtures.
+  Rationale: Regenerating the baseline would obscure review history and risks platform-specific metadata drift; inline comments keep each false positive local and auditable.
   Date/Author: 2026-08-12 / project owner and connector.
+
+- Decision: Normalize baseline repository paths from `\` to `/` while preserving all findings and policy.
+  Rationale: Forward-slash repository paths make the baseline portable across Windows and Linux without changing what is allowed.
+  Date/Author: 2026-08-12 / branch history, verified 2026-08-28 by connector.
 
 - Decision: Exclude only a line matching the deterministic JSON field `csv_sha256` with a 64-character lowercase hexadecimal value.
   Rationale: The digest is reproducible release metadata, not a secret. A line-level pattern avoids excluding `data/`, tests, detectors, or entropy classes.
   Date/Author: 2026-08-28 / connector.
 
-- Decision: Use a new disposable checkout and do not reuse the retained dirty PR #121 remediation clone.
-  Rationale: The retained clone contains prior uncommitted hook output and is protected evidence; a fresh checkout produces an auditable exact-head result.
-  Date/Author: 2026-08-28 / connector.
+- Decision: Run baseline-backed secret detection through `src/scripts/detect_secrets_check.py` using a temporary copy of the reviewed baseline.
+  Rationale: This preserves strict new-finding failures while preventing platform and line-number metadata refreshes from mutating the reviewed baseline.
+  Date/Author: 2026-08-28 / Codex, independently reviewed by connector.
 
-- Decision: Run baseline-backed secret detection through `src/scripts/detect_secrets_check.py`, using a temporary copy of the reviewed baseline and propagating all real-finding failures while accepting only detect-secrets exit code 3 after a clean comparison.
-  Rationale: This keeps detector and entropy policy intact, prevents platform/line-number metadata refreshes from mutating the reviewed baseline, and makes the literal all-files hook idempotent on Windows and Linux.
-  Date/Author: 2026-08-28 / Codex.
-
-- Decision: Add a typing-only cast at the existing `float` conversion rather than pinning or weakening mypy.
+- Decision: Add a typing-only cast at the existing float conversion rather than pinning or weakening mypy.
   Rationale: The cast documents the already validated numeric runtime invariant, changes no output or control flow, and keeps the declared `mypy>=2.3.0,<3` range valid under 2.3.1.
-  Date/Author: 2026-08-28 / Codex.
+  Date/Author: 2026-08-28 / Codex, independently reviewed by connector.
 
 ## Outcomes & Retrospective
 
-The connector phase and preliminary local remediation are complete. Pre-commit 4.6.1 passed twice with identical status and diff hash, 107 focused tests passed, and the full suite passed 461 tests in both runtime and full-source coverage modes. Runtime coverage was 7,590 of 8,344 statements with 87.59% combined coverage, passing the 85% gate. Full-source coverage was 8,903 of 10,376 lines (85.80%) and 1,836 of 2,692 branches (68.20%). Black left 167 files unchanged, Ruff passed, mypy passed on 114 source files, pip-audit found no known vulnerabilities, pip check found no broken requirements, the non-mutating baseline-backed secret scan passed, configuration parity and baseline blob identity passed, and `git diff --check` passed. Benchmark medians were 0.0049 seconds for 100 rows against 0.50 seconds, 0.0151 seconds for 10,000 rows against 2.00 seconds, and 0.1150 seconds for 100,000 rows against 10.00 seconds.
+Phase two's implementation is complete. At exact implementation/evidence head `360cf769f7065800efe7fddd0c1081219a678321`, pre-commit 4.6.1 passed twice with no second-run change, 107 focused tests passed, and the complete suite passed 461 tests in both runtime and full-source coverage modes. Local runtime coverage was 7,594 of 8,344 lines (91.01%), 1,597 of 2,144 branches (74.49%), and 87.63% combined, above the 85% gate. Full-source coverage was 8,903 of 10,376 lines (85.80%) and 1,836 of 2,692 branches (68.20%).
 
-GNU Make was unavailable, so `make quality-gate` was not run; every current constituent was run directly instead. Local Docker was not run because neither the CLI nor daemon was available. Exact-head commits, the complete post-commit rerun, normal push, hosted CI, and safe workspace reconciliation remain. At completion, summarize the final changed files, all-files idempotence proof, security posture, quality/coverage results, hosted CI identity, and any retained workspace or limitation.
+Black left 167 files unchanged, Ruff passed, mypy passed on 114 source files, pip-audit found no known vulnerabilities, pip check found no broken requirements, the non-mutating baseline-backed secret scan passed, configuration parity passed, baseline identity remained `66b02a83380b2742fe31ee2d8902cc1973ec7e67`, and `git diff --check` passed. Local benchmark medians were 0.0057 seconds for 100 rows against 0.50 seconds, 0.0115 seconds for 10,000 rows against 2.00 seconds, and 0.0649 seconds for 100,000 rows against 10.00 seconds.
+
+GNU Make was unavailable locally, so `make quality-gate` was not run there; every current constituent ran directly. Local Docker was unavailable. Hosted CI #341 subsequently ran the literal all-files gate, `make quality-gate`, 461 runtime tests, 461 full-source tests, coverage upload, benchmark, dependency audit, and secret scan successfully. Hosted Docker Smoke #171 built the image, verified the non-root runtime user, exercised Streamlit and API modes, uploaded evidence, and removed its containers successfully.
+
+The published v0.4.0 tag and GitHub prerelease remain unchanged. PR #121 remains open, draft, mergeable, unmerged, current with `main`, and free of submitted reviews or inline review threads at the implementation-head audit. The task-owned disposable checkout is retained clean for review with only generated ignored content; protected and historical retained paths remain untouched.
+
+The connector found one documentation defect after the successful implementation-head checks: this living plan still described final push, hosted checks, and reconciliation as pending. The documentation-only connector correction resolves that defect. Fresh hosted checks on the corrected head are required before the owner receives an exact-head merge recommendation.
 
 ## Context and Orientation
 
-Issue #134 coordinates post-v0.4.0 hardening. Phase one merged root `AGENTS.md`, which governs all local workspace and artifact handling. Phase two is this plan and draft PR #121 on branch `dependabot/pip/pre-commit-gte-4.6.1-and-lt-5`.
+Issue #134 coordinates post-v0.4.0 hardening. Phase one merged root `AGENTS.md`, which governs local workspace and artifact handling. Phase two is draft PR #121 on branch `dependabot/pip/pre-commit-gte-4.6.1-and-lt-5`.
 
 The key files are:
 
 - `.github/workflows/ci.yml`, which installs dependencies, verifies config parity, runs all hooks, then runs `make quality-gate`;
 - `.pre-commit-config.yaml`, the canonical root configuration;
 - `config/.pre-commit-config.yaml`, an intentionally byte-identical compatibility copy;
-- `config/.secrets.baseline`, the reviewed detect-secrets baseline that must remain unchanged;
+- `config/.secrets.baseline`, the reviewed portable baseline;
+- `src/scripts/detect_secrets_check.py`, the non-mutating baseline-check wrapper;
 - `requirements-dev.txt`, which requires pre-commit `>=4.6.1,<5`;
 - `Makefile`, whose `quality-gate` runs formatting, linting, mypy, runtime and full-source coverage, benchmark, vulnerability audit, and secret scanning;
-- the synthetic privacy/security tests reported by CI #339;
-- this ExecPlan, which records the exact remediation and evidence.
+- the synthetic privacy/security tests carrying exact-line allowlist comments;
+- this ExecPlan, which records the remediation and evidence.
 
-At connector checkpoint `e1fef1d087c8ebc7276d4b9164acc13e6632fa31`, CI #339 reported these standard-hook corrections:
+The mechanical corrections are confined to `.agent/execplans/ExecPlan.md`, `.agent/PLANS.md`, `.agent/execplans/universal_stage1_overhaul.md`, `.gitattributes`, `docs/execplans/architecture-alignment.md`, `config/.editorconfig`, `.agent/execplans/repository_cleanup_restructure.md`, `REPORTS/000_CONTEXT.md`, `docs/execplans/observability-remote-shipping.md`, `AGENTS.md`, `.agent/EXEC_PLAN.md`, `docs/execplans/snapshot-replication-future-proofing.md`, `.agent/execplans/stage1_snapshot_persistence.md`, and `REPORTS/001_DIAGNOSIS.md`.
 
-- trailing whitespace: `.agent/execplans/ExecPlan.md`, `.agent/PLANS.md`;
-- end-of-file normalization: `.agent/execplans/universal_stage1_overhaul.md`, `.gitattributes`, `docs/execplans/architecture-alignment.md`, `config/.editorconfig`, `.agent/execplans/repository_cleanup_restructure.md`, `REPORTS/000_CONTEXT.md`, `docs/execplans/observability-remote-shipping.md`, `docs/execplans/snapshot-replication-future-proofing.md`, `AGENTS.md`, `.agent/EXEC_PLAN.md`, `.agent/execplans/stage1_snapshot_persistence.md`, and `REPORTS/001_DIAGNOSIS.md`.
-
-The same run reported eleven findings on nine synthetic test-fixture files:
-
-- `tests/test_streamlit_provenance.py`;
-- `tests/test_config.py` at the synthetic credential URL and password assertion;
-- `tests/test_evaluation_lineage.py`;
-- `tests/test_lineage.py` at the synthetic metadata and credential-bearing URL cases;
-- `tests/test_lineage_exports.py`;
-- `tests/test_application.py`;
-- `tests/test_scenario_planner.py`;
-- `tests/test_core.py`;
-- `tests/test_streamlit_components.py`.
-
-These fixtures deliberately test redaction, rejection, or non-propagation. Review each exact line before adding `# pragma: allowlist secret`. Do not annotate unrelated lines or whole files.
+The exact annotated synthetic fixture locations at implementation head are `tests/test_lineage.py:63`, `:81`, `:106`, and `:181`; `tests/test_config.py:311` and `:323`; `tests/test_evaluation_lineage.py:89`; `tests/test_scenario_planner.py:139`; `tests/test_streamlit_provenance.py:30`; `tests/test_application.py:96`; `tests/test_lineage_exports.py:31`; `tests/test_core.py:201` and `:202`; and `tests/test_streamlit_components.py:131`.
 
 ## Plan of Work
 
-First create a fresh independent clone outside the protected checkout and verify the exact remote `main` and PR branch heads. Read root `AGENTS.md` and this plan before changing anything. Create and activate a Python 3.13 virtual environment, install repository requirements, and explicitly install pre-commit 4.6.1 so the minimum supported version—not merely the newest compatible version—executes the system-language hooks.
+The implementation work is complete. The remaining workflow is connector and owner controlled:
 
-Run the literal all-files command once. Review its modifications against the exact list above. Retain only mechanical whitespace and end-of-file changes; stop if source behavior, release records, snapshots, or an unexpected file changes. Review each detect-secrets finding and append the official inline allowlist comment only where the value is clearly synthetic and the test proves redaction, rejection, or non-propagation.
-
-Do not regenerate or edit `config/.secrets.baseline`. Do not broaden the existing line exclusion. Do not exclude `tests/`, `data/`, a detector, or an entropy class. Keep both pre-commit config files byte-identical.
-
-Run all hooks again. Address any newly reported finding using the same narrow review standard. Once the run passes, run it a second time and prove `git status` and `git diff` are unchanged. Run the focused tests for every annotated fixture file, then run the complete repository gate and supporting checks. Update this plan with exact evidence before the final evidence commit. After that commit, rerun the complete final gate on the exact final SHA and make no further commit.
-
-Push normally without force. Keep PR #121 draft. Observe current-head hosted CI if authenticated inspection is available, but never merge, mark ready, enable auto-merge, modify the published tag/release, or touch PRs #117 and #122.
+1. Verify the documentation-only correction is the sole delta after `360cf769f7065800efe7fddd0c1081219a678321`.
+2. Confirm the PR remains current with `main`, mergeable, draft, and free of blocking reviews or unresolved threads.
+3. Require fresh exact-head CI and Docker Smoke on the corrected head.
+4. Reconfirm the v0.4.0 annotated tag object, peeled release commit, and GitHub prerelease are unchanged.
+5. Update the PR and issue with the exact final audit result.
+6. Present a separate owner-controlled exact-head ready/squash-merge instruction.
+7. After merge, verify the resulting signed `main`, push-triggered checks, issue #134 progress, and safe cleanup disposition.
 
 ## Concrete Steps
 
-Work only in the new disposable clone. Record exact commands and outputs in this plan as they are executed.
+The local implementation used Python 3.13 and an activated task-owned virtual environment with exact pre-commit 4.6.1. The canonical commands are:
 
-Create and activate the environment, then install dependencies:
-
-    py -3.13 -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    python -m pip install --upgrade pip
     python -m pip install -r requirements.txt -r requirements-dev.txt
     python -m pip install "pre-commit==4.6.1"
-    python -m pip check
     pre-commit --version
+    pre-commit run --all-files --show-diff-on-failure --color=always
+    pre-commit run --all-files --show-diff-on-failure --color=always
+    python -m pytest -q tests/test_lineage.py tests/test_config.py tests/test_evaluation_lineage.py tests/test_scenario_planner.py tests/test_streamlit_provenance.py tests/test_application.py tests/test_lineage_exports.py tests/test_core.py tests/test_streamlit_components.py
+    python -m black --check app.py src tests
+    python -m ruff check app.py src tests
+    python -m mypy src
+    python -m pytest -q --cov=src/adapters --cov=src/agents --cov=src/application --cov=src/core --cov=src/extensions --cov=src/infrastructure --cov=src/interfaces/api --cov=src/interfaces/streamlit --cov-report=term-missing --cov-report=xml --cov-fail-under=85
+    python -m pytest -q --cov=src --cov-report=term-missing --cov-report=xml
+    python src/scripts/benchmark_metrics.py --check
+    python -m pip_audit -r requirements.txt -r requirements-dev.txt
+    python src/scripts/detect_secrets_check.py --baseline config/.secrets.baseline --exclude-lines '^\s*"csv_sha256":\s*"[0-9a-f]{64}",?\s*$'
+    python -m pip check
+    git diff --check
 
-Require `pre-commit 4.6.1`.
-
-Verify config and baseline invariants before and after remediation:
+Configuration and baseline invariants are checked with:
 
     git diff --no-index --exit-code -- .pre-commit-config.yaml config/.pre-commit-config.yaml
     git hash-object config/.secrets.baseline
 
-The baseline blob must remain `66b02a83380b2742fe31ee2d8902cc1973ec7e67` throughout local work.
-
-Run the modifying hook pass and inspect the diff:
-
-    pre-commit run --all-files --show-diff-on-failure --color=always
-    git status --short --untracked-files=all
-    git diff --stat
-    git diff
-
-After reviewed annotations and mechanical corrections, prove idempotence:
-
-    pre-commit run --all-files --show-diff-on-failure --color=always
-    git diff --exit-code
-    pre-commit run --all-files --show-diff-on-failure --color=always
-    git diff --exit-code
-
-The two final hook runs must pass and the second must make no change.
-
-Run focused tests for all annotated fixture files, then the full gate. Use `make quality-gate` when GNU Make is available. If it is unavailable, run the exact current Makefile constituents individually and report that the aggregate target was not run. Also run `python -m pip check`, the configured pip-audit command, the baseline-backed detect-secrets hook, and `git diff --check`.
+The expected baseline blob is `66b02a83380b2742fe31ee2d8902cc1973ec7e67`.
 
 ## Validation and Acceptance
 
-Acceptance requires all of the following on the exact final commit:
+Acceptance requires:
 
 - root and compatibility pre-commit configurations are byte-identical;
 - checkout credential persistence is disabled in CI;
-- `config/.secrets.baseline` has the original blob identity and unchanged detector/filter policy;
+- the baseline has repository-standard paths and unchanged policy/findings;
 - the only global secret-scan exception is the exact deterministic `csv_sha256` line pattern;
 - every fixture allowlist is inline, reviewed, and limited to a synthetic value used by a privacy/security test;
-- all hook-generated formatting changes are mechanical and confined to the exact reviewed paths;
+- all hook-generated formatting changes are mechanical and confined to the reviewed paths;
 - pre-commit 4.6.1 passes twice with no second-run modification;
 - focused fixture tests pass;
 - Black, Ruff, mypy, full pytest, runtime coverage, full-source coverage, benchmark, pip check, pip-audit, detect-secrets, and diff checks pass;
-- runtime combined coverage remains at or above the repository's 85% threshold;
-- Docker-relevant validation passes when locally available, or the limitation is reported accurately;
-- the final branch is clean, pushed normally, current with `main`, and PR #121 remains draft;
-- fresh hosted CI passes the configuration-parity step, all-files hooks, complete quality gate, and coverage upload before any merge recommendation.
+- runtime combined coverage remains at or above 85%;
+- hosted CI passes configuration parity, all-files hooks, `make quality-gate`, and coverage upload on the exact final PR head;
+- hosted Docker Smoke passes on the exact final PR head;
+- the PR is current with `main`, mergeable, review-clean, and remains draft until explicit owner authorization;
+- the published v0.4.0 tag and release remain unchanged.
 
 ## Idempotence and Recovery
 
-The hook command is intentionally repeatable. The first run may make reviewed mechanical corrections; subsequent runs must be clean. If an unexpected file changes, restore only that file from the known starting branch in the disposable clone and investigate—never reset, clean, force-push, or touch the protected checkout.
+The hook command is repeatable. A clean repository produces no change on successive runs. The wrapper writes only a temporary baseline copy and removes it in a `finally` block. It propagates new-secret and operational failures and maps only detect-secrets' baseline-update exit code 3 to success after a clean comparison.
 
-If the remote branch or `main` moves, stop and report the exact SHAs rather than rebasing, resetting, or force-updating. If local cleanup is blocked, retain the task-owned workspace and report its precise state; do not change ACLs or ownership and do not use force retries.
+If the PR branch or `main` moves unexpectedly, stop and audit the exact SHAs rather than resetting, rebasing, or forcing. If cleanup is blocked, retain the task-owned workspace and report its exact state; do not change ACLs or ownership and do not use force retries.
 
 ## Artifacts and Notes
 
-Durable evidence belongs in this plan and the PR conversation. Temporary virtual environments, caches, coverage files, reports, and hook repositories remain local and must be inventoried before normal exact-path cleanup. Do not commit private paths, credentials, environment dumps, or generated security reports.
+The task-owned local environment used Python 3.13.7, pip 26.2.1, pre-commit 4.6.1, Black 26.5.1, Ruff 0.16.5, mypy 2.3.1, pytest 9.1.1, pytest-cov 7.1.0, coverage 7.15.4, detect-secrets 1.5.0, and pip-audit 2.10.1.
 
-The task-owned environment uses Python 3.13.7, pip 26.2.1, pre-commit 4.6.1, Black 26.5.1, Ruff 0.16.5, mypy 2.3.1, pytest 9.1.1, pytest-cov 7.1.0, coverage 7.15.4, detect-secrets 1.5.0, and pip-audit 2.10.1. The exact mechanical paths are `.agent/execplans/ExecPlan.md`, `.agent/PLANS.md`, `.agent/execplans/universal_stage1_overhaul.md`, `.gitattributes`, `docs/execplans/architecture-alignment.md`, `config/.editorconfig`, `.agent/execplans/repository_cleanup_restructure.md`, `REPORTS/000_CONTEXT.md`, `docs/execplans/observability-remote-shipping.md`, `AGENTS.md`, `.agent/EXEC_PLAN.md`, `docs/execplans/snapshot-replication-future-proofing.md`, `.agent/execplans/stage1_snapshot_persistence.md`, and `REPORTS/001_DIAGNOSIS.md`.
+Temporary virtual environments, caches, coverage files, reports, hook repositories, and logs remain local generated artifacts. The retained task-owned checkout is not evidence of unpushed work: its tracked and untracked status was clean, the exact implementation head was remotely preserved, task processes were stopped, and generated ignored content was inventoried. Cleanup remains subject to root `AGENTS.md` and must not touch the protected primary checkout or historical retained recovery/remediation paths.
 
-The exact annotated lines after Black formatting are `tests/test_lineage.py:63`, `:81`, `:106`, and `:181`; `tests/test_config.py:311` and `:323`; `tests/test_evaluation_lineage.py:89`; `tests/test_scenario_planner.py:139`; `tests/test_streamlit_provenance.py:30`; `tests/test_application.py:96`; `tests/test_lineage_exports.py:31`; `tests/test_core.py:201` and `:202`; and `tests/test_streamlit_components.py:131`.
+Durable final exact-head hosted evidence belongs in the PR and issue conversation because recording a completed post-push run inside the same commit would create another head and another validation cycle.
 
 ## Interfaces and Dependencies
 
-This slice changes no product API or runtime behavior. It preserves Python 3.13, package version 0.4.0, the published v0.4.0 tag/release, existing tests, and runtime dependencies. The relevant tooling interfaces are pre-commit `>=4.6.1,<5`, Black, Ruff, mypy, pytest/pytest-cov, detect-secrets 1.5, pip-audit, GNU Make when available, and the existing GitHub Actions workflow pinned to full-length action SHAs.
+This slice changes no product API or intended runtime behavior. It preserves Python 3.13, package version 0.4.0, the published v0.4.0 tag/release, runtime dependencies, provider data, snapshots, mappings, analytics, and UI behavior.
+
+The relevant tooling interfaces are pre-commit `>=4.6.1,<5`, Black, Ruff, mypy, pytest/pytest-cov, detect-secrets 1.5.0, pip-audit, GNU Make in hosted CI, and the existing GitHub Actions workflows pinned to full-length action SHAs.
