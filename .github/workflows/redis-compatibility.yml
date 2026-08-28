@@ -1,0 +1,85 @@
+name: Redis 8 Compatibility
+
+on:
+  pull_request:
+    paths:
+      - requirements.txt
+      - requirements-dev.txt
+      - src/core/config.py
+      - src/infrastructure/rate_limiter.py
+      - tests/test_config.py
+      - tests/test_rate_limiter.py
+      - tests/test_rate_limiter_metrics_and_redis_health.py
+      - tests/test_rate_limiting_health_probe.py
+      - tests/test_redis_8_compatibility.py
+      - .github/workflows/redis-compatibility.yml
+  push:
+    branches:
+      - main
+    paths:
+      - requirements.txt
+      - requirements-dev.txt
+      - src/core/config.py
+      - src/infrastructure/rate_limiter.py
+      - tests/test_config.py
+      - tests/test_rate_limiter.py
+      - tests/test_rate_limiter_metrics_and_redis_health.py
+      - tests/test_rate_limiting_health_probe.py
+      - tests/test_redis_8_compatibility.py
+      - .github/workflows/redis-compatibility.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  redis-compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install compatibility dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip check
+
+      - name: Report resolved compatibility versions
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+          print(f"redis={version('redis')}")
+          print(f"fakeredis={version('fakeredis')}")
+          PY
+
+      - name: Run Redis 8 and fakeredis compatibility tests
+        env:
+          REDIS_COMPAT_URL: redis://127.0.0.1:6379/15
+        run: |
+          python -m pytest -q \
+            tests/test_redis_8_compatibility.py \
+            tests/test_rate_limiter.py \
+            tests/test_rate_limiter_metrics_and_redis_health.py \
+            tests/test_rate_limiting_health_probe.py \
+            tests/test_config.py
