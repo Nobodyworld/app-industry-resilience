@@ -59,18 +59,26 @@ jobs:
           python-version: "3.13"
           cache: pip
 
-      - name: Install compatibility dependencies
+      - name: Install exact minimum compatibility dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-dev.txt
+          python -m pip install "redis==8.1.0" "fakeredis[lua]==2.37.1"
           python -m pip check
 
-      - name: Report resolved compatibility versions
+      - name: Assert exact compatibility versions
         run: |
           python - <<'PY'
           from importlib.metadata import version
-          print(f"redis={version('redis')}")
-          print(f"fakeredis={version('fakeredis')}")
+
+          resolved = {
+              "redis": version("redis"),
+              "fakeredis": version("fakeredis"),
+              "lupa": version("lupa"),
+          }
+          print("\n".join(f"{name}={value}" for name, value in resolved.items()))
+          assert resolved["redis"] == "8.1.0"
+          assert resolved["fakeredis"] == "2.37.1"
           PY
 
       - name: Run Redis 8 and fakeredis compatibility tests
