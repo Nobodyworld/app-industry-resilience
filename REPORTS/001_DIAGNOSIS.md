@@ -30,4 +30,3 @@
 - **Test & Verify:** Expand/refresh tests after fixes; ensure pytest covers new pathways and run the full CI-equivalent stack locally.
 - **Security & Stability Audit:** Repair security helpers, review dependency versions, and document secure configuration practices.
 - **AI-Ready Refactor:** Introduce structured schemas (e.g., Pydantic) for agent interoperability and author `docs/AI_INTERFACE.md` describing callable surfaces.
-

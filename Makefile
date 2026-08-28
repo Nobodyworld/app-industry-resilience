@@ -130,10 +130,9 @@ security:
 		echo 'pip-audit not installed; skipping vulnerability scan'; \
 	fi
 	@if command -v detect-secrets-hook >/dev/null 2>&1; then \
-		detect-secrets-hook --baseline config/.secrets.baseline; \
+		$(PYTHON) src/scripts/detect_secrets_check.py --baseline config/.secrets.baseline --exclude-lines '^\s*"csv_sha256":\s*"[0-9a-f]{64}",?\s*$$'; \
 	elif python -c "import importlib.util; import sys; sys.exit(0 if importlib.util.find_spec('detect_secrets') else 1)" >/dev/null 2>&1; then \
-		$(PYTHON) -m detect_secrets scan --all-files > $(REPORT_DIR)/.detect-secrets.scan.json; \
-		echo 'detect-secrets baseline comparison requires manual review (hook binary unavailable).'; \
+		$(PYTHON) src/scripts/detect_secrets_check.py --baseline config/.secrets.baseline --exclude-lines '^\s*"csv_sha256":\s*"[0-9a-f]{64}",?\s*$$'; \
 	elif [ "${CI}" = "true" ] || [ "${GITHUB_ACTIONS}" = "true" ]; then \
 		echo 'detect-secrets is required in CI but was not found'; \
 		exit 1; \

@@ -136,7 +136,7 @@ def test_scenario_planner_builds_redacted_fallback_lineage() -> None:
     base.attrs.update(
         {
             "source": "C:\\Users\\private\\records.csv",
-            "api_key": "not-for-lineage",
+            "api_key": "not-for-lineage",  # pragma: allowlist secret
         }
     )
 

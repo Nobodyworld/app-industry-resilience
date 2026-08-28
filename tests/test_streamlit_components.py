@@ -128,7 +128,7 @@ def test_render_data_provenance_uses_typed_lineage_only(monkeypatch) -> None:
     frame.attrs.update(
         {
             "uploaded_filename": "private-client-data.csv",
-            "api_key": "sentinel-secret",
+            "api_key": "sentinel-secret",  # pragma: allowlist secret
         }
     )
     attach_uploaded_file_lineage(frame)

@@ -98,4 +98,3 @@ Planned artefacts include updated unit test snapshots (if any), coverage metrics
 ## Interfaces and Dependencies
 
 Define `ReplicationExtension` in `src/extensions/contracts.py` with methods `supports(config: SnapshotRemoteStorageConfig) -> bool` and `build(config: SnapshotRemoteStorageConfig) -> SnapshotReplicator`. Update `ExtensionManager` with `register_replication_extension` and `build_replication_backend`. Provide helper `_build_s3_replicator(config)` returning `S3SnapshotReplicator`. Expose metrics named `idiot_index_snapshot_replications_total`, `idiot_index_snapshot_replication_latency_seconds`, and `idiot_index_snapshot_replication_age_seconds`. Debug replication extension should honour option key `path` (string) defaulting to `observability_snapshot_dir / "debug-replication"`.
-

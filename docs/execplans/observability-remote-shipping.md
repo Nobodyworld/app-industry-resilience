@@ -128,4 +128,3 @@ Remote replication requires a new configuration surface (environment variables),
 
 - `snapshot_persistence` obtains replicator via `build_snapshot_replicator` and stores it on `self._replicator`.
 - CLI imports `build_snapshot_replicator` to replicate when storing snapshots manually.
-

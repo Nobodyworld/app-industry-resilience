@@ -86,7 +86,7 @@ def test_sample_evaluation_without_search_records_unfiltered_result_count() -> N
 
 def test_v1_evaluate_inline_records_exposes_redacted_typed_lineage() -> None:
     records = _sample_records()
-    records[0]["api_key"] = "sentinel-api-key"
+    records[0]["api_key"] = "sentinel-api-key"  # pragma: allowlist secret
     records[0]["cache_dir"] = r"C:\Users\example\.cache"
     records[0]["uploaded_filename"] = "private-client-data.csv"
 

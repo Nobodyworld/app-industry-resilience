@@ -93,7 +93,7 @@ def test_evaluation_preserves_uploaded_lineage() -> None:
     uploaded.attrs.update(
         {
             "uploaded_filename": "private-client-data.csv",
-            "api_key": "sentinel-secret",
+            "api_key": "sentinel-secret",  # pragma: allowlist secret
             "source_path": r"C:\\Users\\private\\client.csv",
         }
     )

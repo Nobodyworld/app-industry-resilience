@@ -308,7 +308,7 @@ def test_load_config_parses_distributed_redis_url_fields() -> None:
     config = load_config(
         {
             "RATE_LIMIT_BACKEND": "redis",
-            "RATE_LIMIT_REDIS_URL": "rediss://alice:secret@cache.example:6380/2",
+            "RATE_LIMIT_REDIS_URL": "rediss://alice:secret@cache.example:6380/2",  # pragma: allowlist secret
             "RATE_LIMIT_REDIS_TIMEOUT_SECONDS": "1.5",
             "RATE_LIMIT_REDIS_TTL_SECONDS": "120",
         }
@@ -320,7 +320,7 @@ def test_load_config_parses_distributed_redis_url_fields() -> None:
     assert distributed.port == 6380
     assert distributed.db == 2
     assert distributed.username == "alice"
-    assert distributed.password == "secret"
+    assert distributed.password == "secret"  # pragma: allowlist secret
     assert distributed.ssl is True
     assert distributed.socket_timeout == 1.5
     assert distributed.window_seconds == 120.0

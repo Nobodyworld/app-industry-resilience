@@ -115,4 +115,3 @@ Define/extend interfaces:
 - New FastAPI schema classes `HealthAnalyticsRequest`, `HealthAnalyticsResponse`, `HealthAggregate`. Provide translation helpers between dataclasses and JSON.
 - CLI script should accept options (e.g., `--input data/sample_industries.csv --group-by sector`) and print JSON summary.
 - Requirements updated to latest stable versions for pandas, streamlit, plotly, etc., ensuring compatibility with Python 3.11.
-
