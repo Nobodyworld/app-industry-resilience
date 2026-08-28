@@ -55,4 +55,4 @@ Completion note (indented, one line):
 
 ## Active workstreams
 
-(none)
+- [ ] Complete post-v0.4.0 repository hardening across workspace governance, all-files CI enforcement, and Redis/fakeredis compatibility — issue: #134
