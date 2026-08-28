@@ -94,3 +94,4 @@ The final slice report must include:
 - any retained workspace or storage-heavy path, with the exact reason it was not removed.
 
 Do not claim workspace cleanup complete while a slice-owned path remains unexplained.
+
