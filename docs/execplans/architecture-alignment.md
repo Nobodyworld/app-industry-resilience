@@ -130,4 +130,3 @@ The goal is to introduce `src/application/` to host orchestrators that sit betwe
     value_added: float | None
 
 - Provide helper `sanitize_search(search: str | None) -> str | None` and `resolve_dataframe(...)` functions to keep logic small and testable.
-

@@ -31,4 +31,3 @@
 - Development requirements file lacks trailing newline on the `types-requests` entry.
 - CI workflow's final `fail_ci_if_error` line lacks newline; otherwise standard.
 - No `pyproject.toml`; rely on requirements files and manual tooling invocation.
-

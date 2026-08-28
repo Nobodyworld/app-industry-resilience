@@ -66,4 +66,3 @@ Key artifacts will include an updated `TASKLIST.md`, reorganized documentation u
 ## Interfaces and Dependencies
 
 Python modules in `src/` import internal packages using relative paths such as `from src.core...`. Any moved modules must preserve importable package names, potentially by adding namespace packages under `src/`. External dependencies remain defined in `pyproject.toml` and `requirements*.txt`. Scripts rely on `Makefile` targets; ensure these references stay accurate after directory adjustments.
-

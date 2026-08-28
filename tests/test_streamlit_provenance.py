@@ -27,7 +27,7 @@ def test_attach_uploaded_file_lineage_is_generic_and_private() -> None:
     frame.attrs.update(
         {
             "uploaded_filename": "private-client-data.csv",
-            "api_key": "sentinel-secret",
+            "api_key": "sentinel-secret",  # pragma: allowlist secret
             "source_path": r"C:\Users\private\client.csv",
         }
     )

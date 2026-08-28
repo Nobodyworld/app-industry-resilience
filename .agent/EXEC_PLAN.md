@@ -92,4 +92,3 @@ Artifacts to produce: `/REPORTS/000_CONTEXT.md`, `/REPORTS/001_DIAGNOSIS.md`, `/
 ## Interfaces and Dependencies
 
 Primary dependencies include Streamlit, Pandas, Plotly, and related data libraries defined in `requirements*.txt`. Security updates may involve dependency version adjustments. Agent-ready interfaces will likely utilize Pydantic models and clearly documented functions within `src/` or a new `agents/` directory. Ensure compatibility with Python 3.9+ and existing tooling. Tests leverage `pytest`. Streamlit is the runtime entrypoint via `app.py`.
-

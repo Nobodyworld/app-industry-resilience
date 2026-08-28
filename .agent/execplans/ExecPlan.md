@@ -99,7 +99,7 @@ We must keep core free of infrastructure dependencies, so Redis wiring must be i
 
 7. **Testing and fixtures.**
    - Add fakeredis (`fakeredis>=2.23.2,<3`) to `requirements-dev.txt` and `redis>=5.0.1,<6` to runtime requirements. Update detect-secrets baseline if necessary.
-   - Create new tests: 
+   - Create new tests:
      * `tests/test_rate_limiter.py` verifying local vs Redis backend behaviour, wait logic, and instrumentation hooks (monkeypatching fakeredis).
      * Extend `tests/test_security.py` for handler registration and failure messaging.
      * Extend `tests/test_application.py` to ensure dtype overrides propagate and metrics unaffected.

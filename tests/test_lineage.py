@@ -60,7 +60,7 @@ def test_sample_lineage_serializes_with_explicit_truth_flags() -> None:
 
 def test_lineage_round_trip_ignores_untyped_extra_fields() -> None:
     payload = lineage_to_dict(_sample_lineage())
-    payload["api_key"] = "sentinel-secret"
+    payload["api_key"] = "sentinel-secret"  # pragma: allowlist secret
     payload["absolute_path"] = r"C:\Users\example\private.csv"
     payload["arbitrary_metadata"] = {"token": "sentinel-token"}
 
@@ -78,7 +78,7 @@ def test_dataframe_attachment_reads_only_typed_lineage_attribute() -> None:
     frame = pd.DataFrame([{"industry_code": "311", "year": 2023}])
     frame.attrs.update(
         {
-            "api_key": "sentinel-secret",
+            "api_key": "sentinel-secret",  # pragma: allowlist secret
             "cache_dir": r"C:\Users\example\.cache",
             "uploaded_filename": "private-client-data.csv",
         }
@@ -103,7 +103,7 @@ def test_transformation_details_are_allowlisted_and_ordered() -> None:
             "filter_applied": True,
             "result_count": 4,
             "search": "unrestricted-user-text",
-            "api_key": "sentinel-secret",
+            "api_key": "sentinel-secret",  # pragma: allowlist secret
         },
     )
     lineage = append_lineage_step(
@@ -176,7 +176,10 @@ def test_cache_miss_preserves_original_retrieval_mode() -> None:
     [
         ("source", r"C:\Users\example\data.csv"),
         ("dataset_id", "/home/example/private.csv"),
-        ("dataset_id", "https://user:password@example.com/data?token=secret"),
+        (
+            "dataset_id",
+            "https://user:password@example.com/data?token=secret",  # pragma: allowlist secret
+        ),
         ("dataset_id", "client-secret"),
     ],
 )

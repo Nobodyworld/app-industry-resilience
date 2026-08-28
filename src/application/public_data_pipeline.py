@@ -10,7 +10,7 @@ import zipfile
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import pandas as pd
 import requests
@@ -979,7 +979,7 @@ def _latest_series_fingerprint(cleaned: pd.DataFrame, expected_series_ids: Itera
             "series_id": str(row.series_id),
             "release_period": str(row.release_period),
             "observation_date": str(row.observation_date),
-            "value": float(row.signal_value),
+            "value": float(cast(Any, row.signal_value)),
         }
         for row in latest_rows.itertuples(index=False)
     ]

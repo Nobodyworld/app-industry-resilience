@@ -198,8 +198,8 @@ def test_normalize_columns_without_lineage_drops_arbitrary_attrs() -> None:
             "uploaded_filename": "should-not-propagate.csv",
             "local_path": "should-not-propagate",
             "source_path": "should-not-propagate",
-            "api_key": "should-not-propagate",
-            "password": "should-not-propagate",
+            "api_key": "should-not-propagate",  # pragma: allowlist secret
+            "password": "should-not-propagate",  # pragma: allowlist secret
             "token": "should-not-propagate",
             "cache_key": "should-not-propagate",
             "redis_url": "should-not-propagate",

@@ -28,7 +28,7 @@ def _frame() -> pd.DataFrame:
     )
     frame.attrs.update(
         {
-            "api_key": "sentinel-secret",
+            "api_key": "sentinel-secret",  # pragma: allowlist secret
             "cache_dir": r"C:\\Users\\private\\cache",
         }
     )

@@ -44,6 +44,7 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
+        entry: python src/scripts/detect_secrets_check.py
         exclude: '^config/\.secrets\.baseline$'
         args:
           - --baseline

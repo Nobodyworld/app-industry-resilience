@@ -129,4 +129,3 @@ Expected artifacts include:
 
 - CLI should access config via `load_config()` to resolve storage path and call `SnapshotStorage` for operations.
 - Streamlit helpers operate on stored `ObservabilitySnapshot` objects and convert them into display rows (timestamp, total events, error counts, last error summary).
-
