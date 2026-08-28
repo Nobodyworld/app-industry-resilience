@@ -5,9 +5,13 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from src.scripts import generate_industry_pulse_snapshot
+import src.scripts.generate_industry_momentum_ces_snapshot as ces_generator
+import src.scripts.generate_industry_momentum_g17_snapshot as g17_generator
+import src.scripts.generate_industry_pulse_snapshot as ppi_generator
+from fastapi_compat.testclient import TestClient
+from src.interfaces.api.app import app
 
-EXPECTED_VERSION = "0.3.0"
+EXPECTED_VERSION = "0.4.0"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -40,7 +44,19 @@ def test_authoritative_release_versions_are_aligned() -> None:
     assert len({project_version, commitizen_version, fallback_version}) == 1
 
 
-def test_snapshot_generator_user_agent_uses_the_canonical_version(monkeypatch) -> None:
+def test_api_and_openapi_report_release_version() -> None:
+    client = TestClient(app)
+
+    health = client.get("/health")
+    openapi = client.get("/openapi.json")
+
+    assert health.status_code == 200
+    assert health.json()["version"] == EXPECTED_VERSION
+    assert openapi.status_code == 200
+    assert openapi.json()["info"]["version"] == EXPECTED_VERSION
+
+
+def test_ppi_generator_user_agent_uses_version(monkeypatch) -> None:
     request: dict[str, Any] = {}
 
     class Response:
@@ -55,11 +71,59 @@ def test_snapshot_generator_user_agent_uses_the_canonical_version(monkeypatch) -
         request.update(kwargs)
         return Response()
 
-    monkeypatch.setattr(generate_industry_pulse_snapshot, "__version__", EXPECTED_VERSION)
-    monkeypatch.setattr(generate_industry_pulse_snapshot.requests, "post", fake_post)
+    monkeypatch.setattr(ppi_generator, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(ppi_generator.requests, "post", fake_post)
 
-    generate_industry_pulse_snapshot._request_bls(2024, 2026)
+    ppi_generator._request_bls(2024, 2026)
 
     assert request["headers"] == {
         "User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION} (+offline-snapshot)"
     }
+
+
+def test_ces_generator_user_agent_uses_version(monkeypatch) -> None:
+    request: dict[str, Any] = {}
+
+    class Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, str]:
+            return {"status": "REQUEST_SUCCEEDED"}
+
+    def fake_post(url: str, **kwargs: Any) -> Response:
+        request["url"] = url
+        request.update(kwargs)
+        return Response()
+
+    monkeypatch.setattr(ces_generator, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(ces_generator.requests, "post", fake_post)
+
+    ces_generator.fetch_payload(start_year=2024, end_year=2026)
+
+    expected = {"User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"}
+    assert request["headers"] == expected
+
+
+def test_g17_generator_user_agent_uses_version(monkeypatch) -> None:
+    requests_made: list[tuple[str, dict[str, Any]]] = []
+
+    class Response:
+        text = ""
+
+        def raise_for_status(self) -> None:
+            return None
+
+    def fake_get(url: str, **kwargs: Any) -> Response:
+        requests_made.append((url, kwargs))
+        return Response()
+
+    monkeypatch.setattr(g17_generator, "__version__", EXPECTED_VERSION)
+    monkeypatch.setattr(g17_generator.requests, "get", fake_get)
+
+    payloads = g17_generator.fetch_files()
+
+    assert set(payloads) == set(g17_generator.G17_FILES)
+    assert len(requests_made) == len(g17_generator.G17_FILES)
+    expected = {"User-Agent": f"industry-resilience-dashboard/{EXPECTED_VERSION}"}
+    assert all(request["headers"] == expected for _, request in requests_made)

@@ -48,3 +48,5 @@ repos:
         args:
           - --baseline
           - config/.secrets.baseline
+          - --exclude-lines
+          - '^\s*"csv_sha256":\s*"[0-9a-f]{64}",?\s*$'

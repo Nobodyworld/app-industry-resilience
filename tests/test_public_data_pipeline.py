@@ -12,10 +12,16 @@ import requests
 
 from src.adapters.aies import AIES_BASIC_URL, AIES_EXPENSE_URL
 from src.application.public_data_pipeline import (
+    BLS_CES_SERIES,
     BLS_PPI_SERIES,
+    FED_G17_FILES,
+    FED_G17_SERIES,
     PublicDataPipelineError,
     _bls_latest_fingerprint,
+    _latest_series_fingerprint,
+    _normalise_bls_ces,
     _normalise_bls_ppi,
+    _normalise_fed_g17,
     backfill_public_dataset,
     listen_for_public_release,
 )
@@ -320,3 +326,123 @@ def _bls_payload(
         "message": [],
         "Results": {"series": series_payload},
     }
+
+
+def _ces_payload(*, changed_series: str | None = None) -> dict[str, Any]:
+    return {
+        "status": "REQUEST_SUCCEEDED",
+        "message": [],
+        "Results": {
+            "series": [
+                {
+                    "seriesID": entry.series_id,
+                    "data": [
+                        {
+                            "year": "2026",
+                            "period": "M01",
+                            "value": "101.0" if entry.series_id == changed_series else "100.0",
+                        }
+                    ],
+                }
+                for entry in BLS_CES_SERIES
+            ]
+        },
+    }
+
+
+def _g17_payloads(*, changed_series: str | None = None) -> dict[str, str]:
+    payloads: dict[str, str] = {}
+    for signal_type in FED_G17_FILES:
+        lines = []
+        for entry in FED_G17_SERIES:
+            if entry.signal_type != signal_type:
+                continue
+            code = entry.series_id.split(".")[1]
+            value = "101.0" if entry.series_id == changed_series else "100.0"
+            lines.append(f'"{code}" 2026 {value}')
+        payloads[signal_type] = "\n".join(lines)
+    return payloads
+
+
+def test_ces_normalization_backfill_listener_and_nonfinal_revision(tmp_path) -> None:
+    baseline = _ces_payload()
+    cleaned = _normalise_bls_ces(baseline)
+    assert sorted(cleaned["series_id"].unique()) == sorted(
+        entry.series_id for entry in BLS_CES_SERIES
+    )
+    dry_run = backfill_public_dataset(
+        "bls_ces_monthly",
+        storage_root=tmp_path,
+        dry_run=True,
+        bls_post=lambda *_: baseline,
+    )
+    assert (dry_run.status, dry_run.row_count) == ("planned", 8)
+    ingested = backfill_public_dataset(
+        "bls_ces_monthly", storage_root=tmp_path, bls_post=lambda *_: baseline
+    )
+    assert ingested.status == "ingest"
+    assert (
+        listen_for_public_release(
+            "bls_ces_monthly", storage_root=tmp_path, bls_post=lambda *_: baseline
+        ).status
+        == "no_release_changed"
+    )
+    changed = _ces_payload(changed_series=BLS_CES_SERIES[0].series_id)
+    assert (
+        listen_for_public_release(
+            "bls_ces_monthly", storage_root=tmp_path, bls_post=lambda *_: changed
+        ).status
+        == "existing_release_revised"
+    )
+
+
+def test_g17_normalization_backfill_listener_and_complete_fingerprint(tmp_path) -> None:
+    baseline = _g17_payloads()
+    cleaned = _normalise_fed_g17(baseline)
+    expected = tuple(entry.series_id for entry in FED_G17_SERIES)
+    assert len(cleaned) == 22
+    first_fingerprint = _latest_series_fingerprint(cleaned, expected)
+    changed_series = FED_G17_SERIES[0].series_id
+    revised = _normalise_fed_g17(_g17_payloads(changed_series=changed_series))
+    assert _latest_series_fingerprint(revised, expected) != first_fingerprint
+
+    def download(url: str) -> bytes:
+        signal_type = next(key for key, value in FED_G17_FILES.items() if value == url)
+        return baseline[signal_type].encode()
+
+    result = backfill_public_dataset("fed_g17_monthly", storage_root=tmp_path, download=download)
+    assert (result.status, result.row_count, len(result.raw_paths)) == ("ingest", 22, 3)
+    assert (
+        listen_for_public_release(
+            "fed_g17_monthly", storage_root=tmp_path, download=download
+        ).status
+        == "no_release_changed"
+    )
+
+
+def test_latest_series_fingerprint_requires_full_registry() -> None:
+    cleaned = _normalise_bls_ces(_ces_payload())
+    incomplete = cleaned.iloc[1:].copy()
+    with pytest.raises(PublicDataPipelineError, match="every registered series"):
+        _latest_series_fingerprint(incomplete, (entry.series_id for entry in BLS_CES_SERIES))
+
+
+def test_g17_incomplete_registry_diagnostic_is_provider_neutral_and_revisions_register() -> None:
+    baseline = _normalise_fed_g17(_g17_payloads())
+    expected = tuple(entry.series_id for entry in FED_G17_SERIES)
+    missing_series = FED_G17_SERIES[-1].series_id
+    incomplete = baseline[baseline["series_id"] != missing_series].copy()
+
+    with pytest.raises(PublicDataPipelineError) as error:
+        _latest_series_fingerprint(incomplete, expected)
+
+    assert str(error.value) == "Cleaned observations must contain every registered series."
+    assert "bls" not in str(error.value).lower()
+
+    changed_series = next(
+        entry.series_id for entry in FED_G17_SERIES if entry.series_id != missing_series
+    )
+    revised = _normalise_fed_g17(_g17_payloads(changed_series=changed_series))
+    assert _latest_series_fingerprint(revised, expected) != _latest_series_fingerprint(
+        baseline, expected
+    )

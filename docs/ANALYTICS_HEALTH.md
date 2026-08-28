@@ -9,6 +9,10 @@ composite score, band, ranking, annual output-to-cost ratio, or Scenario Lab cal
 Producer-price movement does not establish profitability, resilience, distress, insolvency
 risk, or causation, and raw levels from series with unlike BLS base dates are not comparable.
 
+Industry Momentum CES employment and G.17 production, capacity, and utilization observations
+follow the same boundary. They do not enter any component, score, band, annual ranking, scenario,
+or lineage. Broader scopes are not exact matches, and unlike units/base periods are not comparable.
+
 The composite score combines four signals derived from the same source cost-structure inputs used by Idiot Index metrics:
 
 1. **Value-added percentage** – derived from value added and gross output.

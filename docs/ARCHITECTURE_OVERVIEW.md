@@ -67,6 +67,9 @@ The U.S. Industry Cost Structure & Resilience Dashboard follows a layered Python
 3. **Normalisation** – `src.core.normalize` ensures consistent column naming; `src.core.metrics.compute_metrics` calculates Idiot Index, value-added %, and material share metrics. `src.core.analytics.compute_health_scores` then derives composite health scores and risk bands that flow into service responses.
 4. **Narrative rendering** – Streamlit components under `src.interfaces.streamlit` render hero metrics, health insights, tables, and charts while maintaining accessible structure for tests.
 5. **Automation reuse** – The `src.agents` package exports typed request/response contracts mirroring the application service so CLI or AI clients can trigger evaluations safely.
+6. **Monthly context** – `IndustryMomentumService` composes the released PPI service with
+   independently validated CES and G.17 snapshot families. Its registry, API, Streamlit, and
+   exports remain outside the annual dataframe/calculation path and perform no request-time network.
 
 ## Caching & performance
 

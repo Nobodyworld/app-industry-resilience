@@ -1,0 +1,43 @@
+{
+  "csv_sha256": "4115607936cf15d80ecbb0f3924dc8611527d150fd7b106733b2c06389904de6",
+  "dataset_id": "bls_ces_monthly",
+  "generator_command": "python src/scripts/generate_industry_momentum_ces_snapshot.py",
+  "generator_version": "industry-momentum-ces-generator-v1",
+  "interpretation_notes": [
+    "Producer prices, employment, production, capacity, and utilization are contextual official observations. They do not prove profitability, resilience, distress, insolvency, or causation and do not enter annual dashboard calculations."
+  ],
+  "latest_release_period": "2026-06",
+  "manifest_identity": "industry-momentum-ces-2024-01-2026-06-4115607936cf15d8",
+  "observation_range": {
+    "end": "2026-06-01",
+    "start": "2024-01-01"
+  },
+  "official_endpoints": [
+    "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+  ],
+  "registry_version": "industry-momentum-registry-v1",
+  "requested_series": [
+    "CES3133110001",
+    "CES3133411101",
+    "CES3133610001",
+    "CES3231110001",
+    "CES3232210001",
+    "CES3232521101",
+    "CES3232611001",
+    "CES3232914001"
+  ],
+  "retrieved_at": "2026-08-10T23:24:23.159727Z",
+  "revision_notes": [
+    "CES observations are revised; regenerate and review hash changes for each refresh."
+  ],
+  "row_count": 240,
+  "schema_version": "industry-momentum-snapshot-v1",
+  "series_count": 8,
+  "transformations": [
+    "requested reviewed CES series without a registration key",
+    "excluded annual-average and non-monthly periods",
+    "normalized observations to first-of-month dates",
+    "bounded all series to their latest common complete month",
+    "sorted by source family, series ID, and observation date"
+  ]
+}
