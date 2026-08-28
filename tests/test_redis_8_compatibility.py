@@ -10,8 +10,8 @@ import pytest
 import redis
 
 from src.infrastructure.rate_limiter import (
-    RateLimitRule,
     RateLimiterService,
+    RateLimitRule,
     RedisTokenBucket,
 )
 
