@@ -22,6 +22,7 @@ from src.adapters.aies import (
     AIES_SURVEY_YEAR,
     build_aies_snapshot,
 )
+from src.core.industry_momentum import INDUSTRY_MOMENTUM_REGISTRY
 from src.core.industry_pulse import INDUSTRY_PULSE_ENDPOINT, INDUSTRY_PULSE_REGISTRY
 from src.core.public_data import (
     DEFAULT_CLEANING_VERSION,
@@ -34,7 +35,12 @@ from src.core.public_data import (
     hash_payload,
 )
 
-DatasetId = Literal["census_aies_annual", "bls_ppi_monthly"]
+DatasetId = Literal[
+    "census_aies_annual",
+    "bls_ppi_monthly",
+    "bls_ces_monthly",
+    "fed_g17_monthly",
+]
 Download = Callable[[str], bytes]
 Head = Callable[[str], Mapping[str, str]]
 BLSPost = Callable[[str, Mapping[str, Any]], Mapping[str, Any]]
@@ -44,6 +50,14 @@ BLS_PPI_ENDPOINT = INDUSTRY_PULSE_ENDPOINT
 BLS_PPI_SERIES: tuple[dict[str, str], ...] = tuple(
     entry.pipeline_mapping() for entry in INDUSTRY_PULSE_REGISTRY.entries
 )
+BLS_CES_ENDPOINT = "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+BLS_CES_SERIES = INDUSTRY_MOMENTUM_REGISTRY.filtered(source_family="bls_ces")
+FED_G17_SERIES = INDUSTRY_MOMENTUM_REGISTRY.filtered(source_family="fed_g17")
+FED_G17_FILES = {
+    "industrial_production_index": "https://www.federalreserve.gov/releases/g17/Current/ipdisk/ip_sa.txt",
+    "capacity_index": "https://www.federalreserve.gov/releases/g17/Current/ipdisk/cap_sa.txt",
+    "capacity_utilization_rate": "https://www.federalreserve.gov/releases/g17/Current/ipdisk/utl_sa.txt",
+}
 
 
 class PublicDataPipelineError(RuntimeError):
@@ -123,6 +137,10 @@ def backfill_public_dataset(
         return _backfill_aies(root, start_year, end_year, dry_run, force, download, head)
     if dataset_id == "bls_ppi_monthly":
         return _backfill_bls_ppi(root, start_year, end_year, dry_run, force, bls_post)
+    if dataset_id == "bls_ces_monthly":
+        return _backfill_bls_ces(root, start_year, end_year, dry_run, force, bls_post)
+    if dataset_id == "fed_g17_monthly":
+        return _backfill_fed_g17(root, start_year, end_year, dry_run, force, download)
     raise PublicDataPipelineError(f"Dataset is cataloged but not implemented: {dataset_id}")
 
 
@@ -132,6 +150,7 @@ def listen_for_public_release(
     storage_root: Path | str = PUBLIC_DATA_ROOT,
     head: Head | None = None,
     bls_post: BLSPost | None = None,
+    download: Download | None = None,
 ) -> ReleaseListenerResult:
     """Check official release metadata without performing a full ingestion."""
 
@@ -140,6 +159,10 @@ def listen_for_public_release(
         return _listen_aies(root, head)
     if dataset_id == "bls_ppi_monthly":
         return _listen_bls_ppi(root, bls_post)
+    if dataset_id == "bls_ces_monthly":
+        return _listen_bls_ces(root, bls_post)
+    if dataset_id == "fed_g17_monthly":
+        return _listen_fed_g17(root, download)
     raise PublicDataPipelineError(f"Dataset is cataloged but not implemented: {dataset_id}")
 
 
@@ -349,6 +372,173 @@ def _backfill_bls_ppi(
     )
 
 
+def _backfill_bls_ces(
+    root: Path,
+    start_year: int | None,
+    end_year: int | None,
+    dry_run: bool,
+    force: bool,
+    bls_post: BLSPost | None,
+) -> BackfillResult:
+    end = end_year or pd.Timestamp.utcnow().year
+    start = start_year or max(end - 2, 1990)
+    if start > end:
+        raise PublicDataPipelineError("start_year cannot be greater than end_year")
+    poster = bls_post or _post_bls_json
+    payload = poster(
+        BLS_CES_ENDPOINT,
+        {
+            "seriesid": [entry.series_id for entry in BLS_CES_SERIES],
+            "startyear": str(start),
+            "endyear": str(end),
+        },
+    )
+    cleaned = _normalise_bls_ces(payload)
+    raw = json.dumps(payload, sort_keys=True).encode("utf-8")
+    return _persist_monthly_signals(
+        root,
+        dataset_id="bls_ces_monthly",
+        source_url=BLS_CES_ENDPOINT,
+        cleaned=cleaned,
+        raw_payloads=(("bls_ces_response.json", raw),),
+        expected_series=tuple(entry.series_id for entry in BLS_CES_SERIES),
+        dry_run=dry_run,
+        force=force,
+        release_notes_url="https://www.bls.gov/ces/",
+        transformations=(
+            "downloaded BLS public API v2 CES response without an API key",
+            "required every reviewed CES employment series",
+            "normalized monthly values into the public signal schema",
+        ),
+    )
+
+
+def _backfill_fed_g17(
+    root: Path,
+    start_year: int | None,
+    end_year: int | None,
+    dry_run: bool,
+    force: bool,
+    download: Download | None,
+) -> BackfillResult:
+    if start_year is not None and end_year is not None and start_year > end_year:
+        raise PublicDataPipelineError("start_year cannot be greater than end_year")
+    downloader = download or _download_url
+    payloads = {
+        signal_type: downloader(url).decode("utf-8") for signal_type, url in FED_G17_FILES.items()
+    }
+    cleaned = _normalise_fed_g17(payloads)
+    if start_year is not None:
+        cleaned = cleaned[cleaned["observation_date"].str[:4].astype(int) >= start_year]
+    if end_year is not None:
+        cleaned = cleaned[cleaned["observation_date"].str[:4].astype(int) <= end_year]
+    cleaned = cleaned.reset_index(drop=True)
+    if cleaned.empty:
+        return _unsupported_range("fed_g17_monthly", str(end_year or start_year), dry_run)
+    raw_payloads = tuple(
+        (f"{signal_type}.txt", payloads[signal_type].encode("utf-8"))
+        for signal_type in sorted(payloads)
+    )
+    return _persist_monthly_signals(
+        root,
+        dataset_id="fed_g17_monthly",
+        source_url="https://www.federalreserve.gov/releases/g17/",
+        cleaned=cleaned,
+        raw_payloads=raw_payloads,
+        expected_series=tuple(entry.series_id for entry in FED_G17_SERIES),
+        dry_run=dry_run,
+        force=force,
+        release_notes_url="https://www.federalreserve.gov/releases/g17/",
+        transformations=(
+            "downloaded official seasonally adjusted G.17 text files",
+            "required every reviewed production, capacity, and utilization series",
+            "normalized monthly values into the public signal schema",
+        ),
+    )
+
+
+def _persist_monthly_signals(
+    root: Path,
+    *,
+    dataset_id: str,
+    source_url: str,
+    cleaned: pd.DataFrame,
+    raw_payloads: tuple[tuple[str, bytes], ...],
+    expected_series: tuple[str, ...],
+    dry_run: bool,
+    force: bool,
+    release_notes_url: str,
+    transformations: tuple[str, ...],
+) -> BackfillResult:
+    if cleaned.empty:
+        raise PublicDataPipelineError(f"{dataset_id} response had no usable observations.")
+    release_period = str(cleaned["release_period"].max())
+    content_hash = hash_payload(cleaned.to_csv(index=False).encode("utf-8"))
+    latest_fingerprint = _latest_series_fingerprint(cleaned, expected_series)
+    if dry_run:
+        return BackfillResult(
+            dataset_id=dataset_id,
+            release_period=release_period,
+            status="planned",
+            reason="dry_run",
+            dry_run=True,
+            row_count=int(cleaned.shape[0]),
+        )
+    store = _manifest_store(root)
+    decision = store.should_fetch(
+        ReleaseIdentity(
+            dataset_id=dataset_id,
+            release_period=release_period,
+            source_url=source_url,
+            content_hash=content_hash,
+            etag=latest_fingerprint,
+            schema_version=DEFAULT_SCHEMA_VERSION,
+            cleaning_version=DEFAULT_CLEANING_VERSION,
+        ),
+        force=force,
+    )
+    if not decision.should_fetch:
+        return BackfillResult(dataset_id, release_period, "skipped", decision.reason, False)
+    raw_dir = _artifact_dir(root, "raw", dataset_id, release_period)
+    cleaned_dir = _artifact_dir(root, "cleaned", dataset_id, release_period)
+    raw_paths: list[Path] = []
+    for name, payload in raw_payloads:
+        digest = hash_payload(payload)
+        path = raw_dir / f"{Path(name).stem}-{digest[:12]}{Path(name).suffix}"
+        _write_bytes_if_missing(path, payload)
+        raw_paths.append(path)
+    cleaned_path = cleaned_dir / f"{dataset_id}-{content_hash[:12]}.csv"
+    _write_csv(cleaned_path, cleaned)
+    manifest = build_release_manifest(
+        dataset_id=dataset_id,
+        release_period=release_period,
+        source_url=source_url,
+        content_hash=content_hash,
+        row_count=int(cleaned.shape[0]),
+        columns=cleaned.columns,
+        etag=latest_fingerprint,
+        observation_start=str(cleaned["observation_date"].min()),
+        observation_end=str(cleaned["observation_date"].max()),
+        release_notes_url=release_notes_url,
+        raw_artifact_path=_relative_to(root, raw_paths[0]),
+        cleaned_artifact_path=_relative_to(root, cleaned_path),
+        transformation_provenance=transformations,
+        notes=("Latest-series fingerprint covers every registered series.",),
+    )
+    manifest_path = store.write(manifest)
+    return BackfillResult(
+        dataset_id=dataset_id,
+        release_period=release_period,
+        status=decision.action,
+        reason=decision.reason,
+        dry_run=False,
+        row_count=int(cleaned.shape[0]),
+        raw_paths=tuple(_relative_to(root, path) for path in raw_paths),
+        cleaned_path=_relative_to(root, cleaned_path),
+        manifest_path=_relative_to(root, manifest_path),
+    )
+
+
 def _listen_aies(root: Path, head: Head | None) -> ReleaseListenerResult:
     header_getter = head or _head_url
     try:
@@ -436,6 +626,87 @@ def _listen_bls_ppi(root: Path, bls_post: BLSPost | None) -> ReleaseListenerResu
         content_hash=None,
         etag=latest_fingerprint,
         metadata_hash=latest_fingerprint,
+    )
+
+
+def _listen_bls_ces(root: Path, bls_post: BLSPost | None) -> ReleaseListenerResult:
+    poster = bls_post or _post_bls_json
+    current_year = pd.Timestamp.utcnow().year
+    try:
+        payload = poster(
+            BLS_CES_ENDPOINT,
+            {
+                "seriesid": [entry.series_id for entry in BLS_CES_SERIES],
+                "startyear": str(current_year - 1),
+                "endyear": str(current_year),
+            },
+        )
+        cleaned = _normalise_bls_ces(payload)
+        fingerprint = _latest_series_fingerprint(
+            cleaned, tuple(entry.series_id for entry in BLS_CES_SERIES)
+        )
+    except requests.RequestException as exc:
+        return ReleaseListenerResult(
+            "bls_ces_monthly",
+            None,
+            "source_unavailable",
+            BLS_CES_ENDPOINT,
+            message=str(exc),
+        )
+    except (PublicDataPipelineError, KeyError, TypeError, ValueError) as exc:
+        return ReleaseListenerResult(
+            "bls_ces_monthly",
+            None,
+            "source_metadata_malformed",
+            BLS_CES_ENDPOINT,
+            message=str(exc),
+        )
+    return _classify_listener_result(
+        root,
+        dataset_id="bls_ces_monthly",
+        release_period=str(cleaned["release_period"].max()),
+        source_url=BLS_CES_ENDPOINT,
+        content_hash=None,
+        etag=fingerprint,
+        metadata_hash=fingerprint,
+    )
+
+
+def _listen_fed_g17(root: Path, download: Download | None) -> ReleaseListenerResult:
+    downloader = download or _download_url
+    try:
+        payloads = {
+            signal_type: downloader(url).decode("utf-8")
+            for signal_type, url in FED_G17_FILES.items()
+        }
+        cleaned = _normalise_fed_g17(payloads)
+        fingerprint = _latest_series_fingerprint(
+            cleaned, tuple(entry.series_id for entry in FED_G17_SERIES)
+        )
+    except (requests.RequestException, UnicodeDecodeError) as exc:
+        return ReleaseListenerResult(
+            "fed_g17_monthly",
+            None,
+            "source_unavailable",
+            "https://www.federalreserve.gov/releases/g17/",
+            message=str(exc),
+        )
+    except (PublicDataPipelineError, KeyError, TypeError, ValueError) as exc:
+        return ReleaseListenerResult(
+            "fed_g17_monthly",
+            None,
+            "source_metadata_malformed",
+            "https://www.federalreserve.gov/releases/g17/",
+            message=str(exc),
+        )
+    return _classify_listener_result(
+        root,
+        dataset_id="fed_g17_monthly",
+        release_period=str(cleaned["release_period"].max()),
+        source_url="https://www.federalreserve.gov/releases/g17/",
+        content_hash=None,
+        etag=fingerprint,
+        metadata_hash=fingerprint,
     )
 
 
@@ -571,6 +842,60 @@ def _normalise_bls_ppi(payload: Mapping[str, Any]) -> pd.DataFrame:
     return frame
 
 
+def _normalise_bls_ces(payload: Mapping[str, Any]) -> pd.DataFrame:
+    from src.scripts.generate_industry_momentum_ces_snapshot import (
+        CESSnapshotGenerationError,
+        normalise_payload,
+    )
+
+    try:
+        rows = normalise_payload(dict(payload))
+    except CESSnapshotGenerationError as exc:
+        raise PublicDataPipelineError(str(exc)) from exc
+    return _momentum_rows_to_signal_frame(rows, "bls_ces_monthly")
+
+
+def _normalise_fed_g17(payloads: Mapping[str, str]) -> pd.DataFrame:
+    from src.scripts.generate_industry_momentum_g17_snapshot import (
+        G17SnapshotGenerationError,
+        normalise_files,
+    )
+
+    try:
+        rows = normalise_files(dict(payloads))
+    except G17SnapshotGenerationError as exc:
+        raise PublicDataPipelineError(str(exc)) from exc
+    return _momentum_rows_to_signal_frame(rows, "fed_g17_monthly")
+
+
+def _momentum_rows_to_signal_frame(rows: list[dict[str, str]], dataset_id: str) -> pd.DataFrame:
+    records = [
+        {
+            "observation_date": row["observation_date"],
+            "frequency": "monthly",
+            "series_id": row["series_id"],
+            "industry_code": row["target_industry_code"],
+            "industry_name": row["published_industry_code"],
+            "signal_name": row["signal_type"],
+            "signal_value": float(row["value"]),
+            "units": row["units"],
+            "seasonal_adjustment": row["seasonal_adjustment"],
+            "release_period": row["release_period"],
+            "source": row["source"],
+        }
+        for row in rows
+    ]
+    frame = pd.DataFrame.from_records(records)
+    if frame.empty:
+        return pd.DataFrame(columns=[*SIGNAL_SCHEMA, "industry_name"])
+    if frame.duplicated(["series_id", "observation_date"]).any():
+        raise PublicDataPipelineError(f"{dataset_id} contains duplicate series-month rows.")
+    frame.sort_values(["series_id", "observation_date"], inplace=True)
+    frame.reset_index(drop=True, inplace=True)
+    _validate_columns(frame, SIGNAL_SCHEMA, dataset_id)
+    return frame
+
+
 def _read_aies_zip_table(payload: bytes, member: str) -> pd.DataFrame:
     try:
         with zipfile.ZipFile(io.BytesIO(payload)) as archive:
@@ -634,13 +959,11 @@ def _aies_listener_headers(head: Head | None) -> tuple[str | None, str | None]:
     return etag, last_modified
 
 
-def _bls_latest_fingerprint(cleaned: pd.DataFrame) -> str:
-    expected_series = sorted(series["series_id"] for series in BLS_PPI_SERIES)
+def _latest_series_fingerprint(cleaned: pd.DataFrame, expected_series_ids: Iterable[str]) -> str:
+    expected_series = sorted(expected_series_ids)
     present_series = sorted(str(value) for value in cleaned["series_id"].unique())
     if present_series != expected_series:
-        raise PublicDataPipelineError(
-            "BLS cleaned observations must contain every reviewed series."
-        )
+        raise PublicDataPipelineError("Cleaned observations must contain every registered series.")
     latest_rows = (
         cleaned.sort_values(["series_id", "observation_date"])
         .groupby("series_id", sort=True, as_index=False)
@@ -649,7 +972,7 @@ def _bls_latest_fingerprint(cleaned: pd.DataFrame) -> str:
     )
     if len(latest_rows) != len(expected_series):
         raise PublicDataPipelineError(
-            "BLS cleaned observations must contain one latest row per reviewed series."
+            "Cleaned observations must contain one latest row per registered series."
         )
     series_payload = [
         {
@@ -668,6 +991,10 @@ def _bls_latest_fingerprint(cleaned: pd.DataFrame) -> str:
             sort_keys=True,
         ).encode("utf-8")
     )
+
+
+def _bls_latest_fingerprint(cleaned: pd.DataFrame) -> str:
+    return _latest_series_fingerprint(cleaned, (series["series_id"] for series in BLS_PPI_SERIES))
 
 
 def _manifest_store(root: Path) -> ManifestStore:
@@ -727,8 +1054,12 @@ def _unsupported_range(dataset_id: str, release_period: str, dry_run: bool) -> B
 
 
 __all__ = [
+    "BLS_CES_ENDPOINT",
+    "BLS_CES_SERIES",
     "BLS_PPI_ENDPOINT",
     "BLS_PPI_SERIES",
+    "FED_G17_FILES",
+    "FED_G17_SERIES",
     "BackfillResult",
     "PublicDataPipelineError",
     "ReleaseListenerResult",

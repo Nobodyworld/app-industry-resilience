@@ -1,5 +1,28 @@
 # Changelog
 
+# 2026-08-27 – v0.4.0 Public Beta — Industry Momentum
+
+- Industry Momentum was implemented in PR #130, prepared for release in PR #132, and published
+  from release-code SHA `eec9886c5f0a4ef495b6b31c3c2cc6cdc52e631a`.
+- Expanded the released PPI context into a 38-series typed registry: eight PPI, eight CES
+  employment, and 22 Federal Reserve G.17 production/capacity/utilization mappings.
+- Added deterministic January 2024 snapshots, exact-calendar percent/percentage-point changes,
+  family-specific degradation/provenance, canonical `/v1/context/momentum*` routes, and separate
+  CSV/JSON/five-sheet XLSX exports.
+- Renamed the fifth tab to Industry Momentum with Prices, Employment, and Production & Capacity
+  sections while keeping signals observational and outside annual analytics.
+- CI / Quality Gate #330 and Docker Smoke #170 passed on the exact release-code SHA.
+- Annotated tag `v0.4.0` uses object `d1b777b192c97aaefe167be0018a1890250a55fe` and peels to
+  `eec9886c5f0a4ef495b6b31c3c2cc6cdc52e631a`; the GitHub release is published as a prerelease / Public Beta.
+- Project, API, OpenAPI, fallback, Commitizen, and PPI/CES/G.17 generator versions report `0.4.0`.
+- Publication parity: **PASS** across `main`, the peeled annotated tag, the GitHub prerelease, and
+  a clean fresh tag checkout.
+- Screen-reader acceptance: NOT RUN. Native effective 200% zoom was not rerun on the exact final
+  release head; earlier accepted evidence applies only to the unchanged implementation tree.
+- Industry Momentum remains contextual, covers a reviewed manufacturing subset, includes broader-
+  published mappings, and contains unlike units and base periods that must not be treated as
+  equivalent or causal.
+
 # 2026-08-01 – v0.3.0 Public Beta final candidate
 - Accepted the release-owner GO for final candidate preparation and aligned the package,
   Commitizen, fallback, and outbound snapshot-generator identities at `0.3.0`.

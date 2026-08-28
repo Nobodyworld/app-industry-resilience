@@ -33,6 +33,18 @@ artifacts. JSON carries mapping, summaries, observations, limitations, and typed
 provenance. XLSX uses `Industry Pulse` and `Signal Metadata` sheets. These helpers do not read
 or mutate annual dataset lineage.
 
+### `src.application.industry_momentum_service.IndustryMomentumService`
+
+`list_mappings(...)` filters the 38-entry PPI/CES/G.17 registry. `for_industry_code(...)` returns
+deterministic per-family histories with exact/broader scope, bounded dates/limits, latest values,
+exact-calendar percent or percentage-point changes, freshness, provenance, and limitations.
+`for_series_id(...)` supports independent manual browsing. Source snapshots degrade independently
+and construction performs no provider request.
+
+`build_industry_momentum_exports(result)` returns deterministic signal-only CSV/JSON/XLSX. XLSX
+uses `Price Signals`, `Employment Signals`, `Production Signals`, `Capacity Signals`, and
+`Signal Metadata`; spreadsheet formula and URL interpretation is disabled for text.
+
 ## Adapters
 
 ### `src.adapters.bea`
@@ -84,6 +96,12 @@ six-digit NAICS validation, observation/change/freshness/provenance/history data
 registry/schema versions, and mandatory interpretation text. The public-data pipeline derives
 its `BLS_PPI_SERIES` compatibility structure from this registry.
 
+### `src.core.industry_momentum`
+
+Defines typed source-family, signal, mapping, observation, change, freshness, availability,
+provenance, family, and result contracts. It adapts the released PPI registry and adds the reviewed
+CES/G.17 mappings; UI, API, and tests do not own mapping dictionaries.
+
 ## Streamlit helpers
 
 ### `src.interfaces.streamlit.helpers`
@@ -104,6 +122,12 @@ Reusable rendering helpers used by `app.py`. Components include `render_page_hea
 snapshot-error states; a monthly chart with adjacent accessible table; comparison mapping
 availability; interpretation limits; provenance; and separate signal downloads.
 
+### `src.interfaces.streamlit.industry_momentum`
+
+`render_industry_momentum(...)` supplies the fifth first-class tab with Prices, Employment, and
+Production & Capacity sub-tabs, manual browsing, family states, per-signal chart/table pairs,
+mapping disclosure, provenance, limitations, and separate exports.
+
 ## Agents toolkit
 
 The `agents` package exposes dataclasses and helper functions that map 1:1 with the application service. Import `agents.compute_idiot_index_summary` to trigger evaluations from CLI tools or other Python code. JSON schemas live alongside the dataclasses for validation in typed clients.
@@ -117,6 +141,13 @@ Licensed under the Apache License 2.0. See [LICENSE](../LICENSE).
 
 - `app` – FastAPI-compatible application exposing canonical `/v1` consumer routes for metadata, evaluation, scenarios, analytics, and snapshot-backed Industry Pulse context alongside unversioned operational endpoints. `GET /v1/context/signals` and `GET /v1/context/signals/{industry_code}` are canonical-only and never perform provider calls. `GET /v1/meta/public-data` returns the validated no-auth readiness catalog with typed implementation stages and ground-truth flags; credentialed BEA and Census ASM adapters remain available through source/connector surfaces rather than this public catalog. Requests are instrumented via `ApiTelemetry` to emit Prometheus metrics, trace IDs, and feed the shared `ObservabilityRegistry`.
 - `ObservabilityRegistry` – Singleton registry (see `src/infrastructure/observability/instrumentation.py`) aggregating metrics, traces, and health checks. Extensions register instrumentation hooks through it instead of modifying services directly.
+
+Industry Momentum adds canonical-only `GET /v1/context/momentum` and
+`GET /v1/context/momentum/{industry_code}`. These routes expose the verified registry,
+source-family states, and typed `IndustryMomentumResponse` without provider calls; existing
+Industry Pulse routes remain unchanged. When a registered `series_id` contradicts either a supplied
+`source_family` or `signal_type`, the collection route returns a stable `400`; an unknown series ID
+deliberately remains a successful empty registry result.
 
 ### `src.interfaces.api.schemas`
 

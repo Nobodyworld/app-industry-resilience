@@ -77,6 +77,24 @@ This guide explains how to refresh the Idiot Index datasets, rotate API keys, an
 
 ## 2. Update bundled datasets (optional)
 
+### Refresh Industry Momentum snapshots
+
+Run the two official-provider generators, review registry/code changes, then validate committed
+hashes. BLS uses one keyless request for eight CES series; G.17 uses the three official current
+seasonally adjusted files.
+
+```bash
+python src/scripts/generate_industry_momentum_ces_snapshot.py
+python src/scripts/generate_industry_momentum_g17_snapshot.py
+python src/scripts/generate_industry_momentum_ces_snapshot.py --validate-only
+python src/scripts/generate_industry_momentum_g17_snapshot.py --validate-only
+```
+
+Review every hash change because both providers revise history. The shared public-data pipeline
+supports `bls_ces_monthly` and `fed_g17_monthly` dry-run/backfill/listener flows. Its fingerprint
+contains the latest relevant observation for every registered series, so a revision to a non-final
+series is detectable. Never commit raw provider payloads or local `data/public/` artifacts.
+
 1. Replace `data/sample_industries.csv` with the refreshed dataset if you want the offline demo to mirror the latest metrics.
 2. Run `python scripts/validate_sample_dataset.py` (or `pytest tests/test_sample_dataset.py` if added) to ensure schema compliance.
 3. Document the refresh in `CHANGELOG.md` and, if applicable, `docs/DEPENDENCIES.md` under "Data sources".

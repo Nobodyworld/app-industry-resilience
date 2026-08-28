@@ -35,6 +35,8 @@ def test_default_public_catalog_covers_readiness_sources() -> None:
     assert status_by_id["census_aies_annual"].backfill_validated is True
     assert "census_asm_annual" not in status_by_id
     assert status_by_id["bls_ppi_monthly"].listener_validated is True
+    assert status_by_id["bls_ces_monthly"].listener_validated is True
+    assert status_by_id["fed_g17_monthly"].listener_validated is True
     assert status_by_id["census_m3_monthly"].adapter_implemented is False
     assert status_by_id["gdelt_events_daily"].backfill_validated is False
 

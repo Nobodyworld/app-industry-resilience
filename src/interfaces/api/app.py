@@ -14,13 +14,25 @@ import pandas as pd
 
 from fastapi_compat import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi_compat.middleware.cors import CORSMiddleware
-from src.application import DataSource, IdiotIndexService, IndustryPulseService, ScenarioPlanner
+from src.application import (
+    DataSource,
+    IdiotIndexService,
+    IndustryMomentumService,
+    IndustryPulseService,
+    ScenarioPlanner,
+)
 from src.core import (
     LineageStep,
     attach_lineage,
     build_lineage,
     public_dataset_catalog,
     summarise_health,
+)
+from src.core.industry_momentum import (
+    INDUSTRY_MOMENTUM_COMPARISON_LIMITATION,
+    INDUSTRY_MOMENTUM_INTERPRETATION,
+    SignalType,
+    SourceFamily,
 )
 from src.core.industry_pulse import IndustryPulseSnapshotError
 from src.extensions.manager import get_extension_manager
@@ -42,6 +54,8 @@ from src.interfaces.api.schemas import (
     HealthAnalyticsRequest,
     HealthAnalyticsResponse,
     HealthResponse,
+    IndustryMomentumListResponse,
+    IndustryMomentumResponse,
     IndustryPulseListResponse,
     IndustryPulseResponse,
     MetaConnectorsResponse,
@@ -160,8 +174,31 @@ def _require_industry_pulse_service() -> IndustryPulseService:
     return _industry_pulse_service
 
 
+def _initialize_industry_momentum_service() -> IndustryMomentumService | None:
+    """Load independent snapshot families without preventing API startup."""
+
+    try:
+        return IndustryMomentumService()
+    except (OSError, ValueError):
+        logger.warning(
+            "Industry Momentum service initialization failed.",
+            extra={"error_classification": "momentum_initialization_failure"},
+        )
+        return None
+
+
+def _require_industry_momentum_service() -> IndustryMomentumService:
+    if _industry_momentum_service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Industry Momentum snapshots are unavailable.",
+        )
+    return _industry_momentum_service
+
+
 _origins = _allowed_origins()
 _industry_pulse_service = _initialize_industry_pulse_service()
+_industry_momentum_service = _initialize_industry_momentum_service()
 
 app.add_middleware(
     CORSMiddleware,
@@ -457,6 +494,149 @@ def _validated_signal_filters(
             detail="limit must be between 1 and 120.",
         )
     return start_date, end_date, limit
+
+
+@app.get(
+    "/v1/context/momentum",
+    response_model=IndustryMomentumListResponse,
+    tags=["context"],
+)
+def list_industry_momentum_v1(
+    source_family: SourceFamily | None = Query(None),
+    signal_type: SignalType | None = Query(None),
+    series_id: str | None = Query(None),
+    start: str | None = Query(None),
+    end: str | None = Query(None),
+    limit: int = Query(1, ge=1, le=120),
+) -> IndustryMomentumListResponse:
+    """List the verified registry and offline source-family snapshot summaries."""
+
+    _validate_momentum_enum_filters(source_family, signal_type)
+    service = _require_industry_momentum_service()
+    _validated_signal_filters(start=start, end=end, limit=limit)
+    if series_id is not None:
+        registered = service.registry.by_series_id(series_id)
+        if registered is not None and (
+            (source_family is not None and registered.source_family != source_family)
+            or (signal_type is not None and registered.signal_type != signal_type)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=("series_id does not match the requested source_family or signal_type."),
+            )
+    mappings = service.list_mappings(
+        source_family=source_family,
+        signal_type=signal_type,
+        series_id=series_id,
+    )
+    metadata = service.metadata["families"]
+    summary_fields = (
+        "dataset_id",
+        "manifest_identity",
+        "latest_release_period",
+        "observation_range",
+        "row_count",
+        "series_count",
+        "registry_version",
+        "schema_version",
+    )
+    snapshot_summaries = {
+        family: {field: payload.get(field) for field in summary_fields if field in payload}
+        for family, payload in metadata.items()
+        if isinstance(payload, dict) and (source_family is None or family == source_family)
+    }
+    availability = service.availability_summary()
+    if source_family is not None:
+        availability = {source_family: availability[source_family]}
+    return IndustryMomentumListResponse(
+        count=len(mappings),
+        registry=[mapping.to_dict() for mapping in mappings],
+        source_family_availability=availability,
+        latest_snapshot_summaries=snapshot_summaries,
+        limitations=[
+            INDUSTRY_MOMENTUM_INTERPRETATION,
+            INDUSTRY_MOMENTUM_COMPARISON_LIMITATION,
+        ],
+    )
+
+
+@app.get(
+    "/v1/context/momentum/{industry_code}",
+    response_model=IndustryMomentumResponse,
+    tags=["context"],
+)
+def get_industry_momentum_v1(
+    industry_code: str,
+    source_family: SourceFamily | None = Query(None),
+    signal_type: SignalType | None = Query(None),
+    series_id: str | None = Query(None),
+    start: str | None = Query(None),
+    end: str | None = Query(None),
+    limit: int = Query(120, ge=1, le=120),
+) -> IndustryMomentumResponse:
+    """Return bounded multi-source context for one exact selected industry code."""
+
+    _validate_momentum_enum_filters(source_family, signal_type)
+    service = _require_industry_momentum_service()
+    if re.fullmatch(r"[0-9]{6}", industry_code) is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="industry_code must be an exact six-digit NAICS code.",
+        )
+    start_date, end_date, bounded_limit = _validated_signal_filters(
+        start=start, end=end, limit=limit
+    )
+    if series_id is not None:
+        registered = service.registry.by_series_id(series_id)
+        if registered is not None and (
+            registered.target_industry_code != industry_code
+            or (source_family is not None and registered.source_family != source_family)
+            or (signal_type is not None and registered.signal_type != signal_type)
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="series_id does not match the requested industry or family filters.",
+            )
+    result = service.for_industry_code(
+        industry_code,
+        source_family=source_family,
+        signal_type=signal_type,
+        series_id=series_id,
+        start=start_date,
+        end=end_date,
+        limit=bounded_limit,
+    )
+    if result.availability == "unavailable":
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Requested Industry Momentum snapshots are unavailable.",
+        )
+    return IndustryMomentumResponse.from_result(result)
+
+
+def _validate_momentum_enum_filters(
+    source_family: SourceFamily | None, signal_type: SignalType | None
+) -> None:
+    allowed_families = {"bls_ppi", "bls_ces", "fed_g17"}
+    allowed_signals = {
+        "producer_price_index",
+        "employment_count",
+        "average_weekly_hours",
+        "average_hourly_earnings",
+        "industrial_production_index",
+        "capacity_index",
+        "capacity_utilization_rate",
+    }
+    if source_family is not None and source_family not in allowed_families:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="source_family is unsupported.",
+        )
+    if signal_type is not None and signal_type not in allowed_signals:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="signal_type is unsupported.",
+        )
 
 
 @app.get(
