@@ -1,19 +1,20 @@
 # v0.4.0 Public Beta Release Notes
 
-**Status:** Release candidate preparation — not published<br>
-**Starting main / merged-feature SHA:** `f99abbf42c898f0fe4a7494f09b4aae13bed5c40`<br>
-**Starting release-candidate SHA:** `27d5caeca73ef29382bd9f34c656f69aea66fa6d`<br>
-**Accepted code-and-doc candidate SHA:** `3afdb891baa681f8b77177434055e257b15e6763`<br>
-**Final pushed evidence-commit SHA:** recorded in PR #132 and the external release report after Git computes the commit identity<br>
-**Release branch:** `release/v0.4.0`<br>
+**Status:** Published GitHub prerelease / Public Beta<br>
+**Published:** `2026-08-27T17:21:40Z`<br>
+**Release-code SHA:** `eec9886c5f0a4ef495b6b31c3c2cc6cdc52e631a`<br>
+**Release-preparation final head:** `0dd726446f2c4d9ce29acb415d6b3461c1dfdfc4`<br>
+**Annotated-tag object:** `d1b777b192c97aaefe167be0018a1890250a55fe`<br>
+**Peeled tag commit:** `eec9886c5f0a4ef495b6b31c3c2cc6cdc52e631a`<br>
+**GitHub release ID:** `378000330`<br>
+**GitHub release:** [v0.4.0 Public Beta — Industry Momentum](https://github.com/Nobodyworld/app-industry-resilience/releases/tag/v0.4.0)<br>
 **Package / Commitizen / fallback version:** `0.4.0` / `0.4.0` / `0.4.0`<br>
-**Planned release tag:** `v0.4.0` — not created<br>
-**GitHub release:** not created<br>
 **Release issue:** [#129](https://github.com/Nobodyworld/app-industry-resilience/issues/129)<br>
 **Implementation pull request:** [#130](https://github.com/Nobodyworld/app-industry-resilience/pull/130)<br>
-**Release pull request:** [#132](https://github.com/Nobodyworld/app-industry-resilience/pull/132) — open, draft, and unmerged at the starting checkpoint
+**Release pull request:** [#132](https://github.com/Nobodyworld/app-industry-resilience/pull/132)<br>
+**Publication bookkeeping pull request:** [#133](https://github.com/Nobodyworld/app-industry-resilience/pull/133)
 
-These notes describe the planned `v0.4.0` Public Beta release. The complete Industry Momentum implementation is merged into `main`, but publication remains gated on version-aligned exact-head validation, release-candidate review, explicit merge authorization, an annotated immutable tag, GitHub release publication, and tag/release/fresh-checkout SHA parity.
+These notes are the durable repository record for the published `v0.4.0 Public Beta — Industry Momentum` GitHub prerelease. The release preserves the established boundary: monthly PPI, CES, and Federal Reserve G.17 observations are contextual and do not alter annual analytics.
 
 ## Highlights
 
@@ -84,7 +85,7 @@ These notes describe the planned `v0.4.0` Public Beta release. The complete Indu
 - Charts have immediately adjacent accessible table alternatives and explicit state language.
 - Streamlit usage telemetry remains disabled.
 - Browser acceptance observed loopback-only application and WebSocket traffic with no automatic BLS, Federal Reserve, or unrelated external request.
-- Screen-reader acceptance remains **NOT RUN** unless a real screen reader is exercised during final release-candidate validation. No screen-reader compliance claim is made.
+- Screen-reader acceptance: NOT RUN. No screen-reader compliance claim is made.
 
 ## Upgrade notes from v0.3.0
 
@@ -95,29 +96,22 @@ These notes describe the planned `v0.4.0` Public Beta release. The complete Indu
 - Use `availability`, per-family state, mapping relationship, units, method, freshness, and provenance fields rather than inferring completeness from the presence of observations.
 - Annual exports and analytical lineage remain separate from Industry Momentum signal-only exports and provenance.
 
-## Validation baseline and remaining release gates
+## Publication Result / Parity
 
-The merged implementation candidate previously recorded:
+Publication parity is **PASS**:
 
-- 458 tests passed;
-- runtime line coverage of 91.01%;
-- runtime branch coverage of 74.49%;
-- combined runtime coverage of 87.63%, above the 85% gate;
-- full-source informational line coverage of 86.04%;
-- full-source informational branch coverage of 68.40%;
-- passing Black, Ruff, mypy, benchmark, detect-secrets, pip check, pip-audit, generator validation-only, and diff checks;
-- passing headed Microsoft Edge/Playwright acceptance for the required product states, exports, accessibility smoke, appearance, scaling, and loopback-only traffic;
-- passing exact-head CI / Quality Gate #320 and Docker Smoke #162;
-- passing post-merge `main` CI #323 and Docker Smoke #163.
+- CI / Quality Gate #330 and Docker Smoke #170 passed on release-code SHA
+  `eec9886c5f0a4ef495b6b31c3c2cc6cdc52e631a`.
+- `refs/tags/v0.4.0` points to annotated-tag object
+  `d1b777b192c97aaefe167be0018a1890250a55fe`, which peels to the exact release-code SHA.
+- The annotated tag is unsigned; GitHub reports verification `false` with reason `unsigned`.
+- Remote `main`, the peeled annotated tag, the GitHub prerelease identity, and a clean fresh tag
+  checkout all resolve to the exact release-code SHA.
+- The fresh checkout reported package/Commitizen and fallback versions `0.4.0`.
+- Publication created only the authorized annotated tag and GitHub prerelease; it did not mutate
+  release code or the release branch.
 
-Those results are implementation and post-merge baselines. They do not replace final validation of the version-aligned release candidate.
-
-Preliminary release-branch evidence at starting SHA
-`27d5caeca73ef29382bd9f34c656f69aea66fa6d` is also historical after the next commit: CI / Quality
-Gate #328 and Docker Smoke #168 passed, with 460 tests and 87.59% runtime combined coverage. Final
-totals and hosted dispositions will be recorded only for the final pushed candidate.
-
-Local release-candidate validation on Python 3.13.7 recorded:
+The accepted release-candidate validation on Python 3.13.7 recorded:
 
 - 59 focused release/Momentum tests and 461 complete tests passed;
 - runtime coverage: 91.01% line, 74.49% branch, 87.63% combined (85% gate passed);
@@ -130,15 +124,11 @@ Local release-candidate validation on Python 3.13.7 recorded:
   keyboard-activated CSV/JSON/five-sheet XLSX exports, partial and total-unavailable states,
   adjacent accessible tables, visible focus, and selected-tab contrast of 6.57:1 light / 5.72:1
   dark;
-- native effective 200% zoom and real screen-reader acceptance are NOT RUN on this exact head;
+- native effective 200% zoom was not rerun on the exact final release head;
+- Screen-reader acceptance: NOT RUN;
 - GNU Make and local Docker are unavailable, so `make quality-gate` and local Docker Smoke are NOT
   RUN; the exact Makefile gate constituents were run individually;
 - the only `pip-audit` diagnostic was a non-vulnerability cache-deserialization warning.
-
-Before publication, still record on the exact final release-candidate head:
-
-- hosted CI / Quality Gate and Docker Smoke;
-- exact release-code SHA and GO / CONDITIONAL GO / NO-GO recommendation.
 
 ## Public Beta limitations
 
@@ -150,23 +140,18 @@ Before publication, still record on the exact final release-candidate head:
 - The application is not financial, investment, credit, insolvency, causal-forecast, or policy advice.
 - Screen-reader acceptance is not a PASS unless a real screen reader is exercised and recorded.
 
-## Publication plan
+## Publication bookkeeping
 
-Publication requires separate explicit owner authorization after the release pull request is validated and merged.
-
-1. Identify the exact merged release-code SHA.
-2. Create annotated immutable tag `v0.4.0` at that SHA.
-3. Publish `v0.4.0 Public Beta — Industry Momentum` as the intended GitHub prerelease/release classification.
-4. Verify the annotated-tag object and peeled commit.
-5. Verify a fresh tag checkout resolves to the release-code SHA and reports version `0.4.0`.
-6. Verify tag, GitHub release, release-code commit, and fresh-checkout parity.
-7. Update these release notes and the durable publication record with exact evidence.
-8. Close issue #129 only after publication bookkeeping is complete.
+Publication is complete. Draft PR #133 contains the documentation-only post-publication record;
+issue #129 remains open until that bookkeeping PR is reviewed and merged. Neither this record nor
+PR #133 changes the release-code commit, annotated tag, or published GitHub prerelease.
 
 ## Evidence
 
 - [`docs/execplans/v0.4.0-industry-momentum.md`](execplans/v0.4.0-industry-momentum.md)
 - [`docs/execplans/v0.4.0-release-preparation.md`](execplans/v0.4.0-release-preparation.md)
+- [`docs/execplans/v0.4.0-publication-record.md`](execplans/v0.4.0-publication-record.md)
 - [Issue #129](https://github.com/Nobodyworld/app-industry-resilience/issues/129)
 - [Implementation PR #130](https://github.com/Nobodyworld/app-industry-resilience/pull/130)
 - [Release PR #132](https://github.com/Nobodyworld/app-industry-resilience/pull/132)
+- [Publication bookkeeping PR #133](https://github.com/Nobodyworld/app-industry-resilience/pull/133)
