@@ -10,6 +10,6 @@ detect-secrets>=1.5.0,<2
 pip-audit>=2.7.3,<3
 botocore>=1.43.59,<2
 
-# Type stubs
+# Type stubs and test doubles
 types-requests>=2.32.0,<3
 fakeredis[lua]>=2.37.1,<3
