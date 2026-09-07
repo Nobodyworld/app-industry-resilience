@@ -47,10 +47,22 @@ This runbook captures the high-level steps for responding to runtime, data-sourc
 - **Performance degradation:** Inspect API-duration histograms, recent observability events, and the diagnostics bundle. Reduce scenario scope or run multiple API instances only after confirming the workload is stateless and the configured rate-limit backend supports the deployment topology.
 - **Bad deployment:** Roll back through the normal deployment mechanism to the last validated commit. Do not bypass `CI / Quality Gate` or alter protected `main` directly during recovery.
 
+### Redis failure and recovery contract (post-v0.4.0, unreleased)
+
+Monitor `rate_limit_backend_up{backend="redis"}`: successful Redis decisions set it to `1`, failures set the same labelled sample to `0`, and recovery restores `1`. Do not use a separate `backend="redis-fallback"` gauge sample as the Redis availability signal. Active `redis-fallback` mode remains in request counters and health summaries. The health component must transition `pass` → `warn` → `pass`, clearing `last_error` after a successful Redis operation.
+
+The application client uses no automatic connection/command retries. `RATE_LIMIT_REDIS_TIMEOUT_SECONDS` supplies both connection and response timeouts; an unset value uses 1.0 second for each. Values must be finite and positive. These are per-operation socket timeouts, not a total request deadline: DNS resolution, connection handshakes, and multiple protocol operations can add time. Increase the value explicitly only for a measured deployment need.
+
+An interrupted Lua reply may mean the server already consumed a token. The application must not automatically replay that mutation. It retains its existing local-memory fallback, which favors availability but is not globally coordinated across processes and cannot provide exactly-once token accounting after ambiguous failures. Reconnecting on a later enforcement call is permitted; do not flush Redis databases to recover.
+
+Use only task-owned services for fault tests. `tests/test_redis_failure_contract.py` covers the production client construction path, a reserved non-listening loopback port, a stalled loopback response, and injected lost replies after real Lua execution. The controlled 50-millisecond timeout tests require fallback within one second; this is a test bound, not a production service-level promise. Set `REDIS_COMPAT_URL` only to a disposable Redis 8 service to include the real-server cases. Tests use unique key prefixes and exact-key cleanup.
+
+See the [unreleased hardening notes](RELEASE_NOTES_POST_V0.4.0_HARDENING.md) and [compatibility execution plan](execplans/post-v0.4.0-redis-8-compatibility.md). These changes are not part of the immutable published v0.4.0 release.
+
 ## 3. Recover and verify
 
 1. Apply the smallest corrective change through a pull request.
-2. Run `make quality-gate` locally when possible and require the hosted `CI / Quality Gate` check before merge.
+2. Run `make quality-gate` locally when possible and require the hosted `CI / Quality Gate` check before merge. Audit the installed test environment with `python -m pip_audit --local --strict` in addition to the requirements audit.
 3. For deployment-sensitive changes, run the pinned `Docker Smoke` workflow and confirm:
    - production image build;
    - non-root runtime user;

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import time
 from collections.abc import Callable, MutableMapping
@@ -77,12 +78,6 @@ def configure_metrics(
 
     global _METRICS
     _METRICS = _Metrics(counter, wait_histogram, backend_gauge)
-    # Also expose a default gauge that reports the last decision backend mode
-    try:
-        # Create simple gauges if the registry is available; use the counter label set
-        _METRICS_backend_gauge = wait_histogram  # no-op default assignment to keep reference
-    except Exception:  # pragma: no cover - defensive
-        pass
 
 
 def _record_decision(
@@ -247,15 +242,6 @@ class RedisTokenBucket(TokenBucketBackend):
             self._last_error = None
             self._last_success = time.time()
             self._active_backend = self.backend_name
-            # Optionally record a simple gauge via metrics if configured
-            if _METRICS is not None:
-                try:
-                    backend_gauge = getattr(_METRICS, "backend_gauge", None)
-                    if backend_gauge is not None:
-                        # Set the gauge to 1.0 for redis (up)
-                        backend_gauge.set(1.0, labels={"backend": self.backend_name})
-                except Exception:
-                    pass
             return RateLimitDecision(
                 allowed=allowed,
                 remaining_tokens=tokens,
@@ -274,12 +260,11 @@ class RedisTokenBucket(TokenBucketBackend):
                 backend=self._active_backend,
             )
         finally:
-            if _METRICS is not None:
+            if _METRICS is not None and _METRICS.backend_gauge is not None:
                 try:
-                    backend_gauge = getattr(_METRICS, "backend_gauge", None)
-                    if backend_gauge is not None:
-                        val = 1.0 if self._active_backend == self.backend_name else 0.0
-                        backend_gauge.set(val, labels={"backend": self._active_backend})
+                    # Keep the label stable so failure clears the previous Redis-up sample.
+                    value = 1.0 if self._active_backend == self.backend_name else 0.0
+                    _METRICS.backend_gauge.set(value, labels={"backend": self.backend_name})
                 except Exception:
                     pass
 
@@ -396,18 +381,28 @@ def _build_backend(config: RateLimitConfig) -> TokenBucketBackend:
 
 
 def _create_redis_client(cfg: DistributedRateLimitConfig) -> RedisClient:
+    from redis.backoff import NoBackoff
+    from redis.retry import Retry
+
+    # A lost Lua reply does not prove the token mutation failed. Never replay it
+    # automatically; preserve the existing, explicitly degraded memory fallback.
+    timeout = cfg.socket_timeout if cfg.socket_timeout is not None else 1.0
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("Redis timeout must be finite and positive")
     kwargs: dict[str, object] = {
         "host": cfg.host,
         "port": cfg.port,
         "db": cfg.db,
         "ssl": cfg.ssl,
+        "socket_timeout": timeout,
+        "socket_connect_timeout": timeout,
+        "retry": Retry(NoBackoff(), 0),
+        "retry_on_error": [],
     }
     if cfg.username:
         kwargs["username"] = cfg.username
     if cfg.password:
         kwargs["password"] = cfg.password
-    if cfg.socket_timeout is not None:
-        kwargs["socket_timeout"] = cfg.socket_timeout
     redis_module = cast(Any, redis)
     return cast(RedisClient, redis_module.Redis(**kwargs))
 
