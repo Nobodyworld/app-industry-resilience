@@ -37,6 +37,51 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Smoke Streamlit server startup without credentials
+        shell: bash
+        env:
+          BEA_API_KEY: ""
+          CENSUS_API_KEY: ""
+        run: |
+          set -euo pipefail
+          log_file="${RUNNER_TEMP}/streamlit-startup-smoke.log"
+          streamlit run app.py \
+            --server.headless=true \
+            --server.address=127.0.0.1 \
+            --server.port=8501 \
+            >"${log_file}" 2>&1 &
+          streamlit_pid=$!
+
+          cleanup() {
+            kill "${streamlit_pid}" >/dev/null 2>&1 || true
+            wait "${streamlit_pid}" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          healthy=0
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:8501/_stcore/health >/dev/null; then
+              healthy=1
+              break
+            fi
+
+            if ! kill -0 "${streamlit_pid}" >/dev/null 2>&1; then
+              echo "Streamlit exited before becoming healthy."
+              cat "${log_file}"
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "${healthy}" -ne 1 ]; then
+            echo "Streamlit did not become healthy within 30 seconds."
+            cat "${log_file}"
+            exit 1
+          fi
+
+          curl --fail --silent --show-error http://127.0.0.1:8501/ >/dev/null
+
       - name: Verify pre-commit configuration parity
         run: diff -u .pre-commit-config.yaml config/.pre-commit-config.yaml
 
