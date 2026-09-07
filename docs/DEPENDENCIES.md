@@ -38,16 +38,22 @@ This document records the vetted runtime and development dependencies for the U.
 - `redis>=8.1.0,<9` is the supported optional runtime client range.
 - `fakeredis[lua]>=2.37.1,<3` is required in development because `RedisTokenBucket` uses `register_script`, which executes through `EVALSHA`; plain fakeredis does not provide that command path.
 - The dedicated Redis compatibility workflow verifies the declared exact minimums under Python 3.13 against both a Redis-8-configured fakeredis server and a disposable real Redis 8 service.
-- In-memory mode remains the default. Redis connection or command failures must continue to degrade to the private in-memory fallback with truthful health and metrics state.
+- The production client explicitly disables automatic connection/command retries. A lost Lua response may follow a successful token mutation, so replaying that operation is unsafe. Later enforcement calls can reconnect normally.
+- `RATE_LIMIT_REDIS_TIMEOUT_SECONDS` applies to both socket connection and response waits. When unset (configuration value `None`), the client uses 1.0 second for each; explicit values must be finite and positive. These per-operation timeouts are not a total request deadline or a DNS deadline.
+- In-memory mode remains the default. Redis failures retain the private in-memory fallback and warning health state. This fallback is not globally coordinated and cannot guarantee exactly-once accounting after a lost response.
+- `rate_limit_backend_up{backend="redis"}` is updated to zero on failure and one on recovery. Active fallback mode remains available through decision counters and health summaries.
 - The Lua extra installs `lupa` only in development/test environments; it is not a runtime dependency of the application image.
 
 ## Review process
 
-1. Run `pip-audit` monthly through `make security` and record actionable findings in the governing issue or ExecPlan.
-2. For quarterly reviews, inspect upstream release notes for major runtime dependencies and exercise the focused compatibility tests before raising version floors.
-3. Update this file whenever a dependency is added, removed, or upgraded; keep its constraints identical to the requirements files.
-4. Validate optional service dependencies against a disposable service rather than production or user-owned data.
-5. Capture temporary pins or exceptions in the relevant ExecPlan and changelog, including an owner and revisit condition.
+1. Run the existing requirements audit through `make security` and record actionable findings in the governing issue or ExecPlan.
+2. Also run `python -m pip_audit --local --strict` using the interpreter of each tested virtual environment. Requirements-file resolution alone does not audit the installed minimum-version graph. Record installed versions alongside the result; report skipped or uncollectable packages rather than treating them as covered.
+3. For quarterly reviews, inspect upstream release notes for major runtime dependencies and exercise focused compatibility tests before raising version floors.
+4. Update this file whenever a dependency is added, removed, or upgraded; keep its constraints identical to the requirements files.
+5. Validate optional service dependencies against a disposable service rather than production or user-owned data.
+6. Capture temporary pins or exceptions in the relevant ExecPlan and changelog, including an owner and revisit condition.
+
+The [unreleased hardening notes](RELEASE_NOTES_POST_V0.4.0_HARDENING.md) describe the operational changes. Exact-head validation is recorded in PR #135, not inferred from older green runs.
 
 ## Data sources
 
