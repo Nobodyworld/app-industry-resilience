@@ -296,3 +296,60 @@ def test_scenario_auto_compute_counter_tracks_baseline_and_scenario(monkeypatch)
         ("build_scenario_comparison_table_baseline",): 1.0,
         ("build_scenario_comparison_table_scenario",): 1.0,
     }
+
+
+@pytest.mark.parametrize(
+    "runtime_url",
+    [
+        None,
+        "?mode=sample",
+        "javascript:alert(1)",
+        "https://example-user@example.com/",
+        "https://example.com:bad/",
+        "https://example.com/\n",
+    ],
+)
+def test_share_value_falls_back_to_query_parameters(runtime_url) -> None:
+    from src.interfaces.streamlit.helpers import build_share_value
+
+    assert build_share_value({"search": ["["], "compare": ["311", "321"]}, runtime_url) == (
+        "?compare=311&compare=321&search=%5B",
+        False,
+    )
+
+
+def test_share_value_preserves_application_path_and_deterministic_query() -> None:
+    from src.interfaces.streamlit.helpers import build_share_value
+
+    params = {"search": ["Food"], "mode": ["sample-(offline)"]}
+    value, absolute = build_share_value(params, "https://example.com/dashboard/?old=1#fragment")
+    assert absolute
+    assert value == "https://example.com/dashboard/?mode=sample-%28offline%29&search=Food"
+    assert (
+        build_share_value(dict(reversed(list(params.items()))), "https://example.com/dashboard/")[0]
+        == value
+    )
+
+
+@pytest.mark.parametrize("change", ["source", "year", "upload"])
+def test_baseline_changes_clear_scenario_and_inputs(change) -> None:
+    from src.interfaces.streamlit.helpers import dataframe_identity, invalidate_scenario_baseline
+
+    frame = pd.DataFrame({"year": [2021], "gross_output": [100.0]})
+    state = {"search_query": "Food"}
+    identity = "sample:2021:" + dataframe_identity(frame)
+    invalidate_scenario_baseline(state, identity)
+    state.update(scenario_committed={"gross": 10}, scenario_gross_delta=10)
+    assert not invalidate_scenario_baseline(state, identity)
+    if change == "upload":
+        frame.loc[0, "gross_output"] = 101.0
+        next_identity = "sample:2021:" + dataframe_identity(frame)
+    else:
+        next_identity = (
+            identity.replace("sample", "official")
+            if change == "source"
+            else identity.replace("2021", "2022")
+        )
+    assert invalidate_scenario_baseline(state, next_identity)
+    assert "scenario_committed" not in state and "scenario_gross_delta" not in state
+    assert state["search_query"] == "Food"

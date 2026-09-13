@@ -57,3 +57,5 @@ Completion note (indented, one line):
 ## Active workstreams
 
 - [ ] Publish a live no-credential Streamlit public demo and deployment contract — issue: #139
+
+- [ ] Correctness and trust showcase slice implemented for review: literal shared search, consistent current-view populations, observed sample year, initial URL hydration, scenario baseline invalidation, accurate sharing, and executable Food Manufacturing documentation. Issue: #142. Browser acceptance and draft PR review remain pending; #143 and #144 are separate work.
