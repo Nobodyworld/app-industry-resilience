@@ -227,6 +227,7 @@ def render_sidebar(
     bea_key: str,
     census_key: str,
     security_utils,
+    sample_year: int | None = None,
 ) -> SidebarState:
     """Render sidebar inputs and validations, returning state for the caller."""
 
@@ -260,6 +261,15 @@ def render_sidebar(
 
     min_year, max_year = year_bounds
     reference_default = 2023 if data_mode == "Official snapshot (AIES 2023)" else default_year
+    fixed_year = (
+        2023
+        if data_mode == "Official snapshot (AIES 2023)"
+        else (sample_year if data_mode == "Sample (offline)" else None)
+    )
+    if fixed_year is not None:
+        reference_default = fixed_year
+        st.session_state["reference_year"] = fixed_year
+        min_year, max_year = min(min_year, fixed_year), max(max_year, fixed_year)
     year_input = int(
         st.sidebar.number_input(
             "Reference year",
@@ -267,7 +277,8 @@ def render_sidebar(
             max_value=max_year,
             value=reference_default,
             step=1,
-            disabled=data_mode == "Official snapshot (AIES 2023)",
+            disabled=data_mode
+            in {"Official snapshot (AIES 2023)", "Sample (offline)", "Upload CSV"},
             key="reference_year",
             help="Select the reporting year for sources that support multiple years.",
         )

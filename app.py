@@ -8,10 +8,10 @@ calls and CSV uploads.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from typing import Any, cast
-from urllib.parse import urlencode
 
 import pandas as pd
 import plotly.express as px
@@ -28,6 +28,7 @@ from src.application import (
     ScenarioPlanner,
     evaluate_idiot_index,
 )
+from src.application.idiot_index_service import observation_period
 from src.core import FilePolicy, SecurityUtils, get_config_summary
 from src.interfaces.streamlit.bootstrap import (
     BootstrapError,
@@ -55,9 +56,12 @@ from src.interfaces.streamlit.helpers import (
     build_comparison_table,
     build_health_band_distribution,
     build_scenario_comparison_table,
+    build_share_value,
     calculate_benchmark,
+    dataframe_identity,
     decode_query_params,
     encode_query_params,
+    invalidate_scenario_baseline,
     load_snapshot_history,
     prepare_download_artifacts,
     prepare_trend_data,
@@ -221,12 +225,14 @@ handler_summary = SecurityUtils.rate_limit_handler_summary()
 config_summary.setdefault("rate_limit_backend", {})["handler"] = handler_summary
 
 query_params_initial = _get_query_params()
+hydration_params = query_params_initial if not st.session_state.get("url_hydrated") else {}
+st.session_state["url_hydrated"] = True
 
 
 def _last_value(key: str, default: str | None = None) -> str | None:
     """Return the last query parameter value for ``key`` if present."""
 
-    values = query_params_initial.get(key)
+    values = hydration_params.get(key)
     if not values:
         return default
     return values[-1]
@@ -240,7 +246,7 @@ if "search_query" not in st.session_state:
 if "industry_selection_code" not in st.session_state:
     st.session_state["industry_selection_code"] = _last_value("industry")
 if "comparison_codes" not in st.session_state:
-    st.session_state["comparison_codes"] = query_params_initial.get("compare", [])
+    st.session_state["comparison_codes"] = hydration_params.get("compare", [])
 
 sidebar_context = bootstrap_state.sidebar_context
 
@@ -253,6 +259,7 @@ if year_override_raw:
         year_override = sidebar_context.default_year
 
 year_override = sidebar_context.normalise_year(year_override)
+year_override = st.session_state.setdefault("initial_reference_year", year_override)
 
 sidebar_modes = [
     "Official snapshot (AIES 2023)",
@@ -267,10 +274,8 @@ if mode_raw:
     slug_lookup = {option.lower().replace(" ", "-"): option for option in sidebar_modes}
     resolved_mode = slug_lookup.get(mode_raw)
 
-if resolved_mode:
-    st.session_state[SOURCE_SESSION_KEY] = resolved_mode
-elif SOURCE_SESSION_KEY not in st.session_state:
-    st.session_state[SOURCE_SESSION_KEY] = "Sample (offline)"
+if SOURCE_SESSION_KEY not in st.session_state:
+    st.session_state[SOURCE_SESSION_KEY] = resolved_mode or "Sample (offline)"
 
 year_bounds = sidebar_context.year_bounds
 
@@ -280,6 +285,7 @@ sidebar_state = render_sidebar(
     bea_key=APP_CONFIG.bea_api_key or "",
     census_key=APP_CONFIG.census_api_key or "",
     security_utils=SecurityUtils,
+    sample_year=int(observation_period(load_sample())),
 )
 
 data_mode = sidebar_state.data_mode
@@ -301,6 +307,15 @@ with st.sidebar.expander("Technical diagnostics", expanded=False):
         st.info("Rate limiting is running in in-process memory mode.")
 
     st.json(config_summary)
+
+upload_identity = (
+    hashlib.sha256(sidebar_state.uploaded_file.getvalue()).hexdigest()
+    if sidebar_state.uploaded_file is not None
+    else "none"
+)
+control_identity = f"{data_mode}:{sidebar_state.year_clean}:{upload_identity}"
+if invalidate_scenario_baseline(st.session_state, control_identity, key="baseline_controls"):
+    st.info("Baseline changed. Scenario cleared; configure and run a new scenario.")
 
 if sidebar_state.halt or sidebar_state.year_clean is None:
     st.stop()
@@ -375,6 +390,7 @@ try:
             config=service_config,
             sample_loader=load_sample,
             top_n=50,
+            search=st.session_state.get("search_query", "").strip(),
             normalization_options=APP_NORMALIZATION,
         )
     if data_mode == "Official snapshot (AIES 2023)":
@@ -398,22 +414,17 @@ if summary is None:
 df_display = summary.dataframe_full
 
 current_query_raw = st.session_state.get("search_query", "")
-current_query = SecurityUtils.sanitize_string_input(current_query_raw.strip())
-
-df_filtered = df_display.copy()
-if current_query:
-    query_lower = current_query.lower()
-    df_filtered = df_filtered[
-        df_filtered["industry_name"].str.lower().str.contains(query_lower)
-        | df_filtered["industry_code"].str.lower().str.contains(query_lower)
-    ]
+df_filtered = summary.dataframe_filtered
+effective_period = observation_period(df_display)
+if invalidate_scenario_baseline(st.session_state, dataframe_identity(df_display)):
+    st.info("Baseline changed. Scenario cleared; configure and run a new scenario.")
 
 render_page_header(
     title="U.S. Industry Cost Structure and Resilience Dashboard",
     subtitle="Explore industry cost structures using transparent ratio calculations and scenario sensitivity checks.",
     meta={
         "Source": data_mode,
-        "Year": str(year_clean),
+        "Year": effective_period,
         "Visible": f"{len(df_filtered):,} / {len(df_display):,}",
     },
     focus_mode=False,
@@ -544,20 +555,13 @@ with overview_tab:
 
 with explore_tab:
     st.subheader("Explore")
-    search_value = st.text_input(
+    st.text_input(
         "Search by name or code",
         value=current_query_raw,
         placeholder="Start typing to focus the table…",
         key="search_query",
     )
-    sanitized = SecurityUtils.sanitize_string_input(search_value.strip() if search_value else "")
-    df_view = df_display.copy()
-    if sanitized:
-        query_lower = sanitized.lower()
-        df_view = df_view[
-            df_view["industry_name"].str.lower().str.contains(query_lower)
-            | df_view["industry_code"].str.lower().str.contains(query_lower)
-        ]
+    df_view = df_filtered
 
     st.dataframe(
         _format_overview_table(
@@ -649,6 +653,7 @@ with compare_tab:
         st.plotly_chart(trend_fig, use_container_width=True)
         render_trend_data_table(trend_data)
 
+    st.caption("Dataset-wide benchmarks use all loaded rows, independent of dashboard search.")
     benchmark_stats = calculate_benchmark(df_display, selected_code)
     metric_cols = st.columns(3)
     with metric_cols[0]:
@@ -702,7 +707,7 @@ with compare_tab:
 
 
 def _last_float_query(key: str, default: float = 0.0) -> float:
-    values = query_params_initial.get(key)
+    values = hydration_params.get(key)
     if not values:
         return default
     try:
@@ -712,7 +717,7 @@ def _last_float_query(key: str, default: float = 0.0) -> float:
 
 
 scenario_defaults_selection = [
-    code for code in query_params_initial.get("scenario_codes", []) if code in code_lookup
+    code for code in hydration_params.get("scenario_codes", []) if code in code_lookup
 ]
 scenario_default_gross = _last_float_query("scenario_gross")
 scenario_default_materials = _last_float_query("scenario_materials")
@@ -915,7 +920,7 @@ share_mapping: dict[str, list[str]] = dict(
         search=st.session_state.get("search_query", "") or None,
         industry=selected_code if selected_code else None,
         compare=comparison_selection if comparison_selection else None,
-        year=str(year_clean) if year_clean is not None else None,
+        year=effective_period if effective_period.isdigit() else None,
         mode=data_mode_slug,
     )
 )
@@ -957,11 +962,13 @@ def _normalise(mapping: Mapping[str, list[str]]) -> tuple[tuple[str, tuple[str, 
 if _normalise(share_mapping) != _normalise(query_params_initial):
     _set_query_params(share_mapping)
 
-share_url = "?" + urlencode(
-    [(key, value) for key, values in share_mapping.items() for value in values]
-)
+share_url, is_absolute_link = build_share_value(share_mapping, getattr(st.context, "url", None))
 st.text_input(
-    "Shareable link",
+    "Shareable link" if is_absolute_link else "Share/query parameters",
     value=share_url,
-    help="Copy this URL to revisit the dashboard with the same filters and selections.",
+    help=(
+        "Copy this URL to revisit the dashboard with the same filters and selections."
+        if is_absolute_link
+        else "Append these query parameters to this application's URL to share filters and selections."
+    ),
 )

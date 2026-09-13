@@ -40,7 +40,8 @@ def test_sample_evaluation_tracks_full_and_filtered_pipeline_steps() -> None:
     assert full_lineage.source == "sample"
     assert full_lineage.source_kind.value == "bundled_sample"
     assert full_lineage.dataset_id == "sample_industries"
-    assert full_lineage.observation_period == "2023"
+    assert summary.dataframe_full["year"].unique().tolist() == [2021]
+    assert full_lineage.observation_period == filtered_lineage.observation_period == "2021"
     assert full_lineage.retrieval_mode.value == "bundled"
     assert full_lineage.is_sample is True
     assert full_lineage.is_official is False
