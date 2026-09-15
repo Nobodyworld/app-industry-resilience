@@ -162,6 +162,13 @@ def test_literal_search_punctuation_has_no_regex_matches(query: str) -> None:
     assert not app.exception
     assert any("No industries match" in warning.value for warning in app.warning)
     assert not any("Avg composite indicator" in text.value for text in app.markdown)
+    ratio_badge = next(
+        text.value
+        for text in app.markdown
+        if 'aria-label="Mean output-to-cost ratio"' in text.value
+    )
+    assert "nan" not in ratio_badge.lower()
+    assert 'signal-card__value">—</div>' in ratio_badge
     assert app.query_params["search"] == [query]
 
 

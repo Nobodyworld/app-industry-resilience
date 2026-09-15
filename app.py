@@ -11,7 +11,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from typing import Any, cast
+from typing import cast
 
 import pandas as pd
 import plotly.express as px
@@ -29,7 +29,7 @@ from src.application import (
     evaluate_idiot_index,
 )
 from src.application.idiot_index_service import observation_period
-from src.core import FilePolicy, SecurityUtils, get_config_summary
+from src.core import FilePolicy, SecurityUtils
 from src.interfaces.streamlit.bootstrap import (
     BootstrapError,
     get_bootstrap_state,
@@ -52,6 +52,7 @@ from src.interfaces.streamlit.components import (
     render_state_banner,
     render_trend_data_table,
 )
+from src.interfaces.streamlit.diagnostics import build_public_diagnostics
 from src.interfaces.streamlit.helpers import (
     build_comparison_table,
     build_health_band_distribution,
@@ -200,18 +201,16 @@ except Exception as exc:  # pragma: no cover - runtime snapshot safeguard
 
 try:
     bootstrap_state = get_bootstrap_state()
-except BootstrapError as exc:
-    st.sidebar.error(f"Configuration error: {exc}")
+except BootstrapError:
+    st.sidebar.error("Configuration is unavailable. Contact the application operator.")
     st.stop()
 
 CONFIG_VALIDATION = bootstrap_state.validation
 
 try:
     APP_CONFIG = bootstrap_state.ensure_ready()
-except BootstrapError as exc:
-    for err in bootstrap_state.errors:
-        st.sidebar.error(err)
-    st.sidebar.error(str(exc))
+except BootstrapError:
+    st.sidebar.error("Configuration is invalid. Contact the application operator.")
     st.stop()
 
 APP_NORMALIZATION = NormalizationOptions(
@@ -220,9 +219,8 @@ APP_NORMALIZATION = NormalizationOptions(
 
 OBSERVABILITY_HISTORY = load_snapshot_history(APP_CONFIG.observability_snapshot_dir, limit=12)
 bootstrap_warnings = list(bootstrap_state.warnings)
-config_summary = cast(dict[str, Any], get_config_summary(APP_CONFIG))
+config_summary = build_public_diagnostics(APP_CONFIG)
 handler_summary = SecurityUtils.rate_limit_handler_summary()
-config_summary.setdefault("rate_limit_backend", {})["handler"] = handler_summary
 
 query_params_initial = _get_query_params()
 hydration_params = query_params_initial if not st.session_state.get("url_hydrated") else {}
@@ -292,8 +290,7 @@ data_mode = sidebar_state.data_mode
 
 with st.sidebar.expander("Technical diagnostics", expanded=False):
     if bootstrap_warnings and data_mode in {"Census ASM (legacy)", "BEA (Economy-wide)"}:
-        for warning in bootstrap_warnings:
-            st.warning(warning)
+        st.warning("Provider configuration has warnings. Contact the application operator.")
 
     rate_backend = handler_summary.get("backend", "memory")
     if rate_backend == "redis":
@@ -895,13 +892,7 @@ with industry_momentum_tab:
     )
 
 with st.expander("Technical diagnostics", expanded=False):
-    render_observability_snapshots(
-        OBSERVABILITY_HISTORY,
-        empty_message=(
-            "Snapshots are persisted under "
-            f"`{APP_CONFIG.observability_snapshot_dir}`. Run `make observability-snapshot` to capture one."
-        ),
-    )
+    render_observability_snapshots(OBSERVABILITY_HISTORY)
 
 download_artifacts = prepare_download_artifacts(
     df_full=df_display,
