@@ -116,7 +116,9 @@ def test_public_config_is_an_explicit_allowlist():
     assert public["bea_key_set"] is True and public["census_key_set"] is True
     assert "private" not in json.dumps(public)
     # The internal configuration still retains the operator's infrastructure data.
-    assert str(config.cache.base_dir) == SENTINELS[0]
+    assert config.cache.base_dir == Path(SENTINELS[0]).resolve()
+    assert config.rate_limits.distributed.host == SENTINELS[3]
+    assert config.rate_limits.distributed.key_prefix == SENTINELS[4]
 
 
 @pytest.mark.parametrize("value", SENTINELS)

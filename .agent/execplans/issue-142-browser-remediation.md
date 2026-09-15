@@ -41,6 +41,8 @@ The empty observability message also interpolated its storage directory. Snapsho
 
 Missing snapshot counts require a consistent numeric type before Plotly wide-form charting. Windows validation requires task-local temporary and tool-cache directories, including an explicit pip-audit cache directory. Browser download-event waits were delayed by native file-save dialogs; file completion must be observed separately from successful HTTP responses.
 
+The first hosted CI run found a Windows-specific assertion in the test fixture's internal path-preservation check. Linux correctly resolves a Windows-looking path relative to the checkout. Compare against `Path(sentinel).resolve()` on both platforms while continuing to assert that neither Windows nor POSIX sentinels reach rendered diagnostics. Docker Smoke passed on that intermediate commit; both hosted gates must be checked again after this test correction.
+
 ## Decision Log
 
 Keep `get_config_summary()` and stored snapshot summaries available to operators. Add a dedicated presentation module instead of a denylist that could miss future fields. Numeric BEA versions can be shown; arbitrary version strings fall back to a fixed label. These choices keep the public output stable as internal configuration grows. Date: 2026-09-15.
