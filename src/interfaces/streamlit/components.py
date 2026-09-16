@@ -14,12 +14,8 @@ import streamlit as st
 from src.core import HealthSummary
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 
-from .helpers import (
-    DownloadArtifact,
-    extract_health_badge,
-    snapshot_history_table,
-    snapshot_timeline_frame,
-)
+from .diagnostics import build_public_snapshot_history
+from .helpers import DownloadArtifact, extract_health_badge
 from .provenance import build_provenance_tables
 
 SOURCE_SESSION_KEY = "Source"
@@ -227,6 +223,7 @@ def render_sidebar(
     bea_key: str,
     census_key: str,
     security_utils,
+    sample_year: int | None = None,
 ) -> SidebarState:
     """Render sidebar inputs and validations, returning state for the caller."""
 
@@ -260,6 +257,15 @@ def render_sidebar(
 
     min_year, max_year = year_bounds
     reference_default = 2023 if data_mode == "Official snapshot (AIES 2023)" else default_year
+    fixed_year = (
+        2023
+        if data_mode == "Official snapshot (AIES 2023)"
+        else (sample_year if data_mode == "Sample (offline)" else None)
+    )
+    if fixed_year is not None:
+        reference_default = fixed_year
+        st.session_state["reference_year"] = fixed_year
+        min_year, max_year = min(min_year, fixed_year), max(max_year, fixed_year)
     year_input = int(
         st.sidebar.number_input(
             "Reference year",
@@ -267,7 +273,8 @@ def render_sidebar(
             max_value=max_year,
             value=reference_default,
             step=1,
-            disabled=data_mode == "Official snapshot (AIES 2023)",
+            disabled=data_mode
+            in {"Official snapshot (AIES 2023)", "Sample (offline)", "Upload CSV"},
             key="reference_year",
             help="Select the reporting year for sources that support multiple years.",
         )
@@ -439,7 +446,7 @@ def render_signal_bar(df: pd.DataFrame, *, health_summary: HealthSummary | None 
         },
         {
             "label": "Mean output-to-cost ratio",
-            "value": f"{avg_idiot_index:.2f}" if avg_idiot_index is not None else "—",
+            "value": f"{avg_idiot_index:.2f}" if pd.notna(avg_idiot_index) else "—",
             "hint": "gross output ÷ available cost input",
         },
     ]
@@ -781,70 +788,43 @@ def render_download_panel(artifacts: Sequence[DownloadArtifact]) -> None:
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def render_observability_snapshots(
-    history: Sequence[Mapping[str, object]], *, empty_message: str | None = None
-) -> None:
-    """Render snapshot history and trend visualisations."""
+def render_observability_snapshots(history: Sequence[Mapping[str, object]]) -> None:
+    """Render only public-safe snapshot counts and status, never operator payloads."""
 
     st.subheader("Observability snapshots")
     if not history:
-        st.info(
-            empty_message
-            or "No snapshots recorded yet. Run `make observability-snapshot` after key deployments to capture state."
-        )
+        st.info("No observability snapshots are available yet.")
         return
 
-    latest: Mapping[str, object] = history[0]
-    events_raw = latest.get("events", {})
-    latest_events: Mapping[str, object]
-    if isinstance(events_raw, Mapping):
-        latest_events = events_raw
-    else:
-        latest_events = {}
+    public_history = build_public_snapshot_history(history)
+    latest = public_history[0]
     cols = st.columns(3)
     captured_at = latest.get("captured_at")
-    captured_label = (
-        captured_at.strftime("%Y-%m-%d %H:%M:%SZ")
-        if hasattr(captured_at, "strftime")
-        else str(captured_at)
-    )
+    captured_label = captured_at.strftime("%Y-%m-%d %H:%M:%SZ") if captured_at is not None else "—"
     with cols[0]:
         st.metric("Most recent", captured_label)
-        metadata_raw = latest.get("metadata", {})
-        label = metadata_raw.get("label") if isinstance(metadata_raw, Mapping) else None
-        if label:
-            st.caption(f"Labelled: {label}")
     with cols[1]:
-        events_captured = latest.get("event_total", 0)
+        events_captured = latest["event_total"]
         st.metric("Events captured", cast(MetricValue, events_captured))
     with cols[2]:
-        errors_observed = latest_events.get("error", 0)
+        errors_observed = latest["errors"]
         st.metric("Errors observed", cast(MetricValue, errors_observed))
 
-    replication = latest.get("replication")
-    if isinstance(replication, Mapping):
-        status_raw = replication.get("status")
-        backend_raw = replication.get("backend")
-        destination = replication.get("path")
-        error_message = replication.get("error")
-        status = str(status_raw).strip().lower() if status_raw else ""
-        backend = str(backend_raw).strip() if backend_raw else "unspecified backend"
-        message = f"Latest replication {status or 'status unknown'} via **{backend}**."
-        if destination:
-            message += f" Destination: `{destination}`."
-        if error_message:
-            message += f" Error: {error_message}."
-        if status == "success":
-            st.success(message)
-        elif status == "error":
-            st.error(message)
-        else:
-            st.info(message)
+    status = latest["replication_status"]
+    if status == "success":
+        st.success("Latest snapshot replication succeeded.")
+    elif status == "error":
+        st.error("Latest snapshot replication failed. Contact the application operator.")
+    elif status == "unknown":
+        st.info("Latest snapshot replication status is unknown.")
     else:
         st.caption("Remote replication disabled or no replication telemetry captured yet.")
 
-    timeline = snapshot_timeline_frame(history)
+    timeline = pd.DataFrame(public_history)[["captured_at", "event_total", "errors", "success"]]
+    timeline = timeline.dropna(subset=["captured_at"])
     if not timeline.empty:
+        count_columns = ["event_total", "errors", "success"]
+        timeline[count_columns] = timeline[count_columns].astype(float)
         timeline_chart = px.line(
             timeline,
             x="captured_at",
@@ -853,14 +833,26 @@ def render_observability_snapshots(
         )
         st.plotly_chart(timeline_chart, use_container_width=True)
 
-    table = snapshot_history_table(history)
+    table = (
+        pd.DataFrame(public_history)
+        .drop(columns=["has_error"])
+        .rename(
+            columns={
+                "captured_at": "Captured",
+                "event_total": "Events",
+                "errors": "Errors",
+                "success": "Success",
+                "replication_status": "Replication",
+            }
+        )
+    )
     if not table.empty:
         st.dataframe(table, use_container_width=True, hide_index=True)
 
-    last_error = latest.get("last_error")
-    if last_error:
-        st.markdown("#### Most recent error event")
-        st.json(last_error)
+    if latest["has_error"]:
+        st.warning(
+            "A recent error was recorded. Details are available to the application operator."
+        )
 
 
 def build_data_story(

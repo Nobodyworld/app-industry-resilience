@@ -354,6 +354,16 @@ def _evaluate_idiot_index(
     )
 
 
+def observation_period(frame: pd.DataFrame) -> str:
+    """Describe the observations actually present, independently of a requested year."""
+    if "year" not in frame:
+        return "unknown"
+    years = pd.to_numeric(frame["year"], errors="coerce").dropna().astype(int).unique()
+    if len(years) == 1:
+        return str(years[0])
+    return "mixed" if len(years) else "unknown"
+
+
 def _ensure_source_lineage(
     frame: pd.DataFrame,
     *,
@@ -371,7 +381,7 @@ def _ensure_source_lineage(
         source="sample",
         source_kind="bundled_sample",
         dataset_id="sample_industries",
-        observation_period=year,
+        observation_period=observation_period(frame),
         retrieval_mode="bundled",
         is_sample=True,
         is_official=False,
@@ -471,10 +481,12 @@ def _get_default_census_fetcher() -> CensusFetcher:
 def _filter_dataframe(df: pd.DataFrame, search: str | None) -> pd.DataFrame:
     if not search:
         return df.copy()
-    lowered = search.lower()
-    mask = df["industry_name"].str.lower().str.contains(lowered) | df[
-        "industry_code"
-    ].str.lower().str.contains(lowered)
+    mask = pd.Series(False, index=df.index)
+    for column in ("industry_name", "industry_code"):
+        if column in df:
+            mask |= (
+                df[column].astype("string").str.contains(search, case=False, regex=False, na=False)
+            )
     return df.loc[mask].copy()
 
 

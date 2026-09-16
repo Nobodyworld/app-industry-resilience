@@ -218,3 +218,25 @@ def test_evaluate_requires_positive_topn() -> None:
 
     with pytest.raises(ValueError):
         service.evaluate(year=2021, source=DataSource.SAMPLE, top_n=0, sample_loader=_sample_frame)
+
+
+@pytest.mark.parametrize("query", ["[", "(", ".", "*", "A+B", "?"])
+def test_search_is_literal_and_missing_values_are_safe(query: str) -> None:
+    frame = _sample_frame()
+    frame.loc[0, "industry_name"] = f"Literal {query} industry"
+    frame.loc[1, "industry_name"] = None
+    frame.loc[1, "industry_code"] = None
+    summary = evaluate_idiot_index(
+        year=2021, source=DataSource.SAMPLE, dataframe=frame, search=query
+    )
+    assert summary.dataframe_filtered["industry_name"].tolist() == [f"Literal {query} industry"]
+    assert summary.average_idiot_index == summary.dataframe_filtered["idiot_index"].mean()
+    assert summary.health_summary_filtered is not None
+    assert summary.health_summary_filtered.overall.industries == 1
+
+
+def test_sample_provenance_uses_loaded_year_not_requested_year() -> None:
+    summary = evaluate_idiot_index(year=2025, source=DataSource.SAMPLE, sample_loader=_sample_frame)
+    lineage = lineage_from_dataframe(summary.dataframe_full)
+    assert lineage is not None
+    assert str(lineage.observation_period) == "2021"

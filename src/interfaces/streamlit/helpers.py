@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import logging
@@ -9,6 +10,7 @@ from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import pandas as pd
 
@@ -572,3 +574,42 @@ def encode_query_params(**state: str | Sequence[str] | None) -> Mapping[str, lis
         else:
             encoded[key] = [str(item) for item in value]
     return encoded
+
+
+def invalidate_scenario_baseline(
+    state: MutableMapping[str, Any], baseline: str, *, key: str = "baseline_identity"
+) -> bool:
+    """Clear scenario inputs and committed results when their baseline changes."""
+    changed = key in state and state[key] != baseline
+    had_commit = bool(state.get("scenario_committed"))
+    if changed:
+        for name in list(state):
+            if name.startswith("scenario_"):
+                del state[name]
+    state[key] = baseline
+    return changed and had_commit
+
+
+def dataframe_identity(frame: pd.DataFrame) -> str:
+    """Fingerprint baseline values and schema, excluding volatile lineage timestamps."""
+    payload = frame.to_json(orient="split", date_format="iso")
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def build_share_value(params: Mapping[str, list[str]], runtime_url: str | None) -> tuple[str, bool]:
+    """Return a deterministic absolute HTTP(S) link or accurately scoped query string."""
+    query = urlencode([(key, value) for key in sorted(params) for value in params[key]])
+    if runtime_url and not any(ord(char) <= 32 or char == "\\" for char in runtime_url):
+        try:
+            parts = urlsplit(runtime_url)
+            if (
+                parts.scheme in {"http", "https"}
+                and parts.hostname
+                and parts.username is None
+                and parts.password is None
+            ):
+                _ = parts.port
+                return urlunsplit((parts.scheme, parts.netloc, parts.path, query, "")), True
+        except ValueError:
+            pass
+    return "?" + query, False
